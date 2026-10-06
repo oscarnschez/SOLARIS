@@ -1142,7 +1142,7 @@ return true;
 },
 };
 const ASSET_MANIFEST = {"music": {"webm": "assets/audio/metamorphosis.webm", "mp3": "assets/audio/metamorphosis.mp3"}, "bodyMeshes": {"fobos": {"url": "assets/models/moons/fobos.bin", "k": 1.26255}, "deimos": {"url": "assets/models/moons/deimos.bin", "k": 1.37497}, "haumea": {"url": "assets/models/dwarfs/haumea.bin", "k": 1.44255}}};
-const SOLARIS_BUILD = '2026.10.06-0532-web';
+const SOLARIS_BUILD = '2026.10.06-0609-web';
 console.info('SOLARIS · versión ' + SOLARIS_BUILD);
 const Assets = {
 cache: new Map(), busyN: new Map(),
@@ -1554,6 +1554,55 @@ ringShadow() { return this.g().shadows >= 2; },
 flash() { return Settings.state.accessibility.reduceFlashes ? 0.4 : 1; },
 distPx() { return { low: 2.5, medium: 1.2, high: 0.6, max: 0.3 }[this.g().distance] || 0.6; },
 };
+const EVENT_CATS = { exploracion: 'Exploración espacial', astronomia: 'Fenómenos astronómicos' };
+const EVENTS = [
+{ date: '1957-10-04', cat: 'exploracion', title: 'Lanzamiento del Sputnik 1', desc: 'Primer satélite artificial puesto en órbita alrededor de la Tierra.', obj: 'tierra', mission: 'Sputnik 1' },
+{ date: '1961-04-12', cat: 'exploracion', title: 'Primer vuelo espacial tripulado', desc: 'Yuri Gagarin completa una órbita alrededor de la Tierra a bordo de la Vostok 1.', obj: 'tierra', mission: 'Vostok 1' },
+{ date: '1969-07-20', cat: 'exploracion', title: 'Primer alunizaje tripulado', desc: 'El módulo lunar del Apolo 11 se posa en el mar de la Tranquilidad.', obj: 'luna', mission: 'Apolo 11' },
+{ date: '1976-07-20', cat: 'exploracion', title: 'Viking 1 aterriza en Marte', desc: 'Primer aterrizaje plenamente exitoso en la superficie marciana con envío prolongado de datos.', obj: 'marte', mission: 'Viking 1' },
+{ date: '1977-08-20', cat: 'exploracion', title: 'Lanzamiento de la Voyager 2', desc: 'Inicio del «Gran Tour» por los planetas exteriores.', obj: 'voyager2', mission: 'Voyager 2' },
+{ date: '1977-09-05', cat: 'exploracion', title: 'Lanzamiento de la Voyager 1', desc: 'La sonda que se convertiría en el objeto humano más lejano.', obj: 'voyager1', mission: 'Voyager 1' },
+{ date: '1979-03-05', cat: 'exploracion', title: 'Voyager 1 sobrevuela Júpiter', desc: 'Descubre los volcanes activos de Ío.', obj: 'jupiter', mission: 'Voyager 1' },
+{ date: '1979-07-09', cat: 'exploracion', title: 'Voyager 2 sobrevuela Júpiter', desc: 'Segundo sobrevuelo del sistema joviano por el programa Voyager.', obj: 'jupiter', mission: 'Voyager 2' },
+{ date: '1980-11-12', cat: 'exploracion', title: 'Voyager 1 sobrevuela Saturno', desc: 'Incluye un sobrevuelo cercano de Titán.', obj: 'saturno', mission: 'Voyager 1' },
+{ date: '1981-08-25', cat: 'exploracion', title: 'Voyager 2 sobrevuela Saturno', desc: 'La sonda continúa después hacia Urano.', obj: 'saturno', mission: 'Voyager 2' },
+{ date: '1986-01-24', cat: 'exploracion', title: 'Voyager 2 sobrevuela Urano', desc: 'Única visita de una nave a Urano hasta la fecha.', obj: 'urano', mission: 'Voyager 2' },
+{ date: '1989-08-25', cat: 'exploracion', title: 'Voyager 2 sobrevuela Neptuno', desc: 'Única visita de una nave a Neptuno; también estudia Tritón.', obj: 'neptuno', mission: 'Voyager 2' },
+{ date: '1990-04-24', cat: 'exploracion', title: 'Lanzamiento del telescopio Hubble', desc: 'Telescopio espacial en órbita baja terrestre.', obj: 'hubble', mission: 'Hubble' },
+{ date: '1995-12-02', cat: 'exploracion', title: 'Lanzamiento de SOHO', desc: 'Observatorio solar situado cerca del punto de Lagrange L1.', obj: 'soho', mission: 'SOHO' },
+{ date: '1998-11-20', cat: 'exploracion', title: 'Primer módulo de la Estación Espacial Internacional', desc: 'Lanzamiento del módulo Zariá, inicio del ensamblaje de la EEI.', obj: 'iss', mission: 'EEI' },
+{ date: '2004-07-01', cat: 'exploracion', title: 'Cassini llega a Saturno', desc: 'Inicio de trece años de estudio del sistema de Saturno.', obj: 'saturno', mission: 'Cassini-Huygens' },
+{ date: '2005-01-14', cat: 'exploracion', title: 'Huygens aterriza en Titán', desc: 'Primer aterrizaje en un cuerpo del Sistema Solar exterior.', obj: 'titan', mission: 'Cassini-Huygens' },
+{ date: '2006-01-19', cat: 'exploracion', title: 'Lanzamiento de New Horizons', desc: 'Rumbo a Plutón y al cinturón de Kuiper.', obj: 'newhorizons', mission: 'New Horizons' },
+{ date: '2011-07-16', cat: 'exploracion', title: 'Dawn entra en órbita de Vesta', desc: 'Primera nave en orbitar un cuerpo del cinturón principal.', obj: 'vesta', mission: 'Dawn' },
+{ date: '2012-08-06', cat: 'exploracion', title: 'Curiosity aterriza en Marte', desc: 'El vehículo explorador llega al cráter Gale.', obj: 'marte', mission: 'Mars Science Laboratory' },
+{ date: '2012-08-25', cat: 'exploracion', title: 'Voyager 1 cruza la heliopausa', desc: 'Primera nave en entrar en el espacio interestelar.', obj: 'voyager1', mission: 'Voyager 1' },
+{ date: '2015-03-06', cat: 'exploracion', title: 'Dawn entra en órbita de Ceres', desc: 'Primera nave en orbitar un planeta enano.', obj: 'ceres', mission: 'Dawn' },
+{ date: '2015-07-14', cat: 'exploracion', title: 'New Horizons sobrevuela Plutón', desc: 'Primeras imágenes detalladas de Plutón y Caronte.', obj: 'pluton', mission: 'New Horizons' },
+{ date: '2016-07-05', cat: 'exploracion', title: 'Juno entra en órbita de Júpiter', desc: 'Estudio del interior, la atmósfera y la magnetosfera de Júpiter.', obj: 'jupiter', mission: 'Juno' },
+{ date: '2017-09-15', cat: 'exploracion', title: 'Fin de la misión Cassini', desc: 'La sonda se sumerge de forma controlada en la atmósfera de Saturno.', obj: 'saturno', mission: 'Cassini-Huygens' },
+{ date: '2018-08-12', cat: 'exploracion', title: 'Lanzamiento de la sonda solar Parker', desc: 'Misión para estudiar la corona solar desde muy cerca.', obj: 'parker', mission: 'Parker Solar Probe' },
+{ date: '2018-11-05', cat: 'exploracion', title: 'Voyager 2 cruza la heliopausa', desc: 'Segunda nave en alcanzar el espacio interestelar.', obj: 'voyager2', mission: 'Voyager 2' },
+{ date: '2019-01-01', cat: 'exploracion', title: 'New Horizons sobrevuela Arrokoth', desc: 'El objeto más lejano visitado por una nave hasta entonces.', obj: 'arrokoth', mission: 'New Horizons' },
+{ date: '2020-12-05', cat: 'exploracion', title: 'Hayabusa2 entrega muestras de Ryugu', desc: 'La cápsula con material del asteroide aterriza en Australia.', obj: 'ryugu', mission: 'Hayabusa2' },
+{ date: '2021-02-18', cat: 'exploracion', title: 'Perseverance aterriza en Marte', desc: 'El vehículo explorador llega al cráter Jezero.', obj: 'marte', mission: 'Mars 2020' },
+{ date: '2021-04-29', cat: 'exploracion', title: 'Lanzamiento del módulo Tianhe', desc: 'Módulo central de la estación espacial china Tiangong.', obj: 'tiangong', mission: 'Tiangong' },
+{ date: '2021-12-25', cat: 'exploracion', title: 'Lanzamiento del telescopio James Webb', desc: 'Observatorio infrarrojo situado cerca del punto L2.', obj: 'jwst', mission: 'JWST' },
+{ date: '2023-07-01', cat: 'exploracion', title: 'Lanzamiento de Euclid', desc: 'Telescopio para cartografiar la materia y la energía oscuras.', obj: 'euclid', mission: 'Euclid' },
+{ date: '2023-09-24', cat: 'exploracion', title: 'OSIRIS-REx entrega muestras de Bennu', desc: 'La cápsula con material del asteroide aterriza en Utah.', obj: 'bennu', mission: 'OSIRIS-REx' },
+{ date: '2024-12-24', cat: 'exploracion', title: 'Parker: máximo acercamiento al Sol', desc: 'La sonda pasa a unos 6.1 millones de km de la superficie solar.', obj: 'parker', mission: 'Parker Solar Probe' },
+{ date: '1986-02-09', cat: 'astronomia', title: 'Perihelio del cometa Halley', desc: 'Máximo acercamiento al Sol en su último paso.', obj: 'halley' },
+{ date: '1997-04-01', cat: 'astronomia', title: 'Perihelio del cometa Hale-Bopp', desc: 'Uno de los cometas más brillantes del siglo XX.', obj: 'halebopp' },
+{ date: '2012-06-06', cat: 'astronomia', title: 'Tránsito de Venus', desc: 'Venus pasa por delante del disco solar visto desde la Tierra; el siguiente será en diciembre de 2117.', obj: 'venus' },
+{ date: '2019-11-11', cat: 'astronomia', title: 'Tránsito de Mercurio', desc: 'Mercurio cruza el disco solar visto desde la Tierra.', obj: 'mercurio' },
+{ date: '2024-04-08', cat: 'astronomia', title: 'Eclipse total de Sol', desc: 'Visible como total desde México, Estados Unidos y Canadá.', obj: 'luna' },
+{ date: '2026-08-12', cat: 'astronomia', title: 'Eclipse total de Sol', desc: 'Franja de totalidad sobre Groenlandia, Islandia y España.', obj: 'luna' },
+{ date: '2027-08-02', cat: 'astronomia', title: 'Eclipse total de Sol', desc: 'Franja de totalidad sobre el sur de España, el norte de África y Egipto.', obj: 'luna', pred: true },
+{ date: '2029-04-13', cat: 'astronomia', title: 'Máximo acercamiento de Apofis', desc: 'El asteroide pasará a unos 32,000 km de la superficie terrestre, sin riesgo de impacto.', obj: 'apofis', pred: true },
+{ date: '2032-11-13', cat: 'astronomia', title: 'Tránsito de Mercurio', desc: 'Próximo tránsito de Mercurio por delante del Sol.', obj: 'mercurio', pred: true },
+{ date: '2061-07-28', cat: 'astronomia', title: 'Próximo perihelio del cometa Halley', desc: 'Fecha prevista de su regreso al Sistema Solar interior.', obj: 'halley', pred: true },
+{ date: '2117-12-11', cat: 'astronomia', title: 'Tránsito de Venus', desc: 'Próximo tránsito de Venus por delante del Sol.', obj: 'venus', pred: true },
+];
 const OBLIQ = 23.4392911 * DEG;
 const GAUSS_K_DEG = 0.9856076686; // movimiento medio (°/día) para a = 1 UA
 const Astro = {
@@ -4580,10 +4629,7 @@ $('#t-now').addEventListener('click', () => { Time.goLive(); this.refreshTime();
 const pick = $('#t-pick');
 pick.addEventListener('change', () => {
 if (!pick.value) return;
-const jd = Astro.jdFromISO(pick.value) + 0.5;
-Time.jd = jd; Time.live = false; this.refreshTime();
-const y = +pick.value.slice(0, 4);
-this.toast(y < 1800 || y > 2050 ? 'Fuera de 1800–2050 la precisión de las posiciones disminuye.' : 'Posiciones aproximadas para el ' + this.dateStr(jd));
+this.setSimDate(Astro.jdFromISO(pick.value) + 0.5);          // único punto de cambio de fecha
 });
 $('#t-cal').innerHTML = ICON.calendar;
 $('#t-cal').addEventListener('click', () => { try { pick.showPicker(); } catch (e) { pick.focus(); } });
@@ -4609,6 +4655,7 @@ tickTime() {
 const d = Astro.dateFromJD(Time.jd);
 if (isNaN(d.getTime())) return;
 $('#t-date').textContent = d.toLocaleDateString(I18N.loc(), { day: 'numeric', month: 'short', year: 'numeric' });
+const nowT = performance.now(); if (!this._tlT || nowT - this._tlT > 250) { this._tlT = nowT; TL.refresh(); }   // indicador de simulación (4 veces por segundo)
 const live = Time.live && !Time.paused && Time.idx === 0;
 $('#t-clock').textContent = d.toLocaleTimeString(I18N.loc(), { hour: '2-digit', minute: '2-digit', hour12: false }) + (live ? ' · en vivo' : ' hora local');
 $('#t-clock').dataset.tip = d.toLocaleString(I18N.loc(), { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'UTC', hour12: false }) + ' UTC';
@@ -4715,6 +4762,7 @@ P.innerHTML = `
 <button class="pill" id="info-travel">${ICON.travel}<span>Viajar</span></button>
 <button class="pill" id="info-follow">${ICON.follow}<span>Seguir</span></button>
 <button class="pill" id="info-close2">${ICON.zoomin}<span>Acercar</span></button>
+${Compare.pillHTML(rb)}
 </div>
 ${rb.isCraft && rb.def.orbit.t === 'lpoint' ? `<p class="rel">En el punto L${rb.def.orbit.L} Sol-Tierra, cerca de <button class="link" data-go="${rb.parent.id}">${esc(rb.parent.def.name)}</button></p>` : ''}
 ${rb.parent && !rb.parent.isSun && !(rb.isCraft && rb.def.orbit.t === 'lpoint') ? `<p class="rel">Orbita a <button class="link" data-go="${rb.parent.id}">${esc(rb.parent.def.name)}</button></p>` : ''}
@@ -6011,6 +6059,262 @@ this.capT = setTimeout(() => cap.classList.remove('on'), 6500);
 },
 hideCineCaption() { clearTimeout(this.capT); $('#cine-cap').classList.remove('on'); },
 });
+const JD_UNIX = 2440587.5;
+const jdToDate = jd => new Date((jd - JD_UNIX) * 86400000);
+const dateToJD = d => d.getTime() / 86400000 + JD_UNIX;
+ICON.herramientas = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16M7 16V9M12 16V5M17 16v-4"/></svg>';
+UI.SECTIONS.splice(UI.SECTIONS.findIndex(s => s[0] === 'capas'), 0, ['herramientas', 'Herramientas']);
+Object.assign(UI, {
+setSimDate(jd, opts) {
+opts = opts || {};
+Time.jd = jd; Time.live = false;
+if (opts.pause) Time.paused = true;
+this.refreshTime();
+if (opts.toast !== false) {
+const y = jdToDate(jd).getUTCFullYear();
+this.toast(y < 1800 || y > 2050 ? 'Fuera de 1800–2050 la precisión de las posiciones disminuye.' : 'Posiciones aproximadas para el ' + this.dateStr(jd));
+}
+TL.refresh();
+},
+isSimulatedDate() { return !Time.live || Math.abs(Time.jd - dateToJD(new Date())) > 0.5; },
+});
+const _sectionHTML = UI.sectionHTML;
+UI.sectionHTML = function (id) {
+if (id !== 'herramientas') return _sectionHTML.call(this, id);
+const row = (t, ico, title, sub) => `<button class="cta-row" data-tool="${t}">${ico}<span><b>${title}</b><small>${sub}</small></span></button>`;
+return `<p class="lead">Herramientas para comparar, medir y viajar en el tiempo. Todas usan la misma fecha y los mismos datos de la simulación.</p>
+<div class="list">${row('compare', ICON.herramientas, 'Comparar cuerpos celestes', 'Hasta 4 objetos: datos, tamaño real y gravedad')}
+${row('timeline', ICON.calendar, 'Línea del tiempo', 'Recorre fechas y eventos de la exploración espacial')}
+${(UI.TOOL_ROWS || []).map(r => row(...r)).join('')}</div>`;
+};
+document.addEventListener('click', e => {
+const t = e.target.closest('[data-tool]'); if (!t) return;
+({ compare: () => Compare.open(), timeline: () => TL.toggle(true) })[t.dataset.tool]?.() ?? (UI.TOOL_ACTIONS || {})[t.dataset.tool]?.();
+});
+const Compare = {
+list: [], view: 'tabla', MAX: 4,
+can(rb) { return rb && !rb.isCraft && ['star', 'planet', 'dwarf', 'tno', 'moon', 'asteroid', 'comet'].includes(rb.def.type); },
+has(id) { return this.list.includes(id); },
+add(id) {
+const rb = World.byId[id]; if (!this.can(rb) || this.has(id)) return;
+if (this.list.length >= this.MAX) { UI.toast('El comparador admite hasta ' + this.MAX + ' objetos.'); return; }
+this.list.push(id); this.changed();
+if (this.list.length === 1) UI.toast(rb.def.name + ' añadido. Añade otro objeto desde su ficha o desde el comparador.');
+},
+remove(id) { this.list = this.list.filter(x => x !== id); this.changed(); },
+clear() { this.list = []; this.changed(); },
+changed() {
+this.paintTray();
+if (UI.sel) { const b = $('#info-cmp'); if (b) b.outerHTML = this.pillHTML(UI.sel); }
+if (this.isOpen()) this.render();
+},
+pillHTML(rb) {
+if (!this.can(rb)) return '';
+const on = this.has(rb.id);
+return `<button class="pill${on ? ' on' : ''}" id="info-cmp" data-cmp="${rb.id}" aria-pressed="${on}">${on ? '✓ En comparación' : '+ Comparar'}</button>`;
+},
+paintTray() {
+let t = $('#cmp-tray');
+if (!t) { t = document.createElement('div'); t.id = 'cmp-tray'; t.className = 'ui'; $('#app').appendChild(t); }
+const n = this.list.length; t.classList.toggle('on', n > 0 && !this.isOpen());
+t.innerHTML = n ? `<span class="ct-dots">${this.list.map(id => `<i class="dot" style="--c:${BODY[id].color}"></i>`).join('')}</span><span>${this.list.map(id => esc(BODY[id].short || BODY[id].name)).join(' · ')}</span>
+<button class="cta" data-cmp-open>${n >= 2 ? 'Comparar (' + n + ')' : 'Añade otro objeto'}</button><button class="icon-btn" data-cmp-clear aria-label="Vaciar comparación">&times;</button>` : '';
+},
+isOpen() { const p = $('#cmp'); return !!p && p.classList.contains('open'); },
+open() {
+let p = $('#cmp');
+if (!p) {
+p = document.createElement('section'); p.id = 'cmp'; p.className = 'tool-panel ui'; p.setAttribute('role', 'dialog'); p.setAttribute('aria-labelledby', 'cmp-title');
+$('#app').appendChild(p);
+p.addEventListener('click', e => {
+const a = e.target.closest('[data-c]'); if (!a) return; const v = a.dataset.c, id = a.dataset.id;
+if (v === 'close') this.close(); else if (v === 'remove') this.remove(id);
+else if (v === 'locate') { this.close(); UI.select(World.byId[id], { fly: true }); }
+else if (v === 'view') { this.view = a.dataset.v; this.render(); }
+else if (v === 'add') { this.add(id); $('#cmp-q').value = ''; }
+});
+p.addEventListener('input', e => { if (e.target.id === 'cmp-q') this.renderHits(); });
+addEventListener('keydown', e => { if (e.key === 'Escape' && this.isOpen()) { e.stopImmediatePropagation(); this.close(); } }, true);
+}
+UI.openSection(null);
+p.classList.add('open'); this.render(); this.paintTray();
+setTimeout(() => { const q = $('#cmp-q'); if (q && this.list.length < 2) q.focus(); }, 60);
+},
+close() { const p = $('#cmp'); if (p) p.classList.remove('open'); this.paintTray(); },
+ROWS: [
+['Tipo', null], ['Diámetro', /^Diámetro medio/, 'diam'], ['Radio', /^Radio medio/], ['Masa', /^Masa$/, 'mass'],
+['Gravedad superficial', /^Gravedad superficial/, 'grav'], ['Temperatura', /^Temperatura aproximada/], ['Duración del día', /^Duración de un día/],
+['Periodo orbital', /^(Duración de un año|Periodo orbital)/, 'per'], ['Distancia media al Sol', /^Distancia media al Sol/, 'au'],
+['Velocidad orbital', /^Velocidad orbital media/, 'v'], ['Número de lunas', /^Número de lunas/], ['Densidad', /^Densidad media/, 'dens'],
+['Composición', /^Composición/], ['Atmósfera', /^Tipo de atmósfera/],
+],
+num(rb, k) {
+const d = rb.def, i = d.info;
+if (k === 'diam') return d.R ? 2 * d.R : null;
+if (k === 'mass') return d.mass || null;
+if (k === 'grav') return this.grav(rb);
+if (k === 'dens') return d.mass && d.R ? d.mass * 1000 / (4 / 3 * Math.PI * Math.pow(d.R * 1e5, 3)) : null;
+if (k === 'per') { const P = Info.periodDays(rb); return P ? P.v : null; }
+if (k === 'v') return typeof i.v === 'number' ? i.v : null;
+if (k === 'au') { const f = this.field(rb, /^Distancia media al Sol/); const m = f && String(f.val).match(/([\d.,]+)\s*UA/); return m ? parseFloat(m[1].replace(/,/g, '')) : null; }
+return null;
+},
+grav(rb) { const d = rb.def; return d.info.grav != null ? d.info.grav : d.mass && d.R ? G_CONST * d.mass / Math.pow(d.R * 1000, 2) : null; },
+field(rb, re) { const F = rb._cmpF || (rb._cmpF = Info.fields(rb)); return [...F.phys, ...F.orb, ...F.comp].find(f => re.test(f.label) && f.val != null); },
+bars(vals) {
+const ok = vals.filter(v => v != null && v > 0); if (ok.length < 2) return null;
+const mx = Math.max(...ok), mn = Math.min(...ok), log = mx / mn > 40;
+return { log, k: v => v == null || v <= 0 ? 0 : log ? Math.max(0.03, (Math.log10(v) - Math.log10(mn) + 0.3) / (Math.log10(mx) - Math.log10(mn) + 0.3)) : Math.max(0.03, v / mx) };
+},
+render() {
+const p = $('#cmp'); if (!p) return;
+const rbs = this.list.map(id => World.byId[id]).filter(Boolean); rbs.forEach(rb => { rb._cmpF = null; });
+const tabs = [['tabla', 'Datos'], ['tamano', 'Comparar tamaño'], ['gravedad', 'Gravedad']];
+p.innerHTML = `
+<header class="tp-head"><div><span class="tp-kicker">Herramienta</span><h2 id="cmp-title">Comparar cuerpos celestes</h2></div><button class="icon-btn" data-c="close" aria-label="Cerrar">&times;</button></header>
+<div class="cmp-cards">${rbs.map(rb => `<div class="cmp-card"><i class="dot" style="--c:${rb.def.color}"></i><b>${esc(rb.def.name)}</b><small>${esc(TYPE_LABEL[rb.def.type])}${rb.def.type === 'moon' && rb.parent ? ' de ' + esc(rb.parent.def.name) : ''}</small>
+<span class="cmp-card-act"><button class="txt-btn" data-c="locate" data-id="${rb.id}">Localizar</button><button class="txt-btn" data-c="remove" data-id="${rb.id}" aria-label="Quitar ${esc(rb.def.name)}">Quitar</button></span></div>`).join('')}
+${rbs.length < this.MAX ? `<div class="cmp-card cmp-add"><input id="cmp-q" type="search" placeholder="Añadir un objeto…" autocomplete="off" aria-label="Buscar un objeto para comparar"><ul id="cmp-hits" role="listbox"></ul></div>` : ''}</div>
+${rbs.length < 2 ? `<p class="note cmp-empty">Elige al menos dos objetos para compararlos. Puedes añadirlos aquí o con «+ Comparar» en la ficha de cada objeto.</p>` : `
+<div class="seg tp-tabs" role="tablist">${tabs.map(([v, t]) => `<button role="tab" aria-selected="${this.view === v}" class="${this.view === v ? 'on' : ''}" data-c="view" data-v="${v}">${t}</button>`).join('')}</div>
+<div class="tp-body">${this.view === 'tamano' ? this.sizeHTML(rbs) : this.view === 'gravedad' ? this.gravHTML(rbs) : this.tableHTML(rbs)}</div>`}`;
+this.renderHits();
+},
+renderHits() {
+const q = $('#cmp-q'), ul = $('#cmp-hits'); if (!q || !ul) return;
+const s = norm(q.value.trim()); if (!s) { ul.innerHTML = ''; return; }
+const hits = World.rb.filter(rb => this.can(rb) && !this.has(rb.id) && [rb.def.name, rb.def.short || '', ...(rb.def.aka || [])].some(n => norm(n).includes(s))).slice(0, 7);
+ul.innerHTML = hits.map(rb => `<li><button data-c="add" data-id="${rb.id}"><i class="dot" style="--c:${rb.def.color}"></i>${esc(rb.def.name)}<small>${esc(TYPE_LABEL[rb.def.type])}</small></button></li>`).join('') || '<li class="note">Sin resultados.</li>';
+},
+tableHTML(rbs) {
+const rows = this.ROWS.map(([label, re, k]) => {
+const cells = rbs.map(rb => {
+if (!re) return { txt: TYPE_LABEL[rb.def.type] + (rb.def.type === 'moon' && rb.parent ? ' de ' + rb.parent.def.name : '') };
+if (k === 'au' && rb.def.type === 'moon') return { txt: 'No aplica: orbita a ' + rb.parent.def.name, na: true };
+const f = this.field(rb, re); return f ? { txt: String(f.val), calc: f.kind === 'calc', n: k ? this.num(rb, k) : null } : { txt: 'No disponible', na: true };
+});
+if (re && cells.every(c => c.na)) return '';                        // campo sin sentido para estos objetos
+const B = k ? this.bars(cells.map(c => c.n)) : null;
+return `<tr><th scope="row">${label}${B && B.log ? '<small class="cmp-log" data-tip="Las diferencias son tan grandes que las barras usan escala logarítmica">escala log.</small>' : ''}</th>${cells.map((c, i) => `<td class="${c.na ? 'na' : ''}">${esc(c.txt)}${c.calc ? ' <small class="calc" data-tip="Valor calculado a partir de otros datos">calc.</small>' : ''}${B ? `<span class="cmp-bar"><i style="--c:${rbs[i].def.color};transform:scaleX(${B.k(c.n)})"></i></span>` : ''}</td>`).join('')}</tr>`;
+}).join('');
+return `<div class="cmp-scroll"><table class="cmp-table"><thead><tr><th></th>${rbs.map(rb => `<th scope="col">${esc(rb.def.short || rb.def.name)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>
+<p class="note">Datos de referencia de las fichas de SOLARIS (NASA y JPL). «calc.» indica valores calculados a partir de la masa y el radio.${rbs.some(rb => rb.def.type === 'moon') ? ' En las lunas, el periodo y la velocidad orbital se refieren a su órbita alrededor del planeta.' : ''}</p>`;
+},
+sizeHTML(rbs) {
+const D = rbs.map(rb => 2 * rb.def.R), W = 760, H = 310, pad = 18, gap = 18, SLOT = 112;   // espacio mínimo por etiqueta
+const sum = D.reduce((a, c) => a + c, 0), s = Math.min(Math.max(1e-9, W - pad * 2 - gap * (rbs.length - 1) - SLOT * rbs.length * 0.5) / sum, (H - 84) / Math.max(...D));
+let x = pad; const base = H - 58;
+const circ = rbs.map((rb, i) => {
+const r = D[i] * s / 2, w = Math.max(2 * r, SLOT), cx = x + w / 2, tiny = r < 1.5; x += w + gap;
+const id = 'cg' + i;
+return `<defs><radialGradient id="${id}" cx="35%" cy="35%" r="70%"><stop offset="0" stop-color="${rb.def.color}"/><stop offset="1" stop-color="${rb.def.color}" stop-opacity=".35"/></radialGradient></defs>
+<circle cx="${cx}" cy="${base - Math.max(r, 1.5)}" r="${Math.max(r, 1.5)}" fill="url(#${id})"${tiny ? ' stroke="#f2c879" stroke-width="1"' : ''}/>
+<text x="${cx}" y="${base + 18}" text-anchor="middle" class="sz-name">${esc(rb.def.short || rb.def.name)}</text>
+<text x="${cx}" y="${base + 33}" text-anchor="middle" class="sz-val">${fmt(D[i], D[i] < 100 ? 1 : 0)} km</text>${tiny ? `<text x="${cx}" y="${base + 47}" text-anchor="middle" class="sz-val">casi invisible a esta escala</text>` : ''}`;
+}).join('');
+const vbW = Math.max(W, x - gap + pad);
+const big = rbs[D.indexOf(Math.max(...D))], small = rbs[D.indexOf(Math.min(...D))], ratio = Math.max(...D) / Math.min(...D);
+return `<svg class="cmp-size" viewBox="0 0 ${vbW} ${H}" role="img" aria-label="Comparación de tamaños a escala relativa">${circ}<line x1="${pad}" y1="${base}" x2="${vbW - pad}" y2="${base}" class="sz-base"/></svg>
+<p class="cmp-ratio">El diámetro de <b>${esc(big.def.name)}</b> es <b>${fmt(ratio, ratio < 10 ? 1 : 0)} veces</b> el de <b>${esc(small.def.name)}</b>.</p>
+<p class="note">Escala relativa basada en diámetro real. No usa la escala visual ampliada del Sistema Solar.</p>`;
+},
+gravHTML(rbs) {
+const G = rbs.map(rb => this.grav(rb)), B = this.bars(G);
+return `<div class="cmp-grav">${rbs.map((rb, i) => {
+const g = G[i];
+if (g == null) return `<div class="cg-row"><b>${esc(rb.def.name)}</b><span class="na">No disponible</span></div>`;
+const f = g / 9.81, kg = 70 * f;
+return `<div class="cg-row"><b><i class="dot" style="--c:${rb.def.color}"></i>${esc(rb.def.name)}</b><span class="cg-g">${fmt(g, g < 0.01 ? 5 : g < 1 ? 3 : 2)} m/s²</span>
+<span class="cg-f">${fmt(f, f < 0.01 ? 4 : f < 1 ? 2 : 2)} × gravedad terrestre</span>${B ? `<span class="cmp-bar"><i style="--c:${rb.def.color};transform:scaleX(${B.k(g)})"></i></span>` : ''}
+<small>Una báscula que marca 70 kg en la Tierra marcaría ≈ ${fmt(kg, kg < 1 ? 2 : 1)} kg${rb.def.type === 'planet' && ['jupiter', 'saturno', 'urano', 'neptuno'].includes(rb.id) ? ' (en la parte alta de la atmósfera: no tiene superficie sólida)' : ''}.</small></div>`;
+}).join('')}</div>${B && B.log ? '<p class="note">Las barras usan escala logarítmica por la gran diferencia entre valores.</p>' : ''}
+<p class="note">Factor respecto a la gravedad terrestre (9.81 m/s²). La masa no cambia: lo que varía es el peso.</p>`;
+},
+};
+document.addEventListener('click', e => {
+if (e.target.closest('#info-cmp')) { const id = e.target.closest('#info-cmp').dataset.cmp; Compare.has(id) ? Compare.remove(id) : Compare.add(id); }
+else if (e.target.closest('[data-cmp-open]')) Compare.open();
+else if (e.target.closest('[data-cmp-clear]')) Compare.clear();
+});
+const TL = {
+MIN: Date.UTC(1950, 0, 1), MAX: Date.UTC(2130, 11, 31), cats: { exploracion: true, astronomia: true }, sel: null,
+isOpen() { const p = $('#tl'); return !!p && p.classList.contains('open'); },
+toggle(v) {
+let p = $('#tl');
+if (!p) { p = this.build(); }
+const open = v == null ? !this.isOpen() : v;
+p.classList.toggle('open', open); $('#app').classList.toggle('tl-open', open);
+const b = $('#t-tl'); if (b) b.classList.toggle('on', open);
+if (open) { UI.openSection(null); this.refresh(true); }
+},
+build() {
+const p = document.createElement('section'); p.id = 'tl'; p.className = 'ui'; p.setAttribute('aria-label', 'Línea del tiempo');
+const J = [['-10 años', -10, 'y'], ['-1 año', -1, 'y'], ['-1 mes', -1, 'm'], ['-1 día', -1, 'd'], ['+1 día', 1, 'd'], ['+1 mes', 1, 'm'], ['+1 año', 1, 'y'], ['+10 años', 10, 'y']];
+p.innerHTML = `
+<div class="tl-top">
+<div class="tl-ind"><span class="tl-tag" id="tl-tag">SIMULACIÓN</span><b id="tl-date"></b><small id="tl-rel"></small></div>
+<div class="tl-jumps" role="group" aria-label="Saltos de fecha">${J.map(([t, n, u]) => `<button class="tl-j" data-j="${n}" data-u="${u}">${t}</button>`).join('')}</div>
+<div class="tl-right"><input id="tl-pick" type="date" min="1600-01-01" max="2400-12-31" aria-label="Elegir fecha"><button class="txt-btn" id="tl-today">Volver a hoy</button><button class="icon-btn" id="tl-x" aria-label="Cerrar la línea del tiempo">&times;</button></div>
+</div>
+<div class="tl-track-wrap"><div class="tl-ticks" id="tl-ticks" aria-hidden="true"></div><div class="tl-evs" id="tl-evs"></div>
+<input id="tl-range" type="range" min="${this.MIN}" max="${this.MAX}" step="86400000" aria-label="Desplazar la fecha de la simulación"></div>
+<div class="tl-bottom">
+<div class="tl-cats" role="group" aria-label="Categorías de eventos">${Object.entries(EVENT_CATS).map(([k, t]) => `<label class="tl-cat tl-${k}"><input type="checkbox" data-cat="${k}" checked><i></i>${t}</label>`).join('')}</div>
+<div class="tl-card" id="tl-card" hidden></div>
+</div>`;
+$('#app').appendChild(p);
+const span = this.MAX - this.MIN, years = [];
+for (let y = 1950; y <= 2130; y += 10) years.push(`<span style="left:${(Date.UTC(y, 0, 1) - this.MIN) / span * 100}%">${y}</span>`);
+$('#tl-ticks').innerHTML = years.join('');
+this.paintEvents();
+p.addEventListener('click', e => {
+const j = e.target.closest('[data-j]');
+if (j) { const d = jdToDate(Time.jd), n = +j.dataset.j, u = j.dataset.u;
+if (u === 'd') d.setUTCDate(d.getUTCDate() + n); else if (u === 'm') d.setUTCMonth(d.getUTCMonth() + n); else d.setUTCFullYear(d.getUTCFullYear() + n);
+UI.setSimDate(dateToJD(d), { toast: false }); }
+const ev = e.target.closest('[data-ev]'); if (ev) this.showEvent(+ev.dataset.ev);
+const a = e.target.closest('[data-tla]');
+if (a) { const E = EVENTS[this.sel], rb = World.byId[E.obj];
+if (a.dataset.tla === 'date') { UI.setSimDate(dateToJD(new Date(E.date + 'T12:00:00Z')), { pause: true }); if (rb && !rb.hidden) UI.select(rb, { fly: true }); }
+else if (a.dataset.tla === 'go' && rb) { if (rb.hidden) UI.toast(rb.def.name + ' no existe en la fecha simulada.'); else UI.select(rb, { fly: true }); } }
+});
+$('#tl-x').addEventListener('click', () => this.toggle(false));
+$('#tl-today').addEventListener('click', () => { Time.goLive(); UI.refreshTime(); this.refresh(); UI.toast('De vuelta a la fecha y hora actuales'); });
+$('#tl-pick').addEventListener('change', e => { if (e.target.value) UI.setSimDate(Astro.jdFromISO(e.target.value) + 0.5); });
+p.addEventListener('change', e => { const c = e.target.closest('[data-cat]'); if (c) { this.cats[c.dataset.cat] = c.checked; this.paintEvents(); } });
+const r = $('#tl-range');
+r.addEventListener('input', () => { this.pending = +r.value; Time.paused = true; if (!this.raf) this.raf = requestAnimationFrame(() => { this.raf = 0; UI.setSimDate(dateToJD(new Date(this.pending)), { toast: false }); }); });
+r.addEventListener('change', () => { const y = new Date(+r.value).getUTCFullYear(); if (y < 1800 || y > 2050) UI.toast('Fuera de 1800–2050 la precisión de las posiciones disminuye.'); });
+return p;
+},
+visibleEvents() { return EVENTS.map((e, i) => ({ e, i })).filter(({ e }) => this.cats[e.cat]); },
+paintEvents() {
+const span = this.MAX - this.MIN;
+$('#tl-evs').innerHTML = this.visibleEvents().map(({ e, i }) => { const t = Date.parse(e.date + 'T12:00:00Z'); if (t < this.MIN || t > this.MAX) return '';
+return `<button class="tl-ev tl-${e.cat}${e.pred ? ' pred' : ''}${this.sel === i ? ' on' : ''}" data-ev="${i}" style="left:${(t - this.MIN) / span * 100}%" data-tip="${esc(e.title)} · ${this.fmtDate(e.date)}" aria-label="${esc(e.title)}, ${this.fmtDate(e.date)}"></button>`; }).join('');
+},
+fmtDate(iso) { return new Date(iso + 'T12:00:00Z').toLocaleDateString(I18N.loc(), { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }); },
+showEvent(i) {
+this.sel = i; const E = EVENTS[i], rb = World.byId[E.obj];
+const c = $('#tl-card'); c.hidden = false;
+c.innerHTML = `<span class="tl-cat-tag tl-${E.cat}">${EVENT_CATS[E.cat]}${E.pred ? ' · fecha prevista' : ''}</span><h4>${esc(E.title)}</h4><time>${this.fmtDate(E.date)}</time><p>${esc(E.desc)}</p>
+<dl>${rb ? `<dt>Objeto relacionado</dt><dd>${esc(rb.def.name)}</dd>` : ''}${E.mission ? `<dt>Misión</dt><dd>${esc(E.mission)}</dd>` : ''}</dl>
+<div class="tl-card-act"><button class="cta" data-tla="date">Ver fecha</button>${rb ? '<button class="cta-ghost" data-tla="go">Ir al objeto</button>' : ''}</div>`;
+this.paintEvents();
+},
+refresh(force) {
+const sim = UI.isSimulatedDate(), d = jdToDate(Time.jd);
+const chip = $('#t-sim'); if (chip) chip.hidden = !sim;
+if (!this.isOpen() && !force) return;
+$('#tl-date').textContent = d.toLocaleDateString(I18N.loc(), { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' }).replace('.', '').toUpperCase();
+$('#tl-tag').textContent = sim ? 'SIMULACIÓN' : 'EN VIVO'; $('#tl-tag').classList.toggle('live', !sim);
+const days = Time.jd - dateToJD(new Date()), ad = Math.abs(days);
+$('#tl-rel').textContent = !sim ? 'Fecha y hora actuales' : (ad < 60 ? fmt(ad, 0) + ' días' : ad < 730 ? fmt(ad / 30.44, 0) + ' meses' : fmt(ad / 365.25, 0) + ' años') + (days > 0 ? ' en el futuro' : ' en el pasado');
+const r = $('#tl-range'); if (document.activeElement !== r) r.value = clamp(d.getTime(), this.MIN, this.MAX);
+const pk = $('#tl-pick'); if (document.activeElement !== pk) pk.value = d.toISOString().slice(0, 10);
+},
+};
+$('#t-tl').addEventListener('click', () => TL.toggle());
 const App = {
 last: 0, scaleRatio: null, ready: false,
 qualityParams() {
@@ -6055,7 +6359,7 @@ const sg = $('#start-tours'); sg.disabled = false; sg.addEventListener('click', 
 const sf = $('#start-fly'); sf.disabled = false; sf.addEventListener('click', () => { this.begin(); Flight.openHangar(); });
 this.ready = true;
 if (Settings.state.general.startup === 'explore' && location.hash !== '#creditos') this.begin();
-window.Solaris = { World, Cam, UI, Time, S, select: id => UI.select(World.byId[id], { fly: true }), App, Flight, Music, SFX, Settings, Keys, Gfx, GLX, I18N, BODY, PackedModels, Assets };
+window.Solaris = { World, Cam, UI, Time, S, select: id => UI.select(World.byId[id], { fly: true }), App, Flight, Music, SFX, Settings, Keys, Gfx, GLX, I18N, BODY, PackedModels, Assets, Compare, TL };
 requestAnimationFrame(t => this.loop(t));
 },
 home() {
