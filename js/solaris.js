@@ -1142,7 +1142,7 @@ return true;
 },
 };
 const ASSET_MANIFEST = {"music": {"webm": "assets/audio/metamorphosis.webm", "mp3": "assets/audio/metamorphosis.mp3"}, "bodyMeshes": {"fobos": {"url": "assets/models/moons/fobos.bin", "k": 1.26255}, "deimos": {"url": "assets/models/moons/deimos.bin", "k": 1.37497}, "haumea": {"url": "assets/models/dwarfs/haumea.bin", "k": 1.44255}}};
-const SOLARIS_BUILD = '2026.10.06-0659-web';
+const SOLARIS_BUILD = '2026.10.06-0756-web';
 console.info('SOLARIS · versión ' + SOLARIS_BUILD);
 const Assets = {
 cache: new Map(), busyN: new Map(),
@@ -1610,6 +1610,66 @@ optimista: { name: 'Optimista', in: 0.75, out: 1.77, calc: true, inName: '«Venu
 ref: 'Kopparapu et al. (2013): límites empíricos; distancias calculadas a partir del flujo efectivo (d = 1/√S, con S = 1.78 y 0.32)' },
 clasico: { name: 'Clásico', in: 0.95, out: 1.67, inName: 'pérdida de agua', outName: 'máximo efecto invernadero', ref: 'Kasting et al. (1993)' },
 };
+const SYSTEMS = {
+solar: { id: 'solar', name: 'Sistema Solar', sub: 'Nuestro sistema planetario', center: 'sol' },
+gargantua: { id: 'gargantua', name: 'Sistema Gargantúa', sub: 'Sistema ficticio de Interstellar', center: 'gargantua', fiction: true,
+H: 60,                                   // radio visual del horizonte de sucesos, en unidades de escena
+disk: { in: 3.0, out: 11.0 },            // disco de acreción, en radios del horizonte (borde interior típico de un disco delgado: 3 radios)
+maxDist: 60 * 240,
+note: 'Sistema ficticio inspirado en Interstellar. Algunos conceptos representados están basados en fenómenos físicos reales.',
+orbitsNote: 'Las órbitas del Sistema Gargantúa son una representación cinematográfica y educativa: la película no establece parámetros orbitales precisos.' },
+};
+const GARG_BODIES = [
+{ id: 'gargantua', system: 'gargantua', name: 'Gargantúa', type: 'blackhole', R: 0, visR: 60, color: '#f0c27a', vis: { style: 'bh' }, extent: 3.4,
+src: 'Película Interstellar (2014) y «The Science of Interstellar», de Kip Thorne (asesor científico de la película).',
+info: {
+desc: 'Agujero negro supermasivo en rápida rotación: el centro del sistema planetario que visita la misión Endurance.',
+fiction: [['Tipo', 'Agujero negro supermasivo en rotación'], ['Masa', '≈ 100 millones de veces la del Sol, según Kip Thorne en «The Science of Interstellar»'],
+['Ubicación', 'En otra galaxia, al otro lado del agujero de gusano que aparece cerca de Saturno'],
+['Papel en la historia', 'Su gravedad domina el sistema donde orbitan los planetas candidatos de las misiones Lázaro']],
+science: [['Horizonte de sucesos', 'Frontera a partir de la cual nada, ni siquiera la luz, puede escapar. Por eso la región central es completamente oscura.'],
+['Disco de acreción', 'Gas que gira alrededor del agujero negro y se calienta por fricción hasta brillar intensamente. Las zonas internas son las más calientes.'],
+['Lente gravitacional', 'La gravedad curva la trayectoria de la luz. Por eso vemos la parte trasera del disco por encima y por debajo del agujero negro.'],
+['Dilatación temporal gravitacional', 'Cerca de una gran masa el tiempo transcurre más despacio que lejos de ella. Es un efecto real que corrigen, por ejemplo, los satélites GPS.']],
+render: 'Representación en tiempo real: SOLARIS traza rayos de luz curvados por la gravedad de un agujero negro sin rotación (aproximación de Schwarzschild). Las imágenes de la película se calcularon con relatividad general para un agujero negro en rotación.',
+} },
+{ id: 'miller', system: 'gargantua', name: 'Planeta de Miller', short: 'Miller', type: 'planet', fiction: true, parent: 'gargantua', visR: 2.4, color: '#8fa3b3', rotH: 30,
+orbit: { t: 'cine', a: 60 * 15, P: 3, phase: 0.18, i: 0.05 },
+vis: { style: 'rock', feat: 'icy', c1: '#6f8596', c2: '#4b5f70', c3: '#a9b8c4', crater: 0, seed: 3.1, atm: { color: [0.62, 0.72, 0.82], h: 0.035, k: 0.9 } },
+src: 'Película Interstellar (2014).',
+info: {
+desc: 'Mundo oceánico de aguas poco profundas, en una órbita muy próxima a Gargantúa.',
+fiction: [['Tipo', 'Planeta oceánico'], ['Condiciones generales', 'Un océano poco profundo cubre casi toda la superficie; la gravedad de Gargantúa levanta olas gigantescas'],
+['Relación con Gargantúa', 'Orbita muy cerca del agujero negro'], ['Dilatación temporal', 'Aproximadamente 1 hora en el planeta equivale a 7 años lejos de Gargantúa'],
+['Misión', 'Primera parada de la Endurance, en busca de la Dra. Laura Miller, de las misiones Lázaro'],
+['Masa, radio y temperatura', 'No especificado']],
+film: 'En la película, la visita dura unas pocas horas: al regresar a la Endurance, Romilly les dice que han pasado 23 años, 4 meses y 8 días.',
+dilation: { localH: 1, externalY: 7 },
+} },
+{ id: 'mann', system: 'gargantua', name: 'Planeta de Mann', short: 'Mann', type: 'planet', fiction: true, parent: 'gargantua', visR: 3.0, color: '#d6e0e8', rotH: 40,
+orbit: { t: 'cine', a: 60 * 46, P: 40, phase: 0.62, i: -0.04 },
+vis: { style: 'rock', feat: 'icy', c1: '#e3eaf0', c2: '#9eb0bf', c3: '#ffffff', crater: 0.12, seed: 8.4, atm: { color: [0.82, 0.88, 0.94], h: 0.025, k: 0.6 } },
+src: 'Película Interstellar (2014).',
+info: {
+desc: 'Mundo helado e inhóspito, con grandes formaciones de hielo y nubes congeladas.',
+fiction: [['Tipo', 'Planeta helado'], ['Condiciones generales', 'Superficie extremadamente fría, terreno irregular, niebla y nubes heladas; atmósfera no respirable'],
+['Relación con Gargantúa', 'Orbita el agujero negro a mayor distancia que Miller'],
+['Misión', 'Explorado por el Dr. Mann, de las misiones Lázaro, que enviaba datos alentadores sobre su habitabilidad; la tripulación descubre que no eran ciertos'],
+['Masa, radio y temperatura', 'No especificado']],
+} },
+{ id: 'edmunds', system: 'gargantua', name: 'Planeta de Edmunds', short: 'Edmunds', type: 'planet', fiction: true, parent: 'gargantua', visR: 3.3, color: '#c9a77c', rotH: 26,
+orbit: { t: 'cine', a: 60 * 80, P: 110, phase: 0.05, i: 0.03 },
+vis: { style: 'rock', feat: 'marte', c1: '#a9875c', c2: '#6d5238', c3: '#d2b48a', crater: 0.04, seed: 5.6, atm: { color: [0.96, 0.84, 0.66], h: 0.03, k: 0.75 } },
+src: 'Película Interstellar (2014).',
+info: {
+desc: 'Mundo rocoso con atmósfera que la película presenta como el candidato más favorable para la vida humana.',
+fiction: [['Tipo', 'Planeta rocoso'], ['Condiciones generales', 'Terreno rocoso y abierto, con relieve y atmósfera; la película sugiere condiciones más favorables que las de Miller y Mann'],
+['Relación con Gargantúa', 'Orbita el agujero negro a gran distancia'],
+['Misión', 'Explorado por Wolf Edmunds, de las misiones Lázaro. Al final de la película, Amelia Brand llega allí y establece un campamento'],
+['Masa, radio y temperatura', 'No especificado']],
+} },
+];
+TYPE_LABEL.blackhole = 'Agujero negro supermasivo';
 const OBLIQ = 23.4392911 * DEG;
 const GAUSS_K_DEG = 0.9856076686; // movimiento medio (°/día) para a = 1 UA
 const Astro = {
@@ -2961,6 +3021,60 @@ float g = 0.6 + 0.4 * sin(3.14159 * v_t);                                       
 writeDepth(v_depth);
 o_col = outc(mix(u_color, u_edge, e), u_alpha * (0.2 * g + 0.65 * e));
 }`;
+SH.FS_BH = SH.HEAD + SH.FRAG + SH.NOISE + `
+in vec2 v_uv;
+uniform vec3 u_camR; uniform vec3 u_camU; uniform vec3 u_camF; uniform vec2 u_tan; uniform vec3 u_cam;
+uniform int u_steps; uniform float u_rin; uniform float u_rout; uniform float u_reveal; uniform float u_heat; uniform float u_spin;
+float h3(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+vec3 lensStars(vec3 d){
+vec3 q = d * 220.0, c = floor(q); float h = h3(c), s = smoothstep(0.988, 1.0, h);
+s *= smoothstep(0.42, 0.0, length(fract(q) - 0.5));
+return s * mix(vec3(1.0, 0.86, 0.72), vec3(0.78, 0.86, 1.0), h3(c + 7.0)) * 1.6;
+}
+vec4 disk(vec3 p, float rr){
+float edge = smoothstep(u_rin, u_rin * 1.12, rr) * (1.0 - smoothstep(u_rout * 0.62, u_rout, rr));
+float a = u_spin * u_time / pow(rr, 1.5);
+vec2 q = mat2(cos(a), -sin(a), sin(a), cos(a)) * p.xz;
+float n1 = fbm4(vec3(q * 0.75, rr * 0.35)) * 0.5 + 0.5;
+float n2 = fbm4(vec3(q * 2.6, rr * 1.7 + 3.0)) * 0.5 + 0.5;
+float bands = 0.75 + 0.25 * sin(rr * 9.0 + n1 * 6.0);
+float T = pow(u_rin / rr, 0.75) * pow(max(1.0 - sqrt(u_rin / rr), 0.0), 0.25) * 2.4;
+float I = T * (0.45 + 0.85 * n1 * n2) * bands * edge;
+vec3 col = mix(vec3(1.0, 0.42, 0.10), vec3(1.0, 0.82, 0.55), clamp(T * 1.35, 0.0, 1.0));
+col = mix(col, vec3(1.0, 0.95, 0.86), clamp(T * T * 1.2 - 0.5, 0.0, 1.0));   // tono cálido: blanco solo en la zona más interna
+return vec4(col * I * 1.55 * u_heat, clamp(I * 1.45, 0.0, 1.0));
+}
+void main(){
+vec2 ndc = v_uv * 2.0 - 1.0;
+vec3 dir = normalize(u_camF + ndc.x * u_tan.x * u_camR + ndc.y * u_tan.y * u_camU);
+vec3 x = u_cam;
+float RI = u_rout * 1.7;                                   // región de influencia apreciable
+float tca = -dot(x, dir), b = length(cross(x, dir));
+if (b > RI || (tca < 0.0 && length(x) > RI)) discard;       // descarte barato: el rayo nunca se acerca
+if (length(x) > RI) x += dir * max(tca - sqrt(max(RI * RI - b * b, 0.0)), 0.0);   // avanzar hasta la región de influencia
+vec3 v = dir, hv = cross(x, v); float h2 = dot(hv, hv);
+vec3 col = vec3(0.0); float alpha = 0.0; bool cap = false;
+float k = 150.0 / float(u_steps);
+for (int i = 0; i < 320; i++) {
+if (i >= u_steps) break;
+float r = length(x);
+float dt = clamp(0.06 * r, 0.025, 1.4) * k;
+vec3 vn = v - 1.5 * h2 * x / pow(r, 5.0) * dt;           // ecuación de la órbita de un fotón (Binet)
+vec3 xn = x + vn * dt;
+if (x.y * xn.y < 0.0) {                                  // cruce del plano del disco
+vec3 p = mix(x, xn, x.y / (x.y - xn.y)); float rr = length(p.xz);
+if (rr > u_rin && rr < u_rout) { vec4 d = disk(p, rr); col += (1.0 - alpha) * d.rgb; alpha += (1.0 - alpha) * d.a; if (alpha > 0.985) break; }
+}
+x = xn; v = vn;
+if (dot(x, x) < 1.0) { cap = true; break; }              // horizonte de sucesos
+if (dot(x, x) > RI * RI * 1.6 && dot(x, v) > 0.0) break; // escapa
+}
+float defl = acos(clamp(dot(normalize(v), dir), -1.0, 1.0));
+vec3 bg = cap ? vec3(0.0) : lensStars(normalize(v)) * smoothstep(0.02, 0.2, defl);
+float aBg = cap ? 1.0 : smoothstep(0.035, 0.45, defl) * 0.92;   // cerca de la sombra, el cielo lenteado sustituye al real
+float aOut = max(alpha, aBg);
+o_col = outc((col + (1.0 - alpha) * bg) * u_reveal, aOut * u_reveal);
+}`;
 SH.VS_STARS = SH.HEAD + `
 in vec3 a_pos; in vec4 a_col; uniform float u_dpr; uniform float u_bright;
 out vec3 v_col;
@@ -3223,7 +3337,7 @@ await step('Dibujando continentes', () => { this.landTex = GLX.texFromCanvas(Ear
 await step('Pintando la Vía Láctea', () => this.bakeSky());
 await step('Situando estrellas y constelaciones', () => this.buildStars());
 this.ptex = {}; this.texState = {};       // texturas y modelos detallados: bajo demanda (ver texTick y PackedModels.tick)
-await step('Calculando órbitas', () => { this.buildBodies(); this.applyPlanetTextures(); });
+await step('Calculando órbitas', () => { this.buildBodies(); this.applyPlanetTextures(); this.buildSystems(); });
 await step('Sembrando asteroides', () => this.buildBelts());
 await step('Preparando cometas', () => this.buildComets());
 gl.bindVertexArray(null);
@@ -3240,7 +3354,7 @@ p('atm', SH.VS_BODY, SH.FS_ATM); p('sun', SH.VS_BODY, SH.FS_SUN);
 p('corona', SH.VS_BILL, SH.FS_CORONA); p('glow', SH.VS_BILL, SH.FS_GLOW); p('tail', SH.VS_TAIL, SH.FS_TAIL);
 p('orbit', SH.VS_ORBIT, SH.FS_ORBIT); p('stars', SH.VS_STARS, SH.FS_STARS); p('linesky', SH.VS_LINESKY, SH.FS_LINESKY);
 p('skybake', SH.VS_FULL, SH.FS_SKYBAKE); p('sky', SH.VS_FULL, SH.FS_SKY);
-p('belt', SH.VS_BELT, SH.FS_BELT); p('mark', SH.VS_MARK, SH.FS_MARK); p('craft', SH.VS_CRAFT, SH.FS_CRAFT); p('hz', SH.VS_HZ, SH.FS_HZ); ['rock', 'luna', 'earth', 'venus', 'titan', 'gas'].forEach(f => p('ptex_' + f, SH.VS_BODY, SH.FS_PTEX(f))); p('ptex_gasring', SH.VS_BODY, SH.FS_PTEX('gas').replace('#define F_GAS', '#define F_GAS\n#define F_RINGTEX')); p('sunTex', SH.VS_BODY, SH.FS_SUNTEX); p('ring_saturnTex', SH.VS_RING, SH.FS_RING('saturnTex')); p('craftTex', SH.VS_CRAFT_TEX, SH.FS_CRAFT_TEX);
+p('belt', SH.VS_BELT, SH.FS_BELT); p('mark', SH.VS_MARK, SH.FS_MARK); p('craft', SH.VS_CRAFT, SH.FS_CRAFT); p('hz', SH.VS_HZ, SH.FS_HZ); p('bh', SH.VS_FULL, SH.FS_BH); ['rock', 'luna', 'earth', 'venus', 'titan', 'gas'].forEach(f => p('ptex_' + f, SH.VS_BODY, SH.FS_PTEX(f))); p('ptex_gasring', SH.VS_BODY, SH.FS_PTEX('gas').replace('#define F_GAS', '#define F_GAS\n#define F_RINGTEX')); p('sunTex', SH.VS_BODY, SH.FS_SUNTEX); p('ring_saturnTex', SH.VS_RING, SH.FS_RING('saturnTex')); p('craftTex', SH.VS_CRAFT_TEX, SH.FS_CRAFT_TEX);
 this.post = { progs: { downT: GLX.program('downT', SH.VS_FULL, SH.FS_DOWN(true)), down: GLX.program('down', SH.VS_FULL, SH.FS_DOWN(false)), up: GLX.program('up', SH.VS_FULL, SH.FS_UP), comp: GLX.program('comp', SH.VS_FULL, SH.FS_COMP) } };
 },
 buildMeshes() {
@@ -3341,9 +3455,8 @@ return { id: c.id, name: c.name, dir: V.norm(cen) };
 });
 this.constLines = GLX.mesh({ a_pos: { data: new Float32Array(lp), size: 3 } }, null, GLX.gl.LINES);
 },
-buildBodies() {
+makeBody(def) {
 const jd0 = Astro.jdFromDate(new Date());
-BODIES.forEach(def => {
 const rb = { def, id: def.id, isSun: def.type === 'star', R: def.R, children: [], hover: 0, rotPhase: null,
 helio: [0, 0, 0], posS: [0, 0, 0], rS: 1, basis: [[1, 0, 0], [0, 1, 0], [0, 0, 1]], model: new Float64Array(16),
 proj: { x: 0, y: 0, w: 0, rpx: 0, on: false }, color: lin(def.color || '#cccccc'), occ: [], occBuf: new Float32Array(16) };
@@ -3372,8 +3485,11 @@ if (v.c1) { rb.u.u_c1 = lin(v.c1); rb.u.u_c2 = lin(v.c2); rb.u.u_c3 = lin(v.c3);
 rb.u.u_bump = v.style === 'earth' ? 0.012 : v.style === 'rock' ? (rb.irregular ? 0.05 : 0.03) : 0;
 rb.u.u_atm = v.atm ? [...v.atm.color.map(x => x * 0.9), v.atm.k] : [0, 0, 0, 0];
 if (v.style === 'earth') rb.u.u_land = this.landTex;
-this.rb.push(rb); this.byId[rb.id] = rb;
-});
+return rb;
+},
+buildBodies() {
+const jd0 = Astro.jdFromDate(new Date());
+BODIES.forEach(def => { const rb = this.makeBody(def); this.rb.push(rb); this.byId[rb.id] = rb; });
 this.rb.forEach(rb => { if (rb.def.parent) { rb.parent = this.byId[rb.def.parent]; rb.parent.children.push(rb); } });
 this.sun = this.byId.sol;
 this.rb.forEach(rb => {
@@ -3517,6 +3633,7 @@ rb.comet = c; this.comets.push(c);
 });
 },
 update(jd, dtReal, speed) {
+if (this.system !== 'solar') return this.updateSystem(jd, dtReal, speed);   // otros sistemas: su propia actualización
 this.jd = jd;
 const d = jd - J2000;
 const sc = ScaleState;
@@ -3627,6 +3744,7 @@ const gl = GLX.gl, P = this.P, cam = this.cam, L = S.layers;
 const nowc = performance.now(), dtc = this._lt ? Math.min(0.1, (nowc - this._lt) / 1000) : 0.016; this._lt = nowc;
 this.cineK = (this.cineK || 0) + (((S.mode === 'cine' || UI.tourCine) ? 1 : 0) - (this.cineK || 0)) * Math.min(1, dtc * 2.2);
 const vis1 = 1 - this.cineK;
+const SOLAR = this.system === 'solar';
 const sunRS = this.sun.rS;
 const sunR = V.sub(this.sun.posS, cam);
 this.shadowSunR = sunRS * ScaleState.get('shadowSun');
@@ -3650,10 +3768,11 @@ GLX.state({ depthTest: false, depthWrite: false, cull: 'none', blend: 'alpha' })
 const pr = useP(P.linesky); GLX.setAll(pr, { u_color: lin('#7f9cc8'), u_alpha: 0.32 * vis1 });
 GLX.draw(this.constLines, pr);
 }
+if (!SOLAR && this.sun.isBH) this.drawBH(t, useP);
 GLX.state({ depthTest: true, depthWrite: true, cull: 'back', blend: 'none' });
 const vis = this.rb.filter(rb => rb.drawOn);
 for (const rb of vis) {
-if (rb.isCraft) continue;
+if (rb.isCraft || rb.isBH || rb.occBH) continue;
 const rel = V.sub(rb.posS, cam);
 M4.fromBasis(rb.basis[0], rb.basis[1], rb.basis[2], rb.rS, rel, rb.model);
 const pr = useP(rb.isSun ? (this.sunTex ? P.sunTex : P.sun) : rb.prog);
@@ -3690,6 +3809,7 @@ if (tex) GLX.setAll(pr, { u_ringTex: this.ringTex, u_rr2: rb.u.u_rr2 });
 GLX.setAll(pr, { u_model: rb.model, u_center: rb.rel, u_radius: rb.rS, u_ringN: rb.basis[1], u_ambient: S.ambient * 0.5, u_alpha: R.alpha, u_rr: [R.in, R.out] });
 GLX.draw(this.meshes.rings[rb.id], pr);
 }
+if (SOLAR) {
 const earth = this.byId.tierra;
 if (earth.drawOn && earth.proj.rpx > 3 && !this.earthTex) {
 GLX.state({ depthTest: true, depthWrite: false, cull: 'back', blend: 'premul' });
@@ -3697,6 +3817,7 @@ const pr = useP(P.clouds), m = M4.fromBasis(earth.basis[0], earth.basis[1], eart
 const ob = earth.occBuf;
 GLX.setAll(pr, { u_model: m, u_cloudT: t * 0.004, u_occ: ob, u_occN: earth.occ.length ? 1 : 0, u_sunR: this.shadowSunR, u_ambient: S.ambient * 0.5 });
 GLX.draw(earth.proj.rpx > 160 ? this.meshes.hi : this.meshes.mid, pr);
+}
 }
 GLX.state({ depthTest: true, depthWrite: false, cull: 'front', blend: 'add' });
 if (Settings.state.graphics.atmospheres) for (const rb of vis) {
@@ -3706,6 +3827,7 @@ const m = M4.fromBasis([1, 0, 0], [0, 1, 0], [0, 0, 1], rb.rS + H, rb.rel);
 GLX.setAll(pr, { u_model: m, u_center: rb.rel, u_R: rb.rS, u_H: H, u_atm: [...A.color, 1.0], u_k: A.k });
 GLX.draw(this.meshes.mid, pr);
 }
+if (SOLAR) {
 if (Settings.state.graphics.sunGlow) {
 const s = this.sun, w = Math.max(V.len(sunR), 1e-9), px = this.pxPerUnit(w);
 const minR = 26 / px; const size = Math.max(s.rS * 5.5, minR);
@@ -3717,12 +3839,15 @@ const pg = useP(P.glow), gsz = Math.max(s.rS * 14, 90 / px);
 GLX.setAll(pg, { u_center: sunR, u_size: gsz, u_near: 0, u_color: [1.0, 0.62, 0.3], u_int: 0.06 * Math.min(1, (s.rS * px) / 12 + 0.25) * (1 - 0.9 * smoothstep(15, 120, s.proj.rpx)) * Gfx.flash(), u_sharp: 14 });
 GLX.draw(this.meshes.quad, pg);
 }
+}
+if (SOLAR) {
 GLX.state({ depthTest: true, depthWrite: false, cull: 'none', blend: 'alpha' });
 const A = SCALES[ScaleState.from].glsl, B = SCALES[ScaleState.to].glsl;
 const beltU = { u_days: this.jd - J2000, u_mapA: A, u_mapB: B, u_mapT: ScaleState.k(), u_off: sunR, u_dpr: GLX.dpr, u_ptK: ScaleState.dist(1) * 3 };
 if (L.asteroids) { const pr = useP(P.belt); GLX.setAll(pr, beltU); GLX.set(pr, 'u_alpha', 0.55); GLX.draw(this.belts.ast, pr, Math.round(this.belts.ast.count * Gfx.particles())); }
 if (L.kuiper) { const pr = useP(P.belt); GLX.setAll(pr, beltU); GLX.set(pr, 'u_ptK', ScaleState.dist(1) * 5); GLX.set(pr, 'u_alpha', 0.28); GLX.draw(this.belts.kui, pr, Math.round(this.belts.kui.count * Gfx.particles())); }
-if (L.hz && vis1 > 0.003) {
+}
+if (SOLAR && L.hz && vis1 > 0.003) {
 if (!this.meshes.hz) {
 const N = 512, pos = new Float32Array((N + 1) * 4), idx = new Uint16Array(N * 6);
 for (let i = 0; i <= N; i++) { const a = i / N * Math.PI * 2; pos.set([0, a, 1, a], i * 4); }
@@ -3736,7 +3861,7 @@ GLX.setAll(pr, { u_model: M4.translate(V.sub([0, 0, 0], cam)), u_rIn: ScaleState
 u_color: lin('#2f8f5f'), u_edge: lin('#8fd8aa'), u_alpha: 0.85 * vis1 });
 GLX.draw(this.meshes.hz, pr);
 }
-if (typeof Planner !== 'undefined' && Planner.routeOn && Planner.route && vis1 > 0.003) {
+if (SOLAR && typeof Planner !== 'undefined' && Planner.routeOn && Planner.route && vis1 > 0.003) {
 const pts = Planner.scenePts(), n = pts ? Math.min(pts.length, 200) : 0;
 if (n > 1) {
 if (!this.meshes.route) { this._rtP = new Float32Array(600); this._rtF = new Float32Array(200); this.meshes.route = GLX.mesh({ a_pos: { data: this._rtP, size: 3 }, a_frac: { data: this._rtF, size: 1 } }, null, gl.LINE_STRIP, true); }
@@ -3752,6 +3877,7 @@ GLX.state({ depthTest: true, depthWrite: false, cull: 'none', blend: 'alpha' });
 const pO = useP(P.orbit);
 const orbMode = S.mode === 'orbits';
 if (vis1 > 0.003) for (const rb of this.rb) {
+if (!rb.def.orbit) continue;                  // cuerpos centrales (Sol, Gargantúa): sin órbita
 if (rb.isSun) continue;
 const sel = UI.sel === rb || UI.tourRB === rb, hov = UI.hov === rb, type = rb.def.type;
 let show = false, color = COLORS.orbitPlanet, alpha = 0.3;
@@ -3766,7 +3892,7 @@ if (!L.moons) continue;
 const px = this.pxPerUnit(Math.max(V.dist(rb.parent.posS, cam), 1e-9)) * rb.moonDistMean;
 show = (L.moonOrbits && px > 14) || sel; color = COLORS.orbitMoon; alpha = 0.3 * smoothstep(14, 40, px);
 } else if (type === 'comet') { show = L.cometOrbits || orbMode || sel; color = COLORS.orbitComet; alpha = 0.32; }
-else if (type === 'planet') { show = L.orbits || sel; alpha = 0.34; }
+else if (type === 'planet') { show = L.orbits || sel; alpha = 0.34; if (rb.def.fiction) { color = COLORS.orbitFiction; alpha = 0.26 * clamp((V.len(cam) / SYSTEMS.gargantua.H - 6) / 6, 0, 1); } }   // muy cerca de Gargantúa las órbitas se atenúan   // órbitas cinematográficas: otro color
 else if (type === 'asteroid') { show = (L.orbits && orbMode) || sel; color = COLORS.orbitAst; alpha = 0.18; }
 else { show = L.orbits || sel; color = COLORS.orbitDwarf; alpha = type === 'tno' ? 0.1 : 0.18; }
 if (!show) continue;
@@ -3780,9 +3906,11 @@ else { m = M4.translate(V.sub([0, 0, 0], cam)); mesh = rb.orbitMesh; }
 GLX.setAll(pO, { u_model: m, u_color: lin(color), u_alpha: alpha * vis1, u_cur: rb.orbitFrac || 0, u_fade: orbMode ? 0.35 : 1 });
 GLX.draw(mesh, pO);
 }
+if (SOLAR) {
 GLX.state({ depthTest: true, depthWrite: false, cull: 'none', blend: 'add' });
 for (const c of this.comets) this.drawComet(c, glob, useP);
 if (Flight.on) Flight.drawFx(useP);
+}
 if (L.markers) {
 const mb = this.markBuf; let n = 0;
 for (const rb of this.rb) {
@@ -4042,6 +4170,54 @@ setMesh(name, mesh) { if (MODELS[name] && !MODELS[name + '-lite']) MODELS[name +
 hex,
 };
 })();
+COLORS.orbitFiction = '#c9a46e';
+Object.assign(World, {
+system: 'solar', bhReveal: 1,
+buildSystems() {
+this.systems = { solar: { rb: this.rb, sun: this.sun } };
+const G = SYSTEMS.gargantua, list = [];
+GARG_BODIES.forEach(def => { const rb = this.makeBody(def); rb.R = def.visR; rb.extent = def.extent || null; list.push(rb); this.byId[rb.id] = rb; });
+list.forEach(rb => { if (rb.def.parent) { rb.parent = this.byId[rb.def.parent]; rb.parent.children.push(rb); } });
+const bh = this.byId.gargantua; bh.isBH = true; bh.rS = G.H;
+list.forEach(rb => {
+const o = rb.def.orbit; if (!o) return;
+const N = 360, pos = new Float32Array((N + 1) * 3), fr = new Float32Array(N + 1);
+for (let i = 0; i <= N; i++) { const a = i / N * Math.PI * 2, p = this.cinePos(o, a); pos.set(p, i * 3); fr[i] = i / N; }
+rb.orbitMesh = GLX.mesh({ a_pos: { data: pos, size: 3 }, a_frac: { data: fr, size: 1 } }, null, GLX.gl.LINE_STRIP);
+});
+this.systems.gargantua = { rb: list, sun: bh };
+},
+cinePos(o, a) { const x = o.a * Math.cos(a), z = -o.a * Math.sin(a); return [x, z * Math.sin(o.i || 0), z * Math.cos(o.i || 0)]; },
+setSystem(id) {
+const s = this.systems[id]; if (!s || id === this.system) return;
+this.system = id; this.rb = s.rb; this.sun = s.sun;
+this.rb.forEach(rb => { rb.hover = 0; rb.drawOn = false; });
+for (const k in this.systems) this.systems[k].rb.forEach(rb => { const L = UI.labels[rb.id]; if (L) { L.el.style.display = k === id ? '' : 'none'; L.shown = false; } });
+},
+updateSystem(jd, dtReal, speed) {
+this.jd = jd; const d = jd - J2000;
+for (const rb of this.rb) {
+const o = rb.def.orbit; rb.rS = rb.def.visR;
+if (o && o.t === 'cine') { const a = (o.phase + d / o.P) * Math.PI * 2; rb.posS = this.cinePos(o, a); rb.orbitFrac = ((a / (Math.PI * 2)) % 1 + 1) % 1; }
+else rb.posS = [0, 0, 0];
+rb.helio = V.scale(rb.posS, 1 / 1000); rb.km = V.scale(rb.posS, 1000);
+rb.rotPhase = (rb.def.W0 || 0) + rb.rate * d; rb.basis = Astro.basisFromFrame(rb.frame, rb.rotPhase);
+}
+const bh = this.sun, cam = this.cam || [0, 0, 0], rel = V.sub(bh.posS, cam), dB = V.len(rel), sh = Math.atan(bh.rS * 2.6 / Math.max(dB, 1e-6));
+for (const rb of this.rb) { if (rb === bh) continue; const rp = V.sub(rb.posS, cam), dp = V.len(rp); rb.occBH = dp > dB && Math.acos(clamp(V.dot(rel, rp) / (dB * dp), -1, 1)) < sh; }
+},
+drawBH(t, useP) {
+const G = SYSTEMS.gargantua, bh = this.sun, pr = useP(this.P.bh), v = this.view, f = 1 / this.proj[5];
+const preset = Settings.state.graphics.preset; let steps = { low: 60, medium: 100, high: 150, ultra: 220 }[preset] || 130;
+const dist = Math.max(V.len(V.sub(this.cam, bh.posS)), 1e-6), cover = clamp((G.disk.out * 1.7 * G.H / dist) / f, 0, 3);
+steps = Math.round(steps * clamp(1.35 - cover * 0.45, 0.45, 1));
+GLX.state({ depthTest: false, depthWrite: false, cull: 'none', blend: 'premul' });
+GLX.setAll(pr, { u_camR: [v[0], v[4], v[8]], u_camU: [v[1], v[5], v[9]], u_camF: [-v[2], -v[6], -v[10]], u_tan: [f * GLX.W / GLX.H, f],
+u_cam: V.scale(V.sub(this.cam, bh.posS), 1 / G.H), u_steps: steps, u_rin: G.disk.in, u_rout: G.disk.out, u_reveal: this.bhReveal,
+u_heat: 1 + (this.bhBoost || 0), u_spin: UI.reducedMotion ? 0.12 : 0.45 });
+GLX.gl.bindVertexArray(GLX.fsTri); GLX.gl.drawArrays(GLX.gl.TRIANGLES, 0, 3);
+},
+});
 const Cam = {
 target: [0, 0, 0], dist: 560, dDist: 560, az: 0.9, el: 0.36, fov: 42 * DEG,
 vAz: 0, vEl: 0, focus: null, follow: true, fly: null, look: null, auto: 0,
@@ -4049,7 +4225,7 @@ pos: [0, 0, 0],
 offsetDir() { const ce = Math.cos(this.el); return [ce * Math.sin(this.az), Math.sin(this.el), ce * Math.cos(this.az)]; },
 minDist() { const f = this.focus; if (!f) return 1e-6; if (f.extent) return f.rS * f.extent * 1.18;   // forma importada: según su radio máximo
 return f.rS * (f.irregular ? 1.6 : f.isCraft ? 1.3 : 1.12); },
-maxDist() { return ScaleState.get('maxDist'); },
+maxDist() { return World.system !== 'solar' ? SYSTEMS[World.system].maxDist : ScaleState.get('maxDist'); },   // cada sistema tiene su propio límite
 frameDist(rb, close) {
 let k = (close ? 2.4 : 4.2) * (rb.extent || 1);
 if (rb.def.vis.rings && rb.def.vis.rings.type === 'saturn') k *= 1.7;
@@ -4065,7 +4241,8 @@ const s = V.norm(V.scale(rb.posS, -1));
 return { az: Math.atan2(s[0], s[2]) + 0.75, el: 0.22 + Math.asin(clamp(s[1], -1, 1)) * 0.5 };
 },
 travel(rb, opts) {
-opts = opts || {};
+opts = Object.assign({}, opts || {});
+if (World.system === 'gargantua') opts.cine = true;      // Sistema Gargantúa: transiciones más lentas y dramáticas
 const d1 = opts.dist || this.frameDist(rb, opts.close);
 const ang = opts.keepAngles ? { az: this.az, el: this.el } : this.arrivalAngles(rb);
 const travel = V.dist(this.target, rb.posS);
@@ -4856,7 +5033,8 @@ el.innerHTML = rows.map(r => `<div class="live-row"><span>${esc(r.label)}</span>
 },
 buildLabels() {
 const host = $('#labels');
-World.rb.forEach(rb => {
+const all = World.systems ? [].concat(...Object.values(World.systems).map(s => s.rb)) : World.rb;   // etiquetas de todos los sistemas
+all.forEach(rb => {
 const el = document.createElement('div');
 el.className = 'lbl lbl-' + rb.def.type;
 el.innerHTML = `<span class="n">${esc(rb.def.short || rb.def.name)}</span><span class="o"></span>`;
@@ -4874,14 +5052,14 @@ if (t === 'craft' && (!L.craft || rb.hidden)) return false;
 if (forPick) return true;
 if (S.mode === 'cine') return false;          // modo cine: ninguna etiqueta
 if (rb === this.sel || rb === this.hov) return true;
-if (t === 'star' || t === 'planet') return L.namesPlanets;
+if (t === 'star' || t === 'planet' || t === 'blackhole') return L.namesPlanets;
 if (t === 'moon') return L.namesMoons;
 if (t === 'dwarf') return L.namesPlanets || L.namesSmall;
 if (t === 'craft') return L.namesCraft;
 return L.namesSmall;
 },
 updateLabels() {
-Sci.labels(); Planner.marks();                 // etiquetas de las capas científicas y marcas de la ruta
+Sci.labels(); Planner.marks(); Systems.frame();   // capas científicas, ruta del planificador y avisos del sistema activo
 const placed = [], W = innerWidth, H = innerHeight;
 const pri = rb => (rb === this.sel ? 0 : rb === this.hov ? 1 : rb.isSun ? 2 : rb.def.type === 'planet' ? 3 : rb.def.type === 'dwarf' ? 4 : rb.def.type === 'moon' ? 6 : rb.isCraft ? 7 : 5);
 const list = World.rb.slice().sort((a, b) => pri(a) - pri(b));
@@ -6658,6 +6836,149 @@ Flight.setTarget(R.d); if (!Flight.intercept) Flight.toggle('intercept');
 UI.TOOL_ROWS = (UI.TOOL_ROWS || []).concat([['planner', ICON.travel, 'Planificador de viaje', 'Distancia, tiempo y transferencia orbital entre dos objetos']]);
 UI.TOOL_ACTIONS = Object.assign(UI.TOOL_ACTIONS || {}, { planner: () => Planner.open() });
 document.addEventListener('click', e => { const b = e.target.closest('#info-plan'); if (b) Planner.open({ dest: b.dataset.plan }); });
+ICON.gargantua = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="3.2" fill="currentColor"/><ellipse cx="12" cy="12" rx="9.5" ry="3"/><path d="M5 9.5a7.5 7.5 0 0 1 14 0" opacity=".6"/></svg>';
+ICON.systems = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="7" cy="12" r="2.6"/><circle cx="17" cy="12" r="2.6" fill="currentColor"/><path d="M9.8 12h4.4"/></svg>';
+const SECTIONS_SOLAR = UI.SECTIONS.slice();
+const SECTIONS_BY_SYSTEM = { gargantua: [['gargantua', 'Sistema Gargantúa'], ['capas', 'Capas'], ['config', 'Ajustes']] };
+const Systems = {
+busy: false,
+current() { return World.system; },
+openPicker() {
+let p = $('#sys-pick');
+if (!p) {
+p = document.createElement('section'); p.id = 'sys-pick'; p.className = 'ui'; p.setAttribute('role', 'dialog'); p.setAttribute('aria-labelledby', 'sys-pick-t');
+$('#app').appendChild(p);
+p.addEventListener('click', e => { const c = e.target.closest('[data-sys]'); if (c) { this.closePicker(); this.go(c.dataset.sys); } if (e.target.closest('[data-sys-close]')) this.closePicker(); });
+addEventListener('keydown', e => { if (e.key === 'Escape' && p.classList.contains('open')) { e.stopImmediatePropagation(); this.closePicker(); } }, true);
+}
+p.innerHTML = `<header class="tp-head"><div><span class="tp-kicker">Exploración</span><h2 id="sys-pick-t">Sistemas</h2></div><button class="icon-btn" data-sys-close aria-label="Cerrar">&times;</button></header>
+<div class="sys-cards">${Object.values(SYSTEMS).map(s => `<button class="sys-card sys-${s.id}${s.id === World.system ? ' on' : ''}" data-sys="${s.id}" ${s.id === World.system ? 'aria-current="true"' : ''}>
+<span class="sys-ico">${s.id === 'solar' ? ICON.overview : ICON.gargantua}</span><b>${s.name}</b><small>${s.sub}</small>${s.id === World.system ? '<em>Sistema actual</em>' : ''}</button>`).join('')}</div>`;
+p.classList.add('open');
+},
+closePicker() { const p = $('#sys-pick'); if (p) p.classList.remove('open'); },
+go(id) {
+if (this.busy || id === World.system || !SYSTEMS[id]) return;
+if (Flight.on) { UI.toast('Termina el vuelo antes de cambiar de sistema.'); return; }
+if (UI.tour) UI.stopTour(true);
+UI.select(null, { keepCam: true }); UI.openSection(null);
+[Compare, Planner, TL].forEach(T => T.close ? T.close() : T.toggle && T.toggle(false)); Sci.closePop && Sci.closePop();
+id === 'gargantua' ? this.enterGargantua() : this.enterSolar();
+},
+fade(on, ms) { const f = $('#sys-fade') || this.mkFade(); f.style.transitionDuration = ms + 'ms'; f.classList.toggle('on', on); },
+mkFade() { const f = document.createElement('div'); f.id = 'sys-fade'; f.innerHTML = '<div class="sys-title"><b id="sys-t1"></b><span id="sys-t2"></span></div><button class="txt-btn sys-skip" id="sys-skip">Omitir</button>'; $('#app').appendChild(f); $('#sys-skip').addEventListener('click', () => this.skip && this.skip()); return f; },
+apply(id) {
+World.setSystem(id);
+const app = $('#app'); Object.keys(SYSTEMS).forEach(k => app.classList.toggle('sys-' + k, k === id));
+UI.SECTIONS = SECTIONS_BY_SYSTEM[id] || SECTIONS_SOLAR;
+$('#rail').innerHTML = UI.SECTIONS.map(([sid, label]) => `<button class="rail-btn" data-sec="${sid}" aria-label="${label}" data-tip="${label}" data-tip-side="right">${ICON[sid] || ICON.herramientas}<span>${label}</span></button>`).join('');
+const sb = $('#sys-btn'); if (sb) sb.querySelector('span').textContent = SYSTEMS[id].name;
+},
+enterGargantua() {
+const G = SYSTEMS.gargantua, reduce = UI.reducedMotion, f = $('#sys-fade') || this.mkFade(), app = $('#app');
+this.busy = true; SFX.play && SFX.play('select');
+this.fade(true, reduce ? 250 : 900);
+const T = [];
+const done = () => { T.forEach(clearTimeout); this.busy = false; this.skip = null; app.classList.remove('sys-intro'); f.classList.remove('on', 'titled'); World.bhReveal = 1;
+Cam.fly = null; Cam.focus = World.sun; Cam.follow = true; Cam.target = [0, 0, 0]; Cam.dDist = Cam.dist = G.H * 34; Cam.el = 0.12; UI.hint('Sistema Gargantúa: elige un objeto en el menú o en el buscador'); };
+T.push(setTimeout(() => {
+this.apply('gargantua'); app.classList.add('sys-intro');
+World.bhReveal = 0; Cam.fly = null; Cam.focus = World.sun; Cam.follow = true; Cam.target = [0, 0, 0]; Cam.az = 0.55; Cam.el = 0.05; Cam.dDist = Cam.dist = G.H * 150;
+this.fade(false, reduce ? 300 : 1800);                                   // 2. aparecen las estrellas
+if (reduce) { done(); return; }
+const t0 = performance.now(), rev = () => { const k = clamp((performance.now() - t0 - 900) / 2600, 0, 1); World.bhReveal = k * k * (3 - 2 * k); if (k < 1 && this.busy) requestAnimationFrame(rev); };
+requestAnimationFrame(rev);                                              // 3–4. Gargantúa y su disco se hacen visibles
+T.push(setTimeout(() => Cam.travelTo([0, 0, 0], G.H * 34, 0.12), 1600));   // 5. aproximación lenta
+T.push(setTimeout(() => { $('#sys-t1').textContent = 'SISTEMA GARGANTÚA'; $('#sys-t2').textContent = 'Interstellar'; f.classList.add('titled'); }, 2600));   // 6. título
+T.push(setTimeout(() => f.classList.remove('titled'), 6200));
+T.push(setTimeout(done, 7000));                                           // 7. controles
+}, reduce ? 260 : 950));
+this.skip = done;
+},
+enterSolar() {
+const reduce = UI.reducedMotion; this.busy = true;
+this.fade(true, reduce ? 250 : 800);
+setTimeout(() => {
+this.apply('solar'); Cam.fly = null; Cam.focus = World.byId.sol; Cam.follow = true; Cam.target = [0, 0, 0]; Cam.dDist = Cam.dist = ScaleState.get('overview'); Cam.el = 0.5;
+this.fade(false, reduce ? 300 : 1100); this.busy = false; UI.toast('De vuelta en el Sistema Solar');
+}, reduce ? 260 : 850);
+},
+};
+const _secSys = UI.sectionHTML;
+UI.sectionHTML = function (id) {
+if (id === 'gargantua') {
+const G = SYSTEMS.gargantua;
+return `<p class="lead">${esc(G.sub)}. Explora el agujero negro supermasivo y los planetas que visita la misión Endurance.</p>
+<div class="list">${World.systems.gargantua.rb.map(rb => this.bodyRow(rb, rb.def.type === 'blackhole' ? 'Agujero negro supermasivo' : rb.def.info.fiction[0][1])).join('')}</div>
+<p class="note sys-note">${esc(G.note)}</p><p class="note">${esc(G.orbitsNote)}</p>
+<button class="cta-row" data-sys-go="solar">${ICON.overview}<span><b>Regresar al Sistema Solar</b><small>Volver a nuestro sistema planetario</small></span></button>`;
+}
+const h = _secSys.call(this, id);
+if (id === 'explorar') return `<button class="cta-row sys-cta" data-sys-go="gargantua">${ICON.gargantua}<span><b>Explorar Sistema Gargantúa</b><small>Universo de Interstellar · sistema ficticio</small></span></button>` + h;
+return h;
+};
+document.addEventListener('click', e => { const g = e.target.closest('[data-sys-go]'); if (g) Systems.go(g.dataset.sysGo); if (e.target.closest('#sys-btn')) Systems.openPicker(); });
+const _renderInfo = UI.renderInfo;
+UI.renderInfo = function (rb) {
+if (rb.def.system !== 'gargantua') return _renderInfo.call(this, rb);
+const d = rb.def, i = d.info, P = $('#info-body'), row = ([k, v]) => `<div class="row"><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`;
+P.innerHTML = `
+<header class="info-head">
+<span class="kind"><i class="dot" style="--c:${d.color}"></i>${esc(TYPE_LABEL[d.type])}${d.fiction || d.type === 'blackhole' ? ' · Interstellar' : ''}</span>
+<h2 id="info-title">${esc(d.name)}</h2><p class="desc">${esc(i.desc)}</p>
+<div class="info-actions"><button class="pill" id="info-travel">${ICON.travel}<span>Viajar</span></button><button class="pill" id="info-follow">${ICON.follow}<span>Seguir</span></button><button class="pill" id="info-close2">${ICON.zoomin}<span>Acercar</span></button></div>
+</header>
+<section class="gx-fic"><h3><span class="gx-tag fic">Universo de Interstellar</span></h3><dl>${i.fiction.map(row).join('')}</dl>${i.film ? `<p class="gx-film">${esc(i.film)}</p>` : ''}</section>
+${i.dilation ? Dilation.html() : ''}
+${i.science ? `<section class="gx-sci"><h3><span class="gx-tag sci">Ciencia real</span></h3>${i.science.map(([k, v]) => `<div class="gx-concept"><b>${esc(k)}</b><p>${esc(v)}</p></div>`).join('')}${i.render ? `<p class="note">${esc(i.render)}</p>` : ''}</section>` : ''}
+<footer class="src"><p><b>Fuente:</b> ${esc(d.src)}</p><p class="sys-note">${esc(SYSTEMS.gargantua.note)}</p>${rb.def.orbit ? `<p class="note">${esc(SYSTEMS.gargantua.orbitsNote)}</p>` : ''}</footer>`;
+P.scrollTop = 0;
+$('#info-travel').addEventListener('click', () => { this.userActed(); Cam.travel(rb); });
+$('#info-follow').addEventListener('click', () => { this.userActed(); if (Cam.focus === rb && Cam.follow) Cam.follow = false; else Cam.travel(rb, { keepAngles: true }); this.refreshCamButtons(); });
+$('#info-close2').addEventListener('click', () => { this.userActed(); Cam.travel(rb, { close: true }); });
+if (i.dilation) Dilation.start();
+this.refreshCamButtons();
+};
+const _updateLive = UI.updateLive;
+UI.updateLive = function (force) { if (this.sel && this.sel.def.system === 'gargantua') return; return _updateLive.call(this, force); };
+const Dilation = {
+RATIO: 7 * 365.25 * 24,                          // horas externas por hora local ≈ 61,362
+t: 0, run: true, last: 0, timer: 0,
+html() {
+return `<section class="gx-dil"><h3>Dilatación temporal <span class="gx-tag fic">Universo de Interstellar</span></h3>
+<p class="gx-ratio">1 hora local ≈ 7 años externos <small>(factor ≈ ${fmt(this.RATIO, 0)})</small></p>
+<div class="gx-clocks"><div><span>Tiempo en Miller</span><b id="dil-local">00:00:00</b></div><div><span>Tiempo externo equivalente</span><b id="dil-ext">0 días</b></div></div>
+<div class="gx-dil-act"><button class="txt-btn" id="dil-play">Pausar</button><button class="txt-btn" id="dil-reset">Reiniciar</button><button class="txt-btn" data-dil="600">10 min</button><button class="txt-btn" data-dil="3600">1 h</button><button class="txt-btn" data-dil="11520">3 h 12 min</button></div>
+<p class="note">Cálculo: tiempo externo = tiempo local × 61,362. Es la relación que usa la película; SOLARIS la representa con fines educativos y visuales. La dilatación temporal gravitacional es real, pero este valor concreto pertenece al escenario ficticio de Interstellar.</p></section>`;
+},
+start() {
+this.t = 0; this.run = true; this.last = performance.now(); clearInterval(this.timer);
+$('#dil-play').addEventListener('click', () => { this.run = !this.run; $('#dil-play').textContent = this.run ? 'Pausar' : 'Continuar'; this.last = performance.now(); });
+$('#dil-reset').addEventListener('click', () => { this.t = 0; this.paint(); });
+document.querySelectorAll('[data-dil]').forEach(b => b.addEventListener('click', () => { this.t = +b.dataset.dil; this.run = false; $('#dil-play').textContent = 'Continuar'; this.paint(); }));
+this.timer = setInterval(() => { if (!$('#dil-local')) { clearInterval(this.timer); return; } const n = performance.now(); if (this.run) this.t += (n - this.last) / 1000; this.last = n; this.paint(); }, 250);
+this.paint();
+},
+paint() {
+const el = $('#dil-local'), ex = $('#dil-ext'); if (!el) return;
+const s = Math.floor(this.t), p2 = n => String(n).padStart(2, '0');
+el.textContent = `${p2(Math.floor(s / 3600))}:${p2(Math.floor(s / 60) % 60)}:${p2(s % 60)}`;
+const days = this.t * this.RATIO / 86400; let y = Math.floor(days / 365.25), m = Math.round((days - y * 365.25) / 30.44); if (m === 12) { y++; m = 0; } const dd = Math.max(0, Math.round(days - y * 365.25 - m * 30.44));
+ex.textContent = days < 1 ? fmt(days * 24, 1) + ' horas' : '≈ ' + [y ? y + (y === 1 ? ' año' : ' años') : '', m ? m + (m === 1 ? ' mes' : ' meses') : '', !y && dd ? dd + (dd === 1 ? ' día' : ' días') : ''].filter(Boolean).join(' y ');
+},
+};
+(() => {
+const b = document.createElement('button'); b.id = 'sys-btn'; b.className = 'sys-btn'; b.setAttribute('aria-haspopup', 'dialog'); b.dataset.tip = 'Cambiar de sistema';
+b.innerHTML = ICON.systems + '<span>Sistema Solar</span>'; const fly = $('#fly-btn'); fly.parentNode.insertBefore(b, fly);
+const w = document.createElement('div'); w.id = 'bh-warn'; w.className = 'ui'; w.setAttribute('role', 'status'); w.innerHTML = '<b>PROXIMIDAD A GARGANTÚA</b><span>Campo gravitacional extremo · la cámara no puede acercarse más al horizonte de sucesos</span>'; $('#app').appendChild(w);
+const chip = document.createElement('div'); chip.id = 'sys-chip'; chip.className = 'ui'; chip.innerHTML = '<b>SISTEMA GARGANTÚA</b><span>Universo de Interstellar · sistema ficticio</span>'; $('#app').appendChild(chip);
+})();
+Systems.frame = function () {
+if (World.system !== 'gargantua') return;
+const bh = World.sun, d = V.len(V.sub(World.cam, bh.posS)) / bh.rS, near = d < 7 && !Systems.busy;
+const w = $('#bh-warn'); if (w.classList.contains('on') !== near) w.classList.toggle('on', near);
+World.bhBoost = clamp((9 - d) / 5, 0, 1) * 0.35;               // el disco se intensifica al acercarse
+};
 const App = {
 last: 0, scaleRatio: null, ready: false,
 qualityParams() {
@@ -6702,7 +7023,7 @@ const sg = $('#start-tours'); sg.disabled = false; sg.addEventListener('click', 
 const sf = $('#start-fly'); sf.disabled = false; sf.addEventListener('click', () => { this.begin(); Flight.openHangar(); });
 this.ready = true;
 if (Settings.state.general.startup === 'explore' && location.hash !== '#creditos') this.begin();
-window.Solaris = { World, Cam, UI, Time, S, select: id => UI.select(World.byId[id], { fly: true }), App, Flight, Music, SFX, Settings, Keys, Gfx, GLX, I18N, BODY, PackedModels, Assets, Compare, TL, Sci, ScaleState, Planner, Flight };
+window.Solaris = { World, Cam, UI, Time, S, select: id => UI.select(World.byId[id], { fly: true }), App, Flight, Music, SFX, Settings, Keys, Gfx, GLX, I18N, BODY, PackedModels, Assets, Compare, TL, Sci, ScaleState, Planner, Flight, Systems, Dilation };
 requestAnimationFrame(t => this.loop(t));
 },
 home() {
