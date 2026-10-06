@@ -1174,6 +1174,21 @@ el.classList.toggle('on', labels.length > 0);
 if (labels.length) el.querySelector('span').textContent = labels[labels.length - 1];
 },
 };
+Object.assign(Assets, {
+visual(rb) {
+const id = rb.id, m = rb.def.model, st = s => s === 'ok' ? 'loaded' : s === 'fail' ? 'failed' : s === 'loading' ? 'loading' : 'available';
+if (rb.isCraft && m && (MODEL_PACKS[m] || (m === 'jwst' && JWST_PACK && JWST_PACK.length > 20)))
+return { type: 'mesh', status: st(PackedModels.state[m]), source: m };
+if (ASSET_MANIFEST.bodyMeshes && ASSET_MANIFEST.bodyMeshes[id])
+return { type: 'mesh', status: st(PackedModels.bodyState[id]), source: ASSET_MANIFEST.bodyMeshes[id].url };
+if (typeof PLANET_TEX !== 'undefined' && PLANET_TEX[id]) {
+const s = World.texState && World.texState[id];
+return { type: s === 'fail' ? 'standard' : 'texture', status: st(s), source: PLANET_TEX[id].map };
+}
+return { type: 'standard', status: 'loaded', source: null };
+},
+changed() { clearTimeout(this.vbT); this.vbT = setTimeout(() => UI.refreshBadges && UI.refreshBadges(), 60); },
+});
 const PREV_CREDITS = [];
 for (const id in PLANET_TEX) {
 const c = PLANET_TEX[id].credit; if (!c || !BODY[id]) continue;
@@ -1183,16 +1198,16 @@ BODY[id].credit = c;
 }
 for (const name in MODEL_PACKS) if (MODEL_PACKS[name].credit && !MODEL_CREDITS[name]) { MODEL_CREDITS[name] = MODEL_PACKS[name].credit; if (BODY[name]) BODY[name].credit = MODEL_CREDITS[name]; }
 Object.assign(PackedModels, {
-state: {},
+state: {}, bodyState: {},
 gunzip(s) { return Assets.gunzip(s); },
 request(name, visible) {
 if (this.state[name] === 'ok' || this.state[name] === 'fail') return Promise.resolve(this.state[name] === 'ok');
 if (visible) Assets.busy('m:' + name, 'Cargando modelo…');
 return Assets.once('model:' + name, async () => {
-this.state[name] = 'loading';
+this.state[name] = 'loading'; Assets.changed();
 let ok = false;
 try { ok = name === 'jwst' ? await this.loadJWST() : await this.loadPack(name); } catch (e) { console.warn('Modelo detallado no disponible: ' + name, e); }
-this.state[name] = ok ? 'ok' : 'fail';
+this.state[name] = ok ? 'ok' : 'fail'; Assets.changed();
 if (ok) this.apply(name);
 Assets.done('m:' + name);
 return ok;
@@ -1213,8 +1228,10 @@ if (UI.sel && UI.sel.def.model === name) UI.renderInfo(UI.sel);
 loadBody(id) {
 const E = ASSET_MANIFEST.bodyMeshes && ASSET_MANIFEST.bodyMeshes[id];
 if (!E || typeof DecompressionStream === 'undefined') return Promise.resolve(false);
+this.bodyState[id] = this.bodyState[id] || 'loading'; Assets.changed();
 return Assets.once('body:' + id, async () => {
-const D = this.decode(await Assets.gunzip(E.url)); if (!D) return false;
+let D = null; try { D = this.decode(await Assets.gunzip(E.url)); } catch (e) { console.warn('Forma no disponible: ' + id, e); }
+if (!D) { this.bodyState[id] = 'fail'; Assets.changed(); return false; }
 const { nv, ni, step, q, nm, dl } = D;
 const pos = new Float32Array(nv * 3), nrm = new Float32Array(nv * 3), dir = new Float32Array(nv * 3); let R = 0;
 for (let i = 0; i < nv * 3; i++) pos[i] = q[i] * step;
@@ -1230,7 +1247,7 @@ const idx = new Uint32Array(ni); let a = 0; for (let i = 0; i < ni; i++) { a += 
 const rb = World.byId[id]; if (!rb) return false;
 const old = rb.mesh;
 rb.mesh = GLX.mesh({ a_pos: { data: pos, size: 3 }, a_nrm: { data: nrm, size: 3 }, a_dir: { data: dir, size: 3 } }, idx);
-rb.irregular = true; World.hd[id] = true;
+rb.irregular = true; World.hd[id] = true; this.bodyState[id] = 'ok'; Assets.changed();
 if (UI.sel === rb) UI.renderInfo(rb);
 if (old && old !== rb.mesh && GLX.freeMesh) GLX.freeMesh(old);           // libera la forma procedural anterior
 return true;
@@ -3313,7 +3330,7 @@ GLX.drawRange(mesh, pr, g.first, g.count);
 },
 requestTex(id, visible) {
 if (typeof PLANET_TEX === 'undefined' || !PLANET_TEX[id] || this.texState[id]) return;
-this.texState[id] = 'loading';
+this.texState[id] = 'loading'; Assets.changed();
 if (visible) Assets.busy('t:' + id, 'Preparando objeto…');
 if (ASSET_MANIFEST.bodyMeshes && ASSET_MANIFEST.bodyMeshes[id]) PackedModels.loadBody(id);   // forma real del cuerpo
 (async () => {
@@ -3322,9 +3339,9 @@ if (!map) throw new Error('sin formato compatible');
 const t = { map: await GLX.texFromURI(map, true) };
 if (e.nmap) t.nmap = await GLX.texFromURI(e.nmap, true);
 if (e.ring) t.ring = await GLX.texFromURI(e.ring.uri, true);
-this.ptex[id] = t; this.applyPlanetTextures(id); this.texState[id] = 'ok';
+this.ptex[id] = t; this.applyPlanetTextures(id); this.texState[id] = 'ok'; Assets.changed();
 if (UI.sel === this.byId[id]) UI.renderInfo(UI.sel);          // la ficha abierta muestra ya el crédito del modelo
-})().catch(err => { this.texState[id] = 'fail'; if (!/formato/.test(err.message)) console.warn('Textura no disponible: ' + id, err); })
+})().catch(err => { this.texState[id] = 'fail'; Assets.changed(); if (!/formato/.test(err.message)) console.warn('Textura no disponible: ' + id, err); })
 .finally(() => Assets.done('t:' + id));
 },
 texTick() {
@@ -4363,15 +4380,45 @@ document.querySelectorAll('.rail-btn').forEach(b => b.classList.toggle('on', b.d
 const d = $('#drawer');
 if (!id) { d.classList.remove('open'); d.setAttribute('aria-hidden', 'true'); return; }
 $('#drawer-title').textContent = this.SECTIONS.find(s => s[0] === id)[1];
-$('#drawer-body').innerHTML = this.sectionHTML(id);
+$('#drawer-body').innerHTML = (['planetas', 'enanos', 'asteroides', 'cometas', 'naves', 'lunas'].includes(id) ? this.only3DHTML() : '') + this.sectionHTML(id);
+const o3 = $('#drawer-body [data-only3d]'); if (o3) o3.addEventListener('change', () => { this.only3D = o3.checked; this.applyOnly3D(); });
+this.applyOnly3D();
 d.classList.add('open'); d.setAttribute('aria-hidden', 'false');
 this.bindSection(id);
 if (id === 'config') this.refreshAudio();
 if (innerWidth < 760) this.select(null, { keepCam: true });
 },
+badge(rb) { return `<span class="vb" data-vb="${rb.id}">${this.badgeInner(rb)}</span>`; },
+badgeInner(rb) {
+const v = Assets.visual(rb);
+const cube = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.6l5.6 3.1v6.6L8 14.4l-5.6-3.1V4.7z M2.4 4.7L8 7.8l5.6-3.1 M8 7.8v6.6"/></svg>';
+if (v.type === 'mesh') {
+if (v.status === 'failed') return `<span class="b3d fail" data-tip="No se pudo cargar el modelo 3D importado; se muestra la representación estándar.">Modelo no disponible</span>`;
+if (v.status === 'loading') return `<span class="b3d loading" data-tip="Descargando el modelo 3D importado…">${cube}3D · Cargando</span>`;
+return `<span class="b3d" role="img" aria-label="Modelo 3D importado" data-tip="${v.status === 'loaded' ? 'Este objeto utiliza un modelo 3D importado.' : 'Este objeto utiliza un modelo 3D importado; se descarga al verlo de cerca.'}">${cube}3D</span>`;
+}
+if (v.type === 'texture') return `<span class="btex" data-tip="Superficie con textura importada sobre la esfera estándar (no es un modelo 3D).">Textura</span>`;
+return '';
+},
+refreshBadges() {
+document.querySelectorAll('[data-vb]').forEach(el => { const rb = World.byId[el.dataset.vb]; if (rb) { const h = this.badgeInner(rb); if (el.innerHTML !== h) el.innerHTML = h; } });
+document.querySelectorAll('.row[data-go]').forEach(r => { const rb = World.byId[r.dataset.go]; if (rb) r.classList.toggle('has3d', Assets.visual(rb).type === 'mesh'); });
+this.applyOnly3D();
+},
+only3D: false,
+only3DHTML() { return `<div class="only3d-bar"><label class="mix-sw only3d"><input type="checkbox" data-only3d ${this.only3D ? 'checked' : ''}><span class="sw" aria-hidden="true"></span><span>Solo objetos con modelo 3D</span></label><span class="vb-legend"><span class="b3d">3D</span> modelo importado · <span class="btex">Textura</span> superficie importada</span></div>`; },
+applyOnly3D() {
+const d = $('#drawer-body'); if (!d) return;
+d.classList.toggle('only3d-on', this.only3D);
+d.querySelectorAll('.list').forEach(l => { const any = l.querySelector('.row.has3d'); l.classList.toggle('empty3d', this.only3D && !any); const h = l.previousElementSibling; if (h && h.tagName === 'H3') h.classList.toggle('empty3d', this.only3D && !any); });
+let msg = d.querySelector('.only3d-none'); const none = this.only3D && !d.querySelector('.row.has3d');
+if (none && !msg) { msg = document.createElement('p'); msg.className = 'note only3d-none'; msg.textContent = 'Ningún objeto de esta lista tiene todavía un modelo 3D importado.'; d.appendChild(msg); }
+if (msg) msg.hidden = !none;
+},
 bodyRow(rb, extra) {
 const c = rb.def.color;
-return `<button class="row" data-go="${rb.id}"><i class="dot" style="--c:${c}"></i><span class="row-main"><b>${esc(rb.def.short || rb.def.name)}</b><small>${esc(extra || TYPE_LABEL[rb.def.type])}</small></span><span class="row-go">${ICON.travel}</span></button>`;
+const vt = Assets.visual(rb).type;
+return `<button class="row${vt === 'mesh' ? ' has3d' : ''}" data-go="${rb.id}"><i class="dot" style="--c:${c}"></i><span class="row-main"><b>${esc(rb.def.short || rb.def.name)}${this.badge(rb)}</b><small>${esc(extra || TYPE_LABEL[rb.def.type])}</small></span><span class="row-go">${ICON.travel}</span></button>`;
 },
 sectionHTML(id) {
 const W = World, by = t => W.rb.filter(r => r.def.type === t);
@@ -4586,7 +4633,7 @@ names.forEach(n => { if (n === t) sc = Math.min(sc, 0); else if (n.startsWith(t)
 return { rb, sc };
 }).filter(h => h.sc < 99).sort((a, b) => a.sc - b.sc || a.rb.def.name.localeCompare(b.rb.def.name)).slice(0, 8);
 this.hits = hits.map(h => h.rb); this.searchIdx = hits.length ? 0 : -1;
-res.innerHTML = hits.length ? hits.map((h, i) => `<li role="option" id="opt-${i}" aria-selected="${i === 0}" data-go="${h.rb.id}"><i class="dot" style="--c:${h.rb.def.color}"></i><b>${esc(h.rb.def.name)}</b><small>${esc(TYPE_LABEL[h.rb.def.type])}${h.rb.parent && h.rb.def.type === 'moon' ? ' de ' + esc(h.rb.parent.def.name) : ''}</small></li>`).join('')
+res.innerHTML = hits.length ? hits.map((h, i) => `<li role="option" id="opt-${i}" aria-selected="${i === 0}" data-go="${h.rb.id}"><i class="dot" style="--c:${h.rb.def.color}"></i><b>${esc(h.rb.def.name)}</b>${this.badge(h.rb)}<small>${esc(TYPE_LABEL[h.rb.def.type])}${h.rb.parent && h.rb.def.type === 'moon' ? ' de ' + esc(h.rb.parent.def.name) : ''}</small></li>`).join('')
 : `<li class="empty">Sin resultados para "${esc(q.value)}". Prueba con un planeta, luna, asteroide o cometa.</li>`;
 res.classList.add('open'); q.setAttribute('aria-expanded', 'true');
 };
@@ -6965,7 +7012,7 @@ const match = r => !q || [r.def.name, r.def.short || '', ...(r.def.aka || [])].s
 $('#ft-list').innerHTML = groups.map(([t, f]) => {
 const items = World.rb.filter(r => f(r) && match(r));
 if (!items.length) return '';
-return `<h5>${t}</h5>` + items.map(r => `<button data-t="${r.id}" class="${r === this.target ? 'on' : ''}"><i class="dot" style="--c:${r.def.color}"></i><span>${esc(r.def.short || r.def.name)}</span><small>${fmtKm(V.dist(this.pos, r.km))}</small></button>`).join('');
+return `<h5>${t}</h5>` + items.map(r => `<button data-t="${r.id}" class="${r === this.target ? 'on' : ''}"><i class="dot" style="--c:${r.def.color}"></i><span>${esc(r.def.short || r.def.name)}${UI.badge(r)}</span><small>${fmtKm(V.dist(this.pos, r.km))}</small></button>`).join('');
 }).join('') || '<p class="note">Sin resultados.</p>';
 document.querySelectorAll('#ft-list [data-t]').forEach(b => b.addEventListener('click', () => { this.setTarget(World.byId[b.dataset.t]); this.toggleTargets(false); }));
 },
