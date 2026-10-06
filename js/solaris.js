@@ -1142,7 +1142,7 @@ return true;
 },
 };
 const ASSET_MANIFEST = {"music": {"webm": "assets/audio/metamorphosis.webm", "mp3": "assets/audio/metamorphosis.mp3"}, "bodyMeshes": {"fobos": {"url": "assets/models/moons/fobos.bin", "k": 1.26255}, "deimos": {"url": "assets/models/moons/deimos.bin", "k": 1.37497}, "haumea": {"url": "assets/models/dwarfs/haumea.bin", "k": 1.44255}}};
-const SOLARIS_BUILD = '2026.10.06-0824-web';
+const SOLARIS_BUILD = '2026.10.06-0842-web';
 console.info('SOLARIS · versión ' + SOLARIS_BUILD);
 const Assets = {
 cache: new Map(), busyN: new Map(),
@@ -3742,7 +3742,7 @@ pxPerUnit(w) { return this.proj[5] * (GLX.H / GLX.dpr) * 0.5 / w; },
 render(t) {
 const gl = GLX.gl, P = this.P, cam = this.cam, L = S.layers;
 const nowc = performance.now(), dtc = this._lt ? Math.min(0.1, (nowc - this._lt) / 1000) : 0.016; this._lt = nowc;
-this.cineK = (this.cineK || 0) + (((S.mode === 'cine' || UI.tourCine) ? 1 : 0) - (this.cineK || 0)) * Math.min(1, dtc * 2.2);
+this.cineK = (this.cineK || 0) + (((S.mode === 'cine' || UI.tourCine || (typeof Missions !== 'undefined' && Missions.run && Missions.run.cine)) ? 1 : 0) - (this.cineK || 0)) * Math.min(1, dtc * 2.2);
 const vis1 = 1 - this.cineK;
 const SOLAR = this.system === 'solar';
 const sunRS = this.sun.rS;
@@ -3800,6 +3800,7 @@ GLX.setAll(pr, { u_model: rb.model, u_occ: ob, u_occN: n, u_sunR: this.shadowSun
 if (mesh.groups) this.drawGroups(mesh, pr); else GLX.draw(mesh, pr);
 }
 if (Flight.on) Flight.drawShip(useP);
+if (!SOLAR && typeof Missions !== 'undefined' && Missions.run) Missions.draw(useP, t);
 GLX.state({ depthTest: true, depthWrite: false, cull: 'none', blend: 'premul' });
 for (const rb of vis) {
 const R = rb.def.vis.rings; if (!R || rb.proj.rpx < 1.2) continue;
@@ -4318,7 +4319,8 @@ sx = (R - L) / W;
 if (UI.tour && !UI.tour.done && W < 900) { const tb = document.getElementById('tourbar'); if (tb) sy = -Math.min(tb.offsetHeight + 40, H * 0.6) / H; }
 const k = 1 - Math.exp(-dt * 5);
 this.sx = lerp(this.sx || 0, sx, k); this.sy = lerp(this.sy || 0, sy, k);
-World.proj[8] = this.sx; World.proj[9] = this.sy;
+this.isy = lerp(this.isy || 0, this.introSY || 0, k);              // composición de presentaciones (p. ej., Gargantúa en el tercio superior)
+World.proj[8] = this.sx; World.proj[9] = this.sy + this.isy;
 },
 };
 const Input = {
@@ -5059,7 +5061,7 @@ if (t === 'craft') return L.namesCraft;
 return L.namesSmall;
 },
 updateLabels() {
-Sci.labels(); Planner.marks(); Systems.frame();   // capas científicas, ruta del planificador y avisos del sistema activo
+Sci.labels(); Planner.marks(); Systems.frame(); Missions.frame();   // capas científicas, ruta del planificador y avisos del sistema activo
 const placed = [], W = innerWidth, H = innerHeight;
 const pri = rb => (rb === this.sel ? 0 : rb === this.hov ? 1 : rb.isSun ? 2 : rb.def.type === 'planet' ? 3 : rb.def.type === 'dwarf' ? 4 : rb.def.type === 'moon' ? 6 : rb.isCraft ? 7 : 5);
 const list = World.rb.slice().sort((a, b) => pri(a) - pri(b));
@@ -6879,10 +6881,10 @@ const G = SYSTEMS.gargantua, reduce = UI.reducedMotion, f = $('#sys-fade') || th
 this.busy = true; SFX.play && SFX.play('select');
 this.fade(true, reduce ? 250 : 900);
 const T = [];
-const done = () => { T.forEach(clearTimeout); this.busy = false; this.skip = null; app.classList.remove('sys-intro'); f.classList.remove('on', 'titled'); World.bhReveal = 1;
+const done = () => { T.forEach(clearTimeout); this.busy = false; this.skip = null; Cam.introSY = 0; app.classList.remove('sys-intro'); f.classList.remove('on', 'titled'); World.bhReveal = 1;
 Cam.fly = null; Cam.focus = World.sun; Cam.follow = true; Cam.target = [0, 0, 0]; Cam.dDist = Cam.dist = G.H * 34; Cam.el = 0.12; UI.hint('Sistema Gargantúa: elige un objeto en el menú o en el buscador'); };
 T.push(setTimeout(() => {
-this.apply('gargantua'); app.classList.add('sys-intro');
+this.apply('gargantua'); app.classList.add('sys-intro'); Cam.introSY = -0.33;     // Gargantúa en el tercio superior, título en el inferior
 World.bhReveal = 0; Cam.fly = null; Cam.focus = World.sun; Cam.follow = true; Cam.target = [0, 0, 0]; Cam.az = 0.55; Cam.el = 0.05; Cam.dDist = Cam.dist = G.H * 150;
 this.fade(false, reduce ? 300 : 1800);                                   // 2. aparecen las estrellas
 if (reduce) { done(); return; }
@@ -6909,6 +6911,11 @@ UI.sectionHTML = function (id) {
 if (id === 'gargantua') {
 const G = SYSTEMS.gargantua;
 return `<p class="lead">${esc(G.sub)}. Explora el agujero negro supermasivo y los planetas que visita la misión Endurance.</p>
+<div class="list">
+<button class="cta-row" data-sys-free>${ICON.overview}<span><b>Explorar libremente</b><small>Navega por el sistema a tu ritmo</small></span></button>
+<button class="cta-row ms-cta" data-ms-brief="endurance">${ICON.tour}<span><b>Modo misión Endurance</b><small>Gargantúa → Miller → Mann → maniobra gravitacional → Edmunds</small></span></button>
+</div>
+<h3>Objetos del sistema</h3>
 <div class="list">${World.systems.gargantua.rb.map(rb => this.bodyRow(rb, rb.def.type === 'blackhole' ? 'Agujero negro supermasivo' : rb.def.info.fiction[0][1])).join('')}</div>
 <p class="note sys-note">${esc(G.note)}</p><p class="note">${esc(G.orbitsNote)}</p>
 <button class="cta-row" data-sys-go="solar">${ICON.overview}<span><b>Regresar al Sistema Solar</b><small>Volver a nuestro sistema planetario</small></span></button>`;
@@ -6979,6 +6986,277 @@ const bh = World.sun, d = V.len(V.sub(World.cam, bh.posS)) / bh.rS, near = d < 7
 const w = $('#bh-warn'); if (w.classList.contains('on') !== near) w.classList.toggle('on', near);
 World.bhBoost = clamp((9 - d) / 5, 0, 1) * 0.35;               // el disco se intensifica al acercarse
 };
+const MissionCam = {
+pose() { return { target: Cam.target.slice(), dist: Cam.dist, az: Cam.az, el: Cam.el }; },
+apply(p) { Cam.fly = null; Cam.focus = null; Cam.follow = false; Cam.auto = 0; Cam.target = p.target.slice(); Cam.dist = Cam.dDist = p.dist; Cam.az = p.az; Cam.el = p.el; },
+blend(a, b, k) {
+const e = k < 0.5 ? 16 * k ** 5 : 1 - Math.pow(-2 * k + 2, 5) / 2;          // arranque y llegada muy suaves
+let daz = ((b.az - a.az) % (Math.PI * 2) + Math.PI * 3) % (Math.PI * 2) - Math.PI;
+return { target: V.add(a.target, V.scale(V.sub(b.target, a.target), e)), dist: Math.exp(lerp(Math.log(a.dist), Math.log(b.dist), e)), az: a.az + daz * e, el: lerp(a.el, b.el, e) };
+},
+angles(dir) { const d = V.norm(dir); return { az: Math.atan2(d[0], d[2]), el: Math.asin(clamp(d[1], -1, 1)) }; },
+};
+const Missions = {
+registry: {}, run: null, speed: 1,
+register(def) { this.registry[def.id] = def; },
+briefing(id) {
+const M = this.registry[id]; if (!M) return;
+UI.openSection(null); UI.select(null, { keepCam: true });
+this.overlay(`<span class="ms-kicker">${esc(M.kicker)}</span><h2>${esc(M.title)}</h2><p class="ms-sub">${esc(M.sub)}</p><p class="ms-desc">${esc(M.desc)}</p>
+<ol class="ms-route">${M.stages.filter(s => s.label).map(s => `<li>${esc(s.label)}</li>`).join('')}</ol><p class="note">${esc(M.note)}</p>
+<div class="ms-btns"><button class="cta" data-ms="start" data-id="${id}">Iniciar misión</button><button class="cta-ghost" data-ms="close">Volver</button></div>`);
+},
+overlay(html) {
+let o = $('#ms-ov'); if (!o) { o = document.createElement('section'); o.id = 'ms-ov'; o.setAttribute('role', 'dialog'); $('#app').appendChild(o); }
+o.innerHTML = `<div class="ms-card">${html}</div>`; o.classList.add('open');
+},
+closeOverlay() { const o = $('#ms-ov'); if (o) o.classList.remove('open'); },
+start(id) {
+const M = this.registry[id]; if (!M) return;
+this.closeOverlay();
+if (this.run) this.exit({ restore: true, silent: true });
+const saved = { cam: Object.assign(MissionCam.pose(), { focus: Cam.focus, follow: Cam.follow, fov: Cam.fov }), time: { jd: Time.jd, paused: Time.paused, idx: Time.idx, live: Time.live },
+sel: UI.sel, mode: S.mode, section: UI.section };
+if (S.mode === 'cine') UI.setMode('explore');
+UI.select(null, { keepCam: true }); UI.openSection(null);
+Time.paused = true;                                                       // las posiciones no avanzan durante la misión
+this.run = { M, i: -1, t: 0, paused: false, saved, cine: false, hidden: false, shot: null, path: null, pathA: 0, ship: null };
+$('#app').classList.add('in-mission'); this.hud(); this.go(0);
+this.sfx('start');
+},
+exit(opts) {
+opts = opts || {}; const R = this.run; if (!R) return;
+const st = R.M.stages[R.i]; if (st && st.exit) st.exit(this.ctx);
+this.run = null; this.ctx.cleanup();
+$('#app').classList.remove('in-mission', 'mission-cine', 'mission-hide', 'ms-active');
+const s = R.saved;
+Time.jd = s.time.jd; Time.paused = s.time.paused; Time.idx = s.time.idx; Time.live = s.time.live; UI.refreshTime();
+Cam.fov = s.cam.fov;
+if (opts.keepCamera) { Cam.focus = opts.focus || null; Cam.follow = !!opts.focus; }
+else { MissionCam.apply(s.cam); Cam.focus = s.cam.focus; Cam.follow = s.cam.follow; }
+if (s.mode === 'cine' && !opts.keepCamera) UI.setMode('cine');
+if (opts.select) UI.select(opts.select, { keepCam: true }); else if (s.sel && !opts.keepCamera && World.rb.includes(s.sel)) UI.select(s.sel, { keepCam: true });
+['ms-hud', 'ms-ctl', 'ms-cap', 'ms-warn', 'ms-dil'].forEach(id => { const e = $('#' + id); if (e) e.remove(); });
+this.closeOverlay();
+if (!opts.silent) UI.toast(opts.msg || 'Has salido de la misión: vuelves al explorador libre');
+},
+go(i) {
+const R = this.run; if (!R) return;
+i = clamp(i, 0, R.M.stages.length - 1);
+const prev = R.M.stages[R.i]; if (prev && prev.exit) prev.exit(this.ctx);
+R.i = i; R.t = 0; R.shot = null; R.marks = {};
+const st = R.M.stages[i]; this.caption(null);
+if (st.enter) st.enter(this.ctx);
+if (st.sfx) this.sfx(st.sfx);
+this.paintHud();
+},
+next() { const R = this.run; if (R && R.i < R.M.stages.length - 1) this.go(R.i + 1); },
+prev() { const R = this.run; if (R) this.go(Math.max(0, R.i - 1)); },
+restart() { const R = this.run; if (R) { R.paused = false; this.go(0); } },
+pause(v) {
+const R = this.run; if (!R) return; R.paused = v == null ? !R.paused : v;
+if (!R.paused && R.shot) { R.shot.from = MissionCam.pose(); R.shot.t0 = R.t; R.shot.dur = Math.min(R.shot.dur, 1.4); }   // reanudar con suavidad
+this.paintHud();
+},
+toggleCine() { const R = this.run; if (!R) return; R.cine = !R.cine; $('#app').classList.toggle('mission-cine', R.cine); this.wake(); this.paintHud(); },
+toggleHide() { const R = this.run; if (!R) return; R.hidden = !R.hidden; $('#app').classList.toggle('mission-hide', R.hidden); this.wake(); this.paintHud(); },
+wake() { $('#app').classList.add('ms-active'); clearTimeout(this.wakeT); this.wakeT = setTimeout(() => { if (this.run && (this.run.cine || this.run.hidden) && !this.run.paused) $('#app').classList.remove('ms-active'); }, 3200); },
+frame() {
+const R = this.run; if (!R) return;
+const now = performance.now(), dt = Math.min(0.1, (now - (this.lastT || now)) / 1000) * this.speed; this.lastT = now;
+if (R.paused) return;
+const st = R.M.stages[R.i];
+R.t += dt;
+if (R.shot) { const S = R.shot, k = clamp((R.t - S.t0) / S.dur, 0, 1), to = typeof S.to === 'function' ? S.to() : S.to; MissionCam.apply(MissionCam.blend(S.from, to, k)); }
+if (st.update) st.update(this.ctx, R.t, dt);
+if (st.dur && R.t >= st.dur && st.auto !== false) this.next();
+if (R.pathA > 0 && !R.pathKeep) R.pathA = Math.max(0, R.pathA - dt * 0.4);
+},
+hud() {
+const h = document.createElement('div'); h.id = 'ms-hud'; $('#app').appendChild(h);
+const c = document.createElement('div'); c.id = 'ms-ctl'; c.setAttribute('role', 'toolbar'); c.setAttribute('aria-label', 'Controles de la misión'); $('#app').appendChild(c);
+c.addEventListener('click', e => { const b = e.target.closest('[data-mc]'); if (!b) return; ({ prev: () => this.prev(), play: () => this.pause(), next: () => this.next(), restart: () => this.restart(), cine: () => this.toggleCine(), hide: () => this.toggleHide(), exit: () => this.exit({ restore: true }) })[b.dataset.mc](); this.wake(); });
+const cap = document.createElement('div'); cap.id = 'ms-cap'; $('#app').appendChild(cap);
+const w = document.createElement('div'); w.id = 'ms-warn'; $('#app').appendChild(w);
+['pointermove', 'pointerdown', 'keydown'].forEach(t => addEventListener(t, () => { if (this.run) this.wake(); }, { passive: true }));
+this.wake();
+},
+paintHud() {
+const R = this.run; if (!R) return;
+const st = R.M.stages, cur = st[R.i], steps = st.filter(s => s.label), idx = steps.indexOf(cur) >= 0 ? steps.indexOf(cur) : steps.length - 1;
+$('#ms-hud').innerHTML = `<b>${esc(R.M.title)}</b><span>${idx + 1} / ${steps.length}</span><ol>${steps.map((s, k) => `<li class="${k < idx ? 'done' : k === idx ? 'on' : ''}">${esc(s.label)}</li>`).join('')}</ol>`;
+const ic = (n, t, on) => `<button data-mc="${n}" class="${on ? 'on' : ''}" aria-label="${t}" data-tip="${t}">${MS_ICON[n]}</button>`;
+$('#ms-ctl').innerHTML = ic('prev', 'Etapa anterior') + ic('play', R.paused ? 'Continuar' : 'Pausar').replace(MS_ICON.play, R.paused ? MS_ICON.resume : MS_ICON.play) + ic('next', 'Siguiente etapa') + ic('restart', 'Reiniciar misión')
++ '<i class="ms-sep"></i>' + ic('cine', 'Modo Cine', R.cine) + ic('hide', 'Ocultar interfaz', R.hidden) + ic('exit', 'Salir de la misión');
+},
+caption(title, sub, ms) {
+const c = $('#ms-cap'); if (!c) return; clearTimeout(this.capT);
+if (!title) { c.classList.remove('on'); return; }
+c.innerHTML = `<b>${esc(title)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}`; c.classList.add('on');
+if (ms) this.capT = setTimeout(() => c.classList.remove('on'), ms / this.speed);
+},
+warn(t) { const w = $('#ms-warn'); if (!w) return; if (w.dataset.t === (t || '')) return; w.dataset.t = t || ''; w.textContent = t || ''; w.classList.toggle('on', !!t); },
+sfx(n) {
+if (!SFX.ready || !SFX.ready()) return; const T = (o) => SFX.tone('navigation', o), H = (o) => SFX.hiss('navigation', o);
+try {
+({ start: () => { T({ f: 110, f2: 82, dur: 2.4, gain: 0.05, lp: 700 }); T({ f: 165, f2: 123, dur: 2.4, gain: 0.03, lp: 900, delay: 0.15 }); },
+whoosh: () => H({ f0: 900, dur: 1.6, gain: 0.03, q: 0.8 }),
+deep: () => { T({ f: 52, f2: 41, dur: 5, gain: 0.07, lp: 300 }); H({ f0: 220, dur: 4, gain: 0.02, q: 0.6 }); },
+assist: () => { T({ f: 55, f2: 110, dur: 7, gain: 0.06, lp: 500 }); H({ f0: 400, dur: 6, gain: 0.03, q: 0.7 }); },
+arrive: () => { T({ f: 330, dur: 2.2, gain: 0.03, lp: 1600 }); T({ f: 494, dur: 2.2, gain: 0.025, lp: 1600, delay: 0.25 }); T({ f: 659, dur: 2.6, gain: 0.02, lp: 1800, delay: 0.5 }); },
+cold: () => T({ f: 220, f2: 196, dur: 3, gain: 0.025, lp: 1200 }) })[n]?.();
+} catch (e) { /* el audio es opcional */ }
+},
+};
+const MS_ICON = {
+prev: '<svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>', next: '<svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>',
+play: '<svg viewBox="0 0 24 24"><path d="M8.5 6v12M15.5 6v12"/></svg>', resume: '<svg viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z"/></svg>',
+restart: '<svg viewBox="0 0 24 24"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3M4.5 4.5v3.7h3.7"/></svg>',
+cine: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 5v14M17 5v14"/></svg>',
+hide: '<svg viewBox="0 0 24 24"><path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"/><path d="M4 4l16 16"/></svg>',
+exit: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+};
+Missions.ctx = {
+get t() { return Missions.run ? Missions.run.t : 0; },
+rb: id => World.byId[id],
+shot(to, dur) { const R = Missions.run; R.shot = { from: MissionCam.pose(), to, t0: R.t, dur: Math.max(dur, 0.01) }; },
+poseBehind(rb, bg, distK, daz, del) { const a = MissionCam.angles(V.sub(rb.posS, bg.posS)); return { target: rb.posS.slice(), dist: rb.rS * distK, az: a.az + (daz || 0), el: a.el + (del || 0) }; },
+caption: (t, s, ms) => Missions.caption(t, s, ms), warn: t => Missions.warn(t), sfx: n => Missions.sfx(n),
+once(key, fn) { const R = Missions.run; if (!R.marks[key]) { R.marks[key] = true; fn(); } },
+setPath(pts) { const R = Missions.run; R.path = pts; R.pathA = 1; R.pathKeep = true; },
+fadePath() { const R = Missions.run; if (R) R.pathKeep = false; },
+ship(v) { const R = Missions.run; if (!v) { R.ship = null; return; } R.ship = R.ship || { pos: [0, 0, 0], vel: [0, 0, 1], size: 0.9, thr: 1 }; Object.assign(R.ship, v); },
+grade(c) { $('#gl').style.filter = c || ''; },
+dilation(on, factor) {
+let d = $('#ms-dil');
+if (!on) { if (d) d.remove(); return; }
+if (!d) { d = document.createElement('div'); d.id = 'ms-dil'; $('#app').appendChild(d); }
+d.dataset.f = factor; d.dataset.t = d.dataset.t || 0;
+},
+cleanup() {
+World.bhBoost = 0; World.bhReveal = 1; Cam.introSY = 0; this.grade(''); Missions.warn('');
+const d = $('#ms-dil'); if (d) d.remove();
+},
+};
+Missions.draw = function (useP, t) {
+const R = this.run; if (!R) return;
+const cam = World.cam, P = World.P;
+if (R.ship) {
+const sh = R.ship; if (!sh.mesh) { PackedModels.request && PackedModels.request('ranger'); sh.mesh = CraftModels.mesh('ranger'); }
+const m0 = CraftModels.mesh('ranger'); if (m0) sh.mesh = m0;
+if (sh.mesh) {
+const F = V.norm(sh.vel), U0 = Math.abs(F[1]) > 0.95 ? [1, 0, 0] : [0, 1, 0], X = V.norm(V.cross(U0, F)), U = V.cross(F, X);
+const tex = !!sh.mesh.groups, pr = useP(tex ? P.craftTex : P.craft), rel = V.sub(sh.pos, cam);
+GLX.state({ depthTest: true, depthWrite: true, cull: 'back', blend: 'none' });
+const ep = V.add(rel, V.scale(F, -sh.size * 1.1));
+GLX.setAll(pr, { u_model: M4.fromBasis(X, U, F, sh.size, rel), u_occ: new Float32Array(16), u_occN: 0, u_sunR: World.shadowSunR, u_ambient: S.ambient + 0.02, u_hover: 0,
+u_eng: [...ep, sh.thr * 1.3], u_engCol: [0.55, 0.75, 1.0], u_engR: sh.size * 0.5 });
+if (tex) World.drawGroups(sh.mesh, pr); else GLX.draw(sh.mesh, pr);
+}
+}
+if (R.path && R.pathA > 0.01 && !R.cine) {
+const pts = R.path, n = Math.min(pts.length, 200);
+if (!this.pathMesh) { this._pP = new Float32Array(600); this._pF = new Float32Array(200); this.pathMesh = GLX.mesh({ a_pos: { data: this._pP, size: 3 }, a_frac: { data: this._pF, size: 1 } }, null, GLX.gl.LINE_STRIP, true); }
+for (let i = 0; i < n; i++) { this._pP.set(pts[i], i * 3); this._pF[i] = i / (n - 1); }
+GLX.update(this.pathMesh, 'a_pos', this._pP, n); GLX.update(this.pathMesh, 'a_frac', this._pF, n);
+GLX.state({ depthTest: true, depthWrite: false, cull: 'none', blend: 'alpha' });
+const pr = useP(P.orbit);
+GLX.setAll(pr, { u_model: M4.translate(V.sub([0, 0, 0], cam)), u_color: lin('#ffd9a0'), u_alpha: 0.85 * R.pathA, u_cur: (t * 0.1) % 1, u_fade: 0.65 });
+GLX.draw(this.pathMesh, pr);
+}
+};
+Missions.register((() => {
+const H = () => SYSTEMS.gargantua.H, bh = () => World.byId.gargantua;
+let path = null, peri = 0;
+const buildAssist = () => {
+const mann = World.byId.mann.posS, ed = World.byId.edmunds.posS;
+const dIn = V.norm(V.scale(mann, -1)), dOut = V.norm(ed);
+let ang = Math.acos(clamp(V.dot(dIn, dOut), -1, 1)); ang = clamp(ang, 0.7, 2.6);
+const e = 1 / Math.sin(ang / 2), rp = H() * 12.5, p = rp * (1 + e);
+const rh = V.norm(V.sub(dIn, dOut)), vh = V.norm(V.add(dIn, dOut));
+const numax = Math.acos(-1 / e) - 0.04, pts = [];
+for (let i = 0; i < 160; i++) {
+const nu = -numax + 2 * numax * i / 159, r = p / (1 + e * Math.cos(nu));
+if (r > H() * 70) continue;
+const lift = H() * 1.8 * Math.cos(nu * 0.5);                                // ligeramente por encima del plano del disco
+pts.push(V.add(V.add(V.scale(rh, r * Math.cos(nu)), V.scale(vh, r * Math.sin(nu))), [0, lift, 0]));
+}
+peri = pts.reduce((b, q, i) => V.len(q) < V.len(pts[b]) ? i : b, 0);
+return pts;
+};
+const along = (pts, u) => { const f = clamp(u, 0, 1) * (pts.length - 1), i = Math.min(Math.floor(f), pts.length - 2), k = f - i; return { pos: V.add(pts[i], V.scale(V.sub(pts[i + 1], pts[i]), k)), vel: V.sub(pts[i + 1], pts[i]) }; };
+return {
+id: 'endurance', kicker: 'Sistema Gargantúa', title: 'MISIÓN ENDURANCE', sub: 'Gargantúa → Miller → Mann → maniobra gravitacional → Edmunds',
+desc: 'Recreación cinematográfica e interactiva de la ruta de la Endurance por el sistema de Gargantúa. Puedes pausarla, avanzar o retroceder de etapa y salir en cualquier momento: el explorador libre se restaura tal como estaba.',
+note: 'Recreación inspirada en Interstellar. Las trayectorias y los tiempos son cinematográficos; los conceptos de lente gravitacional, dilatación temporal y asistencia gravitacional son reales.',
+stages: [
+{ id: 'INTRO', label: 'Llegada', dur: 11, sfx: 'start',
+enter(c) { World.bhReveal = 0; Cam.introSY = -0.33; MissionCam.apply({ target: [0, 0, 0], dist: H() * 170, az: 0.55, el: 0.05 }); c.shot({ target: [0, 0, 0], dist: H() * 52, az: 0.7, el: 0.1 }, 10); },
+update(c, t) { const k = clamp((t - 0.8) / 4.5, 0, 1); World.bhReveal = k * k * (3 - 2 * k);
+c.once('t1', () => c.caption('SISTEMA GARGANTÚA', 'Universo de Interstellar', 4200)); if (t > 5.6) c.once('t2', () => c.caption('MISIÓN ENDURANCE', 'Gargantúa → Miller → Mann → Edmunds', 4600)); },
+exit() { World.bhReveal = 1; Cam.introSY = 0; } },
+{ id: 'GARGANTUA', label: 'Gargantúa', dur: 15, sfx: 'deep',
+enter(c) { c.shot({ target: [0, 0, 0], dist: H() * 15, az: 1.05, el: 0.09 }, 8); c.caption('GARGANTÚA', 'Agujero negro supermasivo', 6000); },
+update(c, t) { World.bhBoost = clamp((t - 3) / 6, 0, 1) * 0.3; if (t > 9) c.once('orb', () => c.shot({ target: [0, 0, 0], dist: H() * 13, az: 1.05 + 0.55, el: 0.16 }, 6)); },
+exit() { World.bhBoost = 0; } },
+{ id: 'MILLER', label: 'Miller', dur: 24, sfx: 'whoosh',
+enter(c) { const m = c.rb('miller'); c.shot(() => c.poseBehind(m, bh(), 7, 0.95, 0.16), 9); },
+update(c, t) {
+if (t > 8.5) c.once('cap', () => { c.caption('PLANETA DE MILLER', 'Dilatación temporal extrema · 1 hora local ≈ 7 años externos', 7000); c.dilation(true, 120); });
+if (t > 13) c.once('drift', () => c.shot(() => c.poseBehind(c.rb('miller'), bh(), 5.5, 1.2, 0.18), 10));
+const d = $('#ms-dil'); if (d && t > 8.5) { const loc = (t - 8.5) * 120; const days = loc * 7 * 365.25 * 24 / 86400; const y = Math.floor(days / 365.25), mo = Math.round((days - y * 365.25) / 30.44), p2 = n => String(n).padStart(2, '0'), s = Math.floor(loc);
+d.innerHTML = `<span>Tiempo en Miller</span><b>${p2(Math.floor(s / 3600))}:${p2(Math.floor(s / 60) % 60)}:${p2(s % 60)}</b><span>Tiempo externo</span><b>≈ ${y ? y + (y === 1 ? ' año ' : ' años ') : ''}${mo} ${mo === 1 ? 'mes' : 'meses'}</b><small>Contador acelerado ×120 · relación de la película Interstellar</small>`; }
+},
+exit(c) { c.dilation(false); } },
+{ id: 'MANN', label: 'Mann', dur: 26, sfx: 'whoosh',
+enter(c) { const m = c.rb('miller'), mid = V.scale(V.add(m.posS, [0, 0, 0]), 0.55); c.shot({ target: mid, dist: H() * 26, az: Cam.az + 0.4, el: 0.22 }, 6); },
+update(c, t) {
+if (t > 6) c.once('go', () => { c.sfx('whoosh'); c.shot(() => c.poseBehind(c.rb('mann'), bh(), 7.5, -0.95, 0.14), 10); });
+if (t > 14) c.once('cap', () => { c.caption('PLANETA DE MANN', 'Mundo helado · aislamiento', 7000); c.sfx('cold'); c.grade('saturate(0.72) hue-rotate(-8deg) brightness(0.96) contrast(1.05)'); });
+if (t > 18) c.once('drift', () => c.shot(() => c.poseBehind(c.rb('mann'), bh(), 5.8, -1.25, 0.2), 8));
+},
+exit(c) { c.grade(''); } },
+{ id: 'GRAVITY_ASSIST', label: 'Maniobra', dur: 30, sfx: 'assist',
+enter(c) { path = buildAssist(); c.setPath(path); c.ship({ pos: path[0], vel: V.sub(path[1], path[0]), size: 0.9 });
+c.shot(() => { const s = Missions.run.ship; return { target: s.pos, dist: 7, az: MissionCam.angles(V.sub(s.pos, [0, 0, 0])).az + 0.25, el: 0.12 }; }, 4);
+c.caption('MANIOBRA GRAVITACIONAL', 'Recreación cinematográfica y educativa', 6000); },
+update(c, t) {
+const u = clamp((t - 1) / 26, 0, 1), q = along(path, u < 0.5 ? 0.5 * Math.pow(u * 2, 0.75) : 1 - 0.5 * Math.pow((1 - u) * 2, 0.75));   // más rápido cerca del perihelio
+c.ship({ pos: q.pos, vel: q.vel });
+const r = V.len(q.pos) / H();
+World.bhBoost = clamp((26 - r) / 14, 0, 1) * 0.45; Cam.fov = 42 * Math.PI / 180 * (1 + clamp((22 - r) / 12, 0, 1) * 0.12);
+c.warn(r < 14.5 ? 'MANIOBRA GRAVITACIONAL' : r < 24 ? 'CAMPO GRAVITACIONAL EXTREMO' : '');
+if (t > 8) c.once('lat', () => { const n = V.norm(V.cross(V.sub(path[peri], path[0]), V.sub(path[path.length - 1], path[peri]))); const a = MissionCam.angles(V.add(n, [0, 0.25, 0])); c.shot({ target: path[peri], dist: H() * 30, az: a.az, el: clamp(a.el, -0.25, 0.25) }, 3); });
+if (t > 15.5) c.once('post', () => c.shot(() => { const s = Missions.run.ship; return { target: s.pos, dist: 8, az: MissionCam.angles(s.vel).az, el: 0.1 }; }, 3));
+if (t > 22.5) c.once('gen', () => { c.fadePath(); c.shot({ target: [0, 0, 0], dist: H() * 85, az: Cam.az + 0.3, el: 0.55 }, 5); });
+},
+exit(c) { c.warn(''); World.bhBoost = 0; Cam.fov = 42 * Math.PI / 180; Missions.run && (Missions.run.path = null); } },
+{ id: 'EDMUNDS', label: 'Edmunds', dur: 26, sfx: null,
+enter(c) { const e = c.rb('edmunds'); c.ship(null); c.shot(() => c.poseBehind(e, bh(), 32, 0.5, 0.18), 8); },
+update(c, t) {
+if (t > 7) c.once('appr', () => { c.caption('PLANETA DE EDMUNDS', 'Destino final de la misión', 7000); c.shot(() => c.poseBehind(c.rb('edmunds'), bh(), 6, 0.9, 0.2), 8); });
+if (t > 15) c.once('orb', () => { c.sfx('arrive'); c.shot(() => c.poseBehind(c.rb('edmunds'), bh(), 4.6, 1.6, 0.12), 10); });
+} },
+{ id: 'COMPLETE', dur: 0, auto: false,
+enter(c) { c.caption(null); Missions.overlay(`<span class="ms-kicker">Sistema Gargantúa</span><h2>MISIÓN ENDURANCE COMPLETADA</h2><p class="ms-sub">Destino final: Edmunds</p>
+<div class="ms-btns ms-btns-v"><button class="cta" data-ms="explore">Explorar Edmunds</button><button class="cta-ghost" data-ms="again">Repetir misión</button><button class="cta-ghost" data-ms="system">Regresar al Sistema Gargantúa</button><button class="cta-ghost" data-ms="solar">Volver al Sistema Solar</button></div>`); } },
+],
+};
+})());
+document.addEventListener('click', e => {
+const b = e.target.closest('[data-ms]'); if (!b) return; const a = b.dataset.ms;
+if (a === 'start') Missions.start(b.dataset.id); else if (a === 'close') Missions.closeOverlay();
+else if (a === 'explore') { const ed = World.byId.edmunds; Missions.exit({ keepCamera: true, focus: ed, select: ed, msg: 'Explorador libre: Planeta de Edmunds' }); }
+else if (a === 'again') { Missions.closeOverlay(); Missions.restart(); }
+else if (a === 'system') Missions.exit({ restore: true, msg: 'De vuelta al explorador del Sistema Gargantúa' });
+else if (a === 'solar') { Missions.exit({ restore: true, silent: true }); Systems.go('solar'); }
+});
+document.addEventListener('click', e => { if (e.target.closest('[data-ms-brief]')) Missions.briefing(e.target.closest('[data-ms-brief]').dataset.msBrief); if (e.target.closest('[data-sys-free]')) UI.openSection(null); });
+addEventListener('keydown', e => {
+if (!Missions.run || e.target.closest && e.target.closest('input, textarea, select')) return;
+if (e.key === 'Escape') { e.stopImmediatePropagation(); e.preventDefault(); Missions.exit({ restore: true }); }
+else if (e.key === ' ') { e.stopImmediatePropagation(); e.preventDefault(); Missions.pause(); }
+}, true);
 const App = {
 last: 0, scaleRatio: null, ready: false,
 qualityParams() {
@@ -7023,7 +7301,7 @@ const sg = $('#start-tours'); sg.disabled = false; sg.addEventListener('click', 
 const sf = $('#start-fly'); sf.disabled = false; sf.addEventListener('click', () => { this.begin(); Flight.openHangar(); });
 this.ready = true;
 if (Settings.state.general.startup === 'explore' && location.hash !== '#creditos') this.begin();
-window.Solaris = { World, Cam, UI, Time, S, select: id => UI.select(World.byId[id], { fly: true }), App, Flight, Music, SFX, Settings, Keys, Gfx, GLX, I18N, BODY, PackedModels, Assets, Compare, TL, Sci, ScaleState, Planner, Flight, Systems, Dilation };
+window.Solaris = { World, Cam, UI, Time, S, select: id => UI.select(World.byId[id], { fly: true }), App, Flight, Music, SFX, Settings, Keys, Gfx, GLX, I18N, BODY, PackedModels, Assets, Compare, TL, Sci, ScaleState, Planner, Flight, Systems, Dilation, Missions, Cam: Cam };
 requestAnimationFrame(t => this.loop(t));
 },
 home() {
