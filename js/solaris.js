@@ -1142,7 +1142,7 @@ return true;
 },
 };
 const ASSET_MANIFEST = {"music": {"webm": "assets/audio/metamorphosis.webm", "mp3": "assets/audio/metamorphosis.mp3"}, "bodyMeshes": {"fobos": {"url": "assets/models/moons/fobos.bin", "k": 1.26255}, "deimos": {"url": "assets/models/moons/deimos.bin", "k": 1.37497}, "haumea": {"url": "assets/models/dwarfs/haumea.bin", "k": 1.44255}}};
-const SOLARIS_BUILD = '2026.10.06-0609-web';
+const SOLARIS_BUILD = '2026.10.06-0647-web';
 console.info('SOLARIS · versión ' + SOLARIS_BUILD);
 const Assets = {
 cache: new Map(), busyN: new Map(),
@@ -1438,7 +1438,7 @@ graphics: Object.assign({ auto: true, preset: 'high', ambient: 0.02 }, GFX_PRESE
 interface: { uiScale: 1, panelOpacity: 0.6, info: 'advanced', hud: 'full', anim: 'full', minimap: true },
 controls: ctl,
 simulation: { timeSpeed: 'real', startDate: 'now', lastJD: null, scale: 'visual', rotCap: true,
-layers: { orbits: true, moonOrbits: true, moons: true, asteroids: true, kuiper: true, craft: true, constLines: false, constNames: false, namesPlanets: true, namesMoons: true, namesSmall: true, namesCraft: true } },
+layers: { orbits: true, moonOrbits: true, moons: true, asteroids: true, kuiper: true, craft: true, constLines: false, constNames: false, namesPlanets: true, namesMoons: true, namesSmall: true, namesCraft: true, hz: false }, hzModel: 'conservador', sciPreset: null },
 language: 'es',
 accessibility: { reducedMotion: rm, contrast: false, text: 'normal', reduceFlashes: false },
 firstRun: true,
@@ -1603,6 +1603,13 @@ const EVENTS = [
 { date: '2061-07-28', cat: 'astronomia', title: 'Próximo perihelio del cometa Halley', desc: 'Fecha prevista de su regreso al Sistema Solar interior.', obj: 'halley', pred: true },
 { date: '2117-12-11', cat: 'astronomia', title: 'Tránsito de Venus', desc: 'Próximo tránsito de Venus por delante del Sol.', obj: 'venus', pred: true },
 ];
+const HZ_MODELS = {
+conservador: { name: 'Conservador', in: 0.99, out: 1.70, inName: 'pérdida de agua (efecto invernadero húmedo)', outName: 'máximo efecto invernadero',
+ref: 'Kopparapu et al. (2013), ApJ 765, 131' },
+optimista: { name: 'Optimista', in: 0.75, out: 1.77, calc: true, inName: '«Venus reciente»', outName: '«Marte primitivo»',
+ref: 'Kopparapu et al. (2013): límites empíricos; distancias calculadas a partir del flujo efectivo (d = 1/√S, con S = 1.78 y 0.32)' },
+clasico: { name: 'Clásico', in: 0.95, out: 1.67, inName: 'pérdida de agua', outName: 'máximo efecto invernadero', ref: 'Kasting et al. (1993)' },
+};
 const OBLIQ = 23.4392911 * DEG;
 const GAUSS_K_DEG = 0.9856076686; // movimiento medio (°/día) para a = 1 UA
 const Astro = {
@@ -2936,6 +2943,24 @@ float a = u_alpha * mix(1.0, tail, u_fade);
 writeDepth(v_depth);
 o_col = outc(u_color, a);
 }`;
+SH.VS_HZ = SH.HEAD + `
+in vec2 a_pos; uniform mat4 u_model; uniform float u_rIn; uniform float u_rOut;
+out float v_t; out float v_depth;
+void main(){
+float r = mix(u_rIn, u_rOut, a_pos.x);
+vec4 wp = u_model * vec4(cos(a_pos.y) * r, 0.0, -sin(a_pos.y) * r, 1.0);
+vec4 vp = u_view * wp; v_depth = -vp.z; v_t = a_pos.x; gl_Position = u_proj * vp;
+}`;
+SH.FS_HZ = SH.HEAD + SH.FRAG + `
+in float v_t; in float v_depth;
+uniform vec3 u_color; uniform vec3 u_edge; uniform float u_alpha;
+void main(){
+float w = max(fwidth(v_t), 1e-4);
+float e = max(1.0 - smoothstep(w * 0.5, w * 2.5, v_t), smoothstep(1.0 - w * 2.5, 1.0 - w * 0.5, v_t));   // bordes nítidos de 1–2 px
+float g = 0.6 + 0.4 * sin(3.14159 * v_t);                                                                // gradiente suave hacia el centro
+writeDepth(v_depth);
+o_col = outc(mix(u_color, u_edge, e), u_alpha * (0.2 * g + 0.65 * e));
+}`;
 SH.VS_STARS = SH.HEAD + `
 in vec3 a_pos; in vec4 a_col; uniform float u_dpr; uniform float u_bright;
 out vec3 v_col;
@@ -3179,7 +3204,9 @@ layers: {
 orbits: true, moonOrbits: true, cometOrbits: false, asteroids: true, kuiper: true, moons: true,
 namesPlanets: true, namesMoons: true, namesSmall: true, constNames: false, constLines: false,
 orbitInfo: false, deepSky: true, stars: true, markers: true, craft: true, namesCraft: true,
+hz: false,          // capa científica: zona habitable
 },
+hzModel: 'conservador',
 };
 const COLORS = { orbitPlanet: '#8fb3e6', orbitDwarf: '#c2ae8c', orbitAst: '#a39886', orbitComet: '#7fd0ff', orbitMoon: '#8095b5', orbitCraft: '#86d3c6', select: '#f2c879' };
 const lin = h => srgbToLin(hexToRgb(h));
@@ -3213,7 +3240,7 @@ p('atm', SH.VS_BODY, SH.FS_ATM); p('sun', SH.VS_BODY, SH.FS_SUN);
 p('corona', SH.VS_BILL, SH.FS_CORONA); p('glow', SH.VS_BILL, SH.FS_GLOW); p('tail', SH.VS_TAIL, SH.FS_TAIL);
 p('orbit', SH.VS_ORBIT, SH.FS_ORBIT); p('stars', SH.VS_STARS, SH.FS_STARS); p('linesky', SH.VS_LINESKY, SH.FS_LINESKY);
 p('skybake', SH.VS_FULL, SH.FS_SKYBAKE); p('sky', SH.VS_FULL, SH.FS_SKY);
-p('belt', SH.VS_BELT, SH.FS_BELT); p('mark', SH.VS_MARK, SH.FS_MARK); p('craft', SH.VS_CRAFT, SH.FS_CRAFT); ['rock', 'luna', 'earth', 'venus', 'titan', 'gas'].forEach(f => p('ptex_' + f, SH.VS_BODY, SH.FS_PTEX(f))); p('ptex_gasring', SH.VS_BODY, SH.FS_PTEX('gas').replace('#define F_GAS', '#define F_GAS\n#define F_RINGTEX')); p('sunTex', SH.VS_BODY, SH.FS_SUNTEX); p('ring_saturnTex', SH.VS_RING, SH.FS_RING('saturnTex')); p('craftTex', SH.VS_CRAFT_TEX, SH.FS_CRAFT_TEX);
+p('belt', SH.VS_BELT, SH.FS_BELT); p('mark', SH.VS_MARK, SH.FS_MARK); p('craft', SH.VS_CRAFT, SH.FS_CRAFT); p('hz', SH.VS_HZ, SH.FS_HZ); ['rock', 'luna', 'earth', 'venus', 'titan', 'gas'].forEach(f => p('ptex_' + f, SH.VS_BODY, SH.FS_PTEX(f))); p('ptex_gasring', SH.VS_BODY, SH.FS_PTEX('gas').replace('#define F_GAS', '#define F_GAS\n#define F_RINGTEX')); p('sunTex', SH.VS_BODY, SH.FS_SUNTEX); p('ring_saturnTex', SH.VS_RING, SH.FS_RING('saturnTex')); p('craftTex', SH.VS_CRAFT_TEX, SH.FS_CRAFT_TEX);
 this.post = { progs: { downT: GLX.program('downT', SH.VS_FULL, SH.FS_DOWN(true)), down: GLX.program('down', SH.VS_FULL, SH.FS_DOWN(false)), up: GLX.program('up', SH.VS_FULL, SH.FS_UP), comp: GLX.program('comp', SH.VS_FULL, SH.FS_COMP) } };
 },
 buildMeshes() {
@@ -3695,6 +3722,20 @@ const A = SCALES[ScaleState.from].glsl, B = SCALES[ScaleState.to].glsl;
 const beltU = { u_days: this.jd - J2000, u_mapA: A, u_mapB: B, u_mapT: ScaleState.k(), u_off: sunR, u_dpr: GLX.dpr, u_ptK: ScaleState.dist(1) * 3 };
 if (L.asteroids) { const pr = useP(P.belt); GLX.setAll(pr, beltU); GLX.set(pr, 'u_alpha', 0.55); GLX.draw(this.belts.ast, pr, Math.round(this.belts.ast.count * Gfx.particles())); }
 if (L.kuiper) { const pr = useP(P.belt); GLX.setAll(pr, beltU); GLX.set(pr, 'u_ptK', ScaleState.dist(1) * 5); GLX.set(pr, 'u_alpha', 0.28); GLX.draw(this.belts.kui, pr, Math.round(this.belts.kui.count * Gfx.particles())); }
+if (L.hz && vis1 > 0.003) {
+if (!this.meshes.hz) {
+const N = 512, pos = new Float32Array((N + 1) * 4), idx = new Uint16Array(N * 6);
+for (let i = 0; i <= N; i++) { const a = i / N * Math.PI * 2; pos.set([0, a, 1, a], i * 4); }
+for (let i = 0; i < N; i++) idx.set([i * 2, i * 2 + 1, i * 2 + 3, i * 2, i * 2 + 3, i * 2 + 2], i * 6);
+this.meshes.hz = GLX.mesh({ a_pos: { data: pos, size: 2 } }, idx);
+}
+const H = HZ_MODELS[S.hzModel] || HZ_MODELS.conservador;
+GLX.state({ depthTest: true, depthWrite: false, cull: 'none', blend: 'alpha' });
+const pr = useP(P.hz);
+GLX.setAll(pr, { u_model: M4.translate(V.sub([0, 0, 0], cam)), u_rIn: ScaleState.dist(H.in), u_rOut: ScaleState.dist(H.out),
+u_color: lin('#2f8f5f'), u_edge: lin('#8fd8aa'), u_alpha: 0.85 * vis1 });
+GLX.draw(this.meshes.hz, pr);
+}
 GLX.state({ depthTest: true, depthWrite: false, cull: 'none', blend: 'alpha' });
 const pO = useP(P.orbit);
 const orbMode = S.mode === 'orbits';
@@ -4827,6 +4868,7 @@ if (t === 'craft') return L.namesCraft;
 return L.namesSmall;
 },
 updateLabels() {
+Sci.labels();                                  // etiquetas de las capas científicas
 const placed = [], W = innerWidth, H = innerHeight;
 const pri = rb => (rb === this.sel ? 0 : rb === this.hov ? 1 : rb.isSun ? 2 : rb.def.type === 'planet' ? 3 : rb.def.type === 'dwarf' ? 4 : rb.def.type === 'moon' ? 6 : rb.isCraft ? 7 : 5);
 const list = World.rb.slice().sort((a, b) => pri(a) - pri(b));
@@ -5890,7 +5932,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) Setti
 syncRuntime() {
 const st = Settings.state, sim = st.simulation;
 S.scale = sim.scale; ScaleState.set(sim.scale, false);
-S.ambient = st.graphics.ambient; S.rotCap = sim.rotCap;
+S.ambient = st.graphics.ambient; S.rotCap = sim.rotCap; S.hzModel = HZ_MODELS[sim.hzModel] ? sim.hzModel : 'conservador';
 Object.assign(S.layers, sim.layers);
 UI.mmOn = st.interface.minimap && innerWidth >= 760;
 },
@@ -6315,6 +6357,118 @@ const pk = $('#tl-pick'); if (document.activeElement !== pk) pk.value = d.toISOS
 },
 };
 $('#t-tl').addEventListener('click', () => TL.toggle());
+const SCI_LAYERS = [
+{ k: 'hz', name: 'Zona habitable', desc: 'Región aproximada donde podría existir agua líquida en la superficie de un planeta' },
+];
+const SCI_PRESETS = {
+exploracion: { name: 'Exploración', desc: 'Interfaz limpia con pocas capas', L: { orbits: true, moonOrbits: true, namesPlanets: true, namesMoons: false, namesSmall: false, orbitInfo: false, cometOrbits: false, hz: false } },
+educativo: { name: 'Educativo', desc: 'Órbitas, nombres y zona habitable', L: { orbits: true, moonOrbits: true, namesPlanets: true, namesMoons: true, namesSmall: false, orbitInfo: false, hz: true } },
+astronomia: { name: 'Astronomía', desc: 'Órbitas, trayectorias, datos orbitales y zona habitable', L: { orbits: true, moonOrbits: true, cometOrbits: true, namesPlanets: true, namesMoons: true, orbitInfo: true, hz: true } },
+cinematico: { name: 'Cinemático', desc: 'Sin capas técnicas', L: { orbits: false, moonOrbits: false, cometOrbits: false, namesPlanets: false, namesMoons: false, namesSmall: false, namesCraft: false, orbitInfo: false, markers: false, constLines: false, constNames: false, hz: false } },
+};
+const AU_MKM = AU_KM / 1e6;
+const Sci = {
+hz() { return HZ_MODELS[S.hzModel] || HZ_MODELS.conservador; },
+status(r) {
+const H = this.hz();
+if (r < H.in * 0.9) return ['fuera', 'Fuera (más cerca del Sol)'];
+if (r < H.in) return ['borde', 'Cerca del límite interior, por fuera'];
+if (r < H.in * 1.1) return ['dentro', 'Dentro, cerca del límite interior'];
+if (r <= H.out * 0.9) return ['dentro', 'Dentro'];
+if (r <= H.out) return ['dentro', 'Dentro, cerca del límite exterior'];
+if (r <= H.out * 1.1) return ['borde', 'Cerca del límite exterior, por fuera'];
+return ['fuera', 'Fuera (más lejos del Sol)'];
+},
+setModel(k) { S.hzModel = k; Settings.state.simulation.hzModel = k; Settings.save(); this.paintPop(); this.paintSection(); },
+applyPreset(id) {
+const P = SCI_PRESETS[id]; if (!P) return;
+for (const k in P.L) if (S.layers[k] !== P.L[k]) UI.setLayer(k, P.L[k]);
+Settings.state.simulation.sciPreset = id; Settings.save();
+this.paintSection(); UI.toast('Preset de capas: ' + P.name);
+},
+sectionHTML() {
+const pr = Settings.state.simulation.sciPreset, H = this.hz();
+return `<h3 class="sci-h">Capas científicas</h3>
+<div class="seg sci-presets" role="radiogroup" aria-label="Presets de capas">${Object.entries(SCI_PRESETS).map(([k, p]) => `<button role="radio" aria-checked="${pr === k}" class="${pr === k ? 'on' : ''}" data-sci-preset="${k}" data-tip="${p.desc}">${p.name}</button>`).join('')}</div>
+${SCI_LAYERS.map(l => `<div class="sci-row"><label class="mix-sw sci-sw"><input type="checkbox" data-layer="${l.k}" ${S.layers[l.k] ? 'checked' : ''}><span class="sw" aria-hidden="true"></span><span>${l.name}</span></label>
+<button class="sci-q" data-sci-info="${l.k}" aria-label="Información sobre: ${l.name}" data-tip="Información">?</button></div>
+<p class="sci-state" data-sci-state="${l.k}">${S.layers[l.k] ? 'Activada' : 'Desactivada'} · modelo ${H.name.toLowerCase()} (${fmt(H.in, 2)}–${fmt(H.out, 2)} UA)</p>`).join('')}
+<p class="note">Visualizaciones educativas superpuestas: no modifican las órbitas ni los datos de los objetos. En Modo Cine se ocultan y se restauran al salir.</p>`;
+},
+paintSection() {
+const st = document.querySelector('[data-sci-state="hz"]'), H = this.hz();
+if (st) st.textContent = `${S.layers.hz ? 'Activada' : 'Desactivada'} · modelo ${H.name.toLowerCase()} (${fmt(H.in, 2)}–${fmt(H.out, 2)} UA)`;
+const pr = Settings.state.simulation.sciPreset;
+document.querySelectorAll('[data-sci-preset]').forEach(b => { const on = b.dataset.sciPreset === pr; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); });
+},
+openPop() {
+let p = $('#sci-pop');
+if (!p) {
+p = document.createElement('section'); p.id = 'sci-pop'; p.className = 'ui'; p.setAttribute('role', 'dialog'); p.setAttribute('aria-labelledby', 'sci-pop-t');
+$('#app').appendChild(p);
+p.addEventListener('click', e => { if (e.target.closest('[data-sci-close]')) this.closePop(); const m = e.target.closest('[data-hz-model]'); if (m) this.setModel(m.dataset.hzModel); });
+addEventListener('keydown', e => { if (e.key === 'Escape' && p.classList.contains('open')) { e.stopImmediatePropagation(); this.closePop(); } }, true);
+}
+p.classList.add('open'); this.paintPop();
+clearInterval(this.popT); this.popT = setInterval(() => this.paintPlanets(), 500);   // las posiciones cambian con la fecha
+},
+closePop() { const p = $('#sci-pop'); if (p) p.classList.remove('open'); clearInterval(this.popT); },
+paintPop() {
+const p = $('#sci-pop'); if (!p || !p.classList.contains('open')) return;
+const H = this.hz(), lim = (d, n) => `<b>${fmt(d, 2)} UA</b> · ${fmt(d * AU_MKM, 1)} millones de km <small>(${n})</small>`;
+const scaleTxt = S.scale === 'real' ? 'Escala real: el anillo y las órbitas usan distancias reales proporcionales.'
+: 'Escala ' + String((SCALES[S.scale] && SCALES[S.scale].name) || 'visual').toLowerCase() + ': las distancias se comprimen para facilitar la exploración. El anillo usa exactamente la misma transformación que las órbitas, así que la posición de los planetas respecto a la zona es correcta, aunque las proporciones entre distancias no sean las reales.';
+p.innerHTML = `
+<header class="tp-head"><div><span class="tp-kicker">Capa científica</span><h2 id="sci-pop-t">Zona habitable</h2></div><button class="icon-btn" data-sci-close aria-label="Cerrar">&times;</button></header>
+<p>Región aproximada alrededor de una estrella donde podrían existir temperaturas compatibles con agua líquida en la superficie de un planeta, dependiendo de factores como su atmósfera, presión y composición.</p>
+<p class="sci-warn">Estar dentro de la zona habitable no significa automáticamente que un planeta sea habitable.</p>
+<h4>Modelo</h4>
+<div class="seg" role="radiogroup" aria-label="Modelo de zona habitable">${Object.entries(HZ_MODELS).map(([k, m]) => `<button role="radio" aria-checked="${S.hzModel === k}" class="${S.hzModel === k ? 'on' : ''}" data-hz-model="${k}">${m.name}</button>`).join('')}</div>
+<dl class="sci-lims"><dt>Límite interior</dt><dd>${lim(H.in, H.inName)}</dd><dt>Límite exterior</dt><dd>${lim(H.out, H.outName)}</dd></dl>
+<p class="note">Fuente: ${H.ref}.${H.calc ? ' Valores calculados a partir de los datos publicados.' : ''} Los límites son aproximados y dependen del modelo climático utilizado.</p>
+<h4>Planetas respecto a la zona <small id="sci-date"></small></h4>
+<div id="sci-planets" class="sci-planets"></div>
+<p class="note">${scaleTxt}</p>`;
+this.paintPlanets();
+},
+paintPlanets() {
+const el = $('#sci-planets'); if (!el) return;
+const pl = World.rb.filter(r => r.def.type === 'planet');
+el.innerHTML = pl.map(rb => { const r = V.len(rb.helio), [c, t] = this.status(r);
+return `<div class="sp-row sp-${c}${rb.id === 'tierra' ? ' sp-ref' : ''}"><i class="dot" style="--c:${rb.def.color}"></i><b>${esc(rb.def.name)}</b><span>${fmt(r, 2)} UA</span><em>${t}</em></div>`; }).join('');
+const d = $('#sci-date'); if (d) d.textContent = '· ' + UI.dateStr(Time.jd);
+},
+labels() {
+let A = $('#hz-labels');
+if (!A) { A = document.createElement('div'); A.id = 'hz-labels'; A.innerHTML = '<span class="hz-lab" id="hz-in"></span><span class="hz-lab" id="hz-out"></span>'; $('#labels').appendChild(A); }
+const show = S.layers.hz && (World.cineK || 0) < 0.4 && !Flight.on;
+A.hidden = !show; if (!show) return;
+const H = this.hz(), cam = World.cam, h = Math.hypot(cam[0], cam[2]) || 1, dir = [cam[0] / h, 0, cam[2] / h];
+const put = (id, au, name) => {
+const el = $('#' + id), r = ScaleState.dist(au), o = World.project([dir[0] * r, 0, dir[2] * r], {}), o2 = World.project([-dir[0] * r, 0, -dir[2] * r], {});
+const big = o.on && o2.on && Math.hypot(o.x - o2.x, o.y - o2.y) > 90;           // solo si el anillo se ve con tamaño suficiente
+el.hidden = !(o.on && big); if (el.hidden) return;
+el.style.transform = `translate(${o.x}px, ${o.y}px)`;
+const t = `${name} · ${fmt(au, 2)} UA`; if (el.textContent !== t) { el.textContent = t; el.dataset.tip = `${name}: ${fmt(au, 2)} UA ≈ ${fmt(au * AU_MKM, 1)} millones de km del Sol (modelo ${H.name.toLowerCase()})`; }
+};
+put('hz-in', H.in, 'Límite interior'); put('hz-out', H.out, 'Límite exterior');
+},
+};
+const _secCapas = UI.sectionHTML;
+UI.sectionHTML = function (id) { const h = _secCapas.call(this, id); return id === 'capas' ? h + Sci.sectionHTML() : h; };
+UI.TOOL_ROWS = (UI.TOOL_ROWS || []).concat([['science', ICON.capas || ICON.herramientas, 'Capas científicas', 'Zona habitable y presets de capas']]);
+UI.TOOL_ACTIONS = Object.assign(UI.TOOL_ACTIONS || {}, { science: () => UI.openSection('capas') });
+document.addEventListener('click', e => {
+const q = e.target.closest('[data-sci-info]'); if (q) Sci.openPop();
+const pr = e.target.closest('[data-sci-preset]'); if (pr) Sci.applyPreset(pr.dataset.sciPreset);
+});
+const _setLayer = UI.setLayer;
+UI.setLayer = function (k, v) {
+_setLayer.call(this, k, v);
+if (k === 'hz') Sci.paintSection();
+if (!Sci.applying && Settings.state.simulation.sciPreset) { const P = SCI_PRESETS[Settings.state.simulation.sciPreset]; if (P && k in P.L && P.L[k] !== v) { Settings.state.simulation.sciPreset = null; Settings.save(); Sci.paintSection(); } }
+};
+const _apply = Sci.applyPreset.bind(Sci); Sci.applyPreset = id => { Sci.applying = true; try { _apply(id); } finally { Sci.applying = false; } };
 const App = {
 last: 0, scaleRatio: null, ready: false,
 qualityParams() {
@@ -6359,7 +6513,7 @@ const sg = $('#start-tours'); sg.disabled = false; sg.addEventListener('click', 
 const sf = $('#start-fly'); sf.disabled = false; sf.addEventListener('click', () => { this.begin(); Flight.openHangar(); });
 this.ready = true;
 if (Settings.state.general.startup === 'explore' && location.hash !== '#creditos') this.begin();
-window.Solaris = { World, Cam, UI, Time, S, select: id => UI.select(World.byId[id], { fly: true }), App, Flight, Music, SFX, Settings, Keys, Gfx, GLX, I18N, BODY, PackedModels, Assets, Compare, TL };
+window.Solaris = { World, Cam, UI, Time, S, select: id => UI.select(World.byId[id], { fly: true }), App, Flight, Music, SFX, Settings, Keys, Gfx, GLX, I18N, BODY, PackedModels, Assets, Compare, TL, Sci, ScaleState };
 requestAnimationFrame(t => this.loop(t));
 },
 home() {
