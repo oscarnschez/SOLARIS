@@ -1142,7 +1142,7 @@ return true;
 },
 };
 const ASSET_MANIFEST = {"music": {"webm": "assets/audio/metamorphosis.webm", "mp3": "assets/audio/metamorphosis.mp3"}, "bodyMeshes": {"fobos": {"url": "assets/models/moons/fobos.bin", "k": 1.26255}, "deimos": {"url": "assets/models/moons/deimos.bin", "k": 1.37497}, "haumea": {"url": "assets/models/dwarfs/haumea.bin", "k": 1.44255}}};
-const SOLARIS_BUILD = '2026.10.06-0647-web';
+const SOLARIS_BUILD = '2026.10.06-0659-web';
 console.info('SOLARIS · versión ' + SOLARIS_BUILD);
 const Assets = {
 cache: new Map(), busyN: new Map(),
@@ -1438,7 +1438,7 @@ graphics: Object.assign({ auto: true, preset: 'high', ambient: 0.02 }, GFX_PRESE
 interface: { uiScale: 1, panelOpacity: 0.6, info: 'advanced', hud: 'full', anim: 'full', minimap: true },
 controls: ctl,
 simulation: { timeSpeed: 'real', startDate: 'now', lastJD: null, scale: 'visual', rotCap: true,
-layers: { orbits: true, moonOrbits: true, moons: true, asteroids: true, kuiper: true, craft: true, constLines: false, constNames: false, namesPlanets: true, namesMoons: true, namesSmall: true, namesCraft: true, hz: false }, hzModel: 'conservador', sciPreset: null },
+layers: { orbits: true, moonOrbits: true, moons: true, asteroids: true, kuiper: true, craft: true, constLines: false, constNames: false, namesPlanets: true, namesMoons: true, namesSmall: true, namesCraft: true, hz: false }, hzModel: 'conservador', sciPreset: null, plannerMode: 'simple' },
 language: 'es',
 accessibility: { reducedMotion: rm, contrast: false, text: 'normal', reduceFlashes: false },
 firstRun: true,
@@ -3736,6 +3736,18 @@ GLX.setAll(pr, { u_model: M4.translate(V.sub([0, 0, 0], cam)), u_rIn: ScaleState
 u_color: lin('#2f8f5f'), u_edge: lin('#8fd8aa'), u_alpha: 0.85 * vis1 });
 GLX.draw(this.meshes.hz, pr);
 }
+if (typeof Planner !== 'undefined' && Planner.routeOn && Planner.route && vis1 > 0.003) {
+const pts = Planner.scenePts(), n = pts ? Math.min(pts.length, 200) : 0;
+if (n > 1) {
+if (!this.meshes.route) { this._rtP = new Float32Array(600); this._rtF = new Float32Array(200); this.meshes.route = GLX.mesh({ a_pos: { data: this._rtP, size: 3 }, a_frac: { data: this._rtF, size: 1 } }, null, gl.LINE_STRIP, true); }
+for (let i = 0; i < n; i++) { this._rtP[i * 3] = pts[i][0]; this._rtP[i * 3 + 1] = pts[i][1]; this._rtP[i * 3 + 2] = pts[i][2]; this._rtF[i] = i / (n - 1); }
+GLX.update(this.meshes.route, 'a_pos', this._rtP, n); GLX.update(this.meshes.route, 'a_frac', this._rtF, n);
+GLX.state({ depthTest: true, depthWrite: false, cull: 'none', blend: 'alpha' });
+const pr = useP(P.orbit);
+GLX.setAll(pr, { u_model: M4.translate(V.sub([0, 0, 0], cam)), u_color: lin('#d39bff'), u_alpha: 0.95 * vis1, u_cur: (t * 0.12) % 1, u_fade: 0.7 });
+GLX.draw(this.meshes.route, pr);
+}
+}
 GLX.state({ depthTest: true, depthWrite: false, cull: 'none', blend: 'alpha' });
 const pO = useP(P.orbit);
 const orbMode = S.mode === 'orbits';
@@ -4804,6 +4816,7 @@ P.innerHTML = `
 <button class="pill" id="info-follow">${ICON.follow}<span>Seguir</span></button>
 <button class="pill" id="info-close2">${ICON.zoomin}<span>Acercar</span></button>
 ${Compare.pillHTML(rb)}
+<button class="pill" id="info-plan" data-plan="${rb.id}">Planificar viaje</button>
 </div>
 ${rb.isCraft && rb.def.orbit.t === 'lpoint' ? `<p class="rel">En el punto L${rb.def.orbit.L} Sol-Tierra, cerca de <button class="link" data-go="${rb.parent.id}">${esc(rb.parent.def.name)}</button></p>` : ''}
 ${rb.parent && !rb.parent.isSun && !(rb.isCraft && rb.def.orbit.t === 'lpoint') ? `<p class="rel">Orbita a <button class="link" data-go="${rb.parent.id}">${esc(rb.parent.def.name)}</button></p>` : ''}
@@ -4868,7 +4881,7 @@ if (t === 'craft') return L.namesCraft;
 return L.namesSmall;
 },
 updateLabels() {
-Sci.labels();                                  // etiquetas de las capas científicas
+Sci.labels(); Planner.marks();                 // etiquetas de las capas científicas y marcas de la ruta
 const placed = [], W = innerWidth, H = innerHeight;
 const pri = rb => (rb === this.sel ? 0 : rb === this.hov ? 1 : rb.isSun ? 2 : rb.def.type === 'planet' ? 3 : rb.def.type === 'dwarf' ? 4 : rb.def.type === 'moon' ? 6 : rb.isCraft ? 7 : 5);
 const list = World.rb.slice().sort((a, b) => pri(a) - pri(b));
@@ -6469,6 +6482,182 @@ if (k === 'hz') Sci.paintSection();
 if (!Sci.applying && Settings.state.simulation.sciPreset) { const P = SCI_PRESETS[Settings.state.simulation.sciPreset]; if (P && k in P.L && P.L[k] !== v) { Settings.state.simulation.sciPreset = null; Settings.save(); Sci.paintSection(); } }
 };
 const _apply = Sci.applyPreset.bind(Sci); Sci.applyPreset = id => { Sci.applying = true; try { _apply(id); } finally { Sci.applying = false; } };
+const MU_SUN = G_CONST * BODY.sol.mass;              // m³/s², a partir de la masa del Sol de los datos
+const AU_M = AU_KM * 1000;
+const PLAN_GROUPS = [['Sol y planetas', r => r.isSun || r.def.type === 'planet'], ['Lunas', r => r.def.type === 'moon'], ['Planetas enanos y transneptunianos', r => r.def.type === 'dwarf' || r.def.type === 'tno'],
+['Asteroides', r => r.def.type === 'asteroid'], ['Cometas', r => r.def.type === 'comet'], ['Naves y sondas', r => r.isCraft]];
+const Planner = {
+origin: 'tierra', dest: 'marte', ship: null, route: null, routeOn: false,
+get mode() { return Settings.state.simulation.plannerMode || 'simple'; },
+set mode(v) { Settings.state.simulation.plannerMode = v; Settings.save(); },
+isOpen() { const p = $('#plan'); return !!p && p.classList.contains('open'); },
+open(opts) {
+opts = opts || {};
+if (opts.origin) this.origin = opts.origin; if (opts.dest) this.dest = opts.dest;
+let p = $('#plan');
+if (!p) {
+p = document.createElement('section'); p.id = 'plan'; p.className = 'tool-panel ui'; p.setAttribute('role', 'dialog'); p.setAttribute('aria-labelledby', 'plan-title'); $('#app').appendChild(p);
+p.addEventListener('change', e => {
+const t = e.target;
+if (t.id === 'pl-o') this.origin = t.value; else if (t.id === 'pl-d') this.dest = t.value; else if (t.id === 'pl-s') this.ship = t.value; else return;
+if (this.routeOn) this.buildRoute(); this.render();
+});
+p.addEventListener('click', e => {
+const a = e.target.closest('[data-pl]'); if (!a) return; const v = a.dataset.pl;
+if (v === 'close') this.close();
+else if (v === 'mode') { this.mode = a.dataset.m; if (this.routeOn) this.buildRoute(); this.render(); }
+else if (v === 'swap') { [this.origin, this.dest] = [this.dest, this.origin]; if (this.routeOn) this.buildRoute(); this.render(); }
+else if (v === 'see-o' || v === 'see-d') { this.close(); UI.select(World.byId[v === 'see-o' ? this.origin : this.dest], { fly: true }); }
+else if (v === 'route') { this.routeOn ? this.hideRoute() : this.showRoute(); this.render(); }
+else if (v === 'window') { const H = this.calc().hoh; if (H && H.win != null) { UI.setSimDate(Time.jd + H.win, { pause: true }); World.update(Time.jd, 0, 0); if (this.routeOn) this.buildRoute(); this.render(); } }   // posiciones de la nueva fecha antes de recalcular
+else if (v === 'start') this.start();
+});
+addEventListener('keydown', e => { if (e.key === 'Escape' && this.isOpen()) { e.stopImmediatePropagation(); this.close(); } }, true);
+}
+UI.openSection(null); Compare.close && Compare.close();
+p.classList.add('open'); this.render();
+clearInterval(this.tick); this.tick = setInterval(() => { if (this.isOpen()) this.paintResults(); }, 1000);   // la fecha global puede cambiar
+},
+close() { const p = $('#plan'); if (p) p.classList.remove('open'); clearInterval(this.tick); },
+rb(id) { const r = World.byId[id]; return r && !r.hidden ? r : null; },
+shipDef() { return SHIPS.find(s => s.id === this.ship) || SHIPS.find(s => s.id === 'ranger') || SHIPS[0]; },
+orbitalOK(o, d) { return o && d && o !== d && !o.isSun && !d.isSun && !o.isCraft && !d.isCraft && o.parent && o.parent.isSun && d.parent && d.parent.isSun; },
+meanAU(rb) { const n = Compare.num(rb, 'au'); return n || V.len(rb.helio); },
+calc() {
+const o = this.rb(this.origin), d = this.rb(this.dest), sh = this.shipDef(); if (!o || !d || o === d) return { o, d, sh };
+const dAU = V.len(V.sub(d.helio, o.helio)), km = dAU * AU_KM;
+const days = Flight.tripDays(sh, km);
+const R = { o, d, sh, dAU, km, days, arr: Time.jd + days };
+if (this.mode === 'orbital' && this.orbitalOK(o, d)) {
+const r1 = this.meanAU(o), r2 = this.meanAU(d), a = (r1 + r2) / 2;
+const T = Math.PI * Math.sqrt(Math.pow(a * AU_M, 3) / MU_SUN) / 86400;                   // días
+const v = r => Math.sqrt(MU_SUN / (r * AU_M)), vt = r => Math.sqrt(MU_SUN * (2 / (r * AU_M) - 1 / (a * AU_M)));
+const dv1 = Math.abs(vt(r1) - v(r1)) / 1000, dv2 = Math.abs(v(r2) - vt(r2)) / 1000;
+const P1 = Info.periodDays(o), P2 = Info.periodDays(d);
+let win = null, phase = null, phi = null, syn = null;
+if (P1 && P2) {
+const n1 = 2 * Math.PI / P1.v, n2 = 2 * Math.PI / P2.v, w = n2 - n1, lon = rb => Math.atan2(rb.helio[1], rb.helio[0]);
+const TAU = Math.PI * 2, wrap = x => ((x % TAU) + TAU) % TAU;
+phase = wrap(lon(d) - lon(o)); phi = wrap(Math.PI - n2 * T);
+win = Math.abs(w) < 1e-9 ? null : w > 0 ? wrap(phi - phase) / w : wrap(phase - phi) / -w;
+const dphi = Math.abs(((phase - phi + Math.PI * 3) % TAU) - Math.PI);            // margen propio de usar movimientos medios
+if (dphi < 6 * Math.PI / 180) win = 0;
+syn = Math.abs(w) < 1e-9 ? null : TAU / Math.abs(w);
+}
+R.hoh = { r1, r2, a, T, dv1, dv2, win, phase, phi, syn };
+const vel = rb => { const o2 = rb.def.orbit; if (!o2 || !Astro.helioPos) return null; try { const p0 = Astro.helioPos(o2, Time.jd - 0.5), p1 = Astro.helioPos(o2, Time.jd + 0.5); return V.sub(p1, p0); } catch (e) { return null; } };
+const vo = vel(o), vd = vel(d); R.vrel = vo && vd ? V.len(V.sub(vd, vo)) * AU_KM / 86400 : null;
+}
+return R;
+},
+optionsHTML(sel) {
+return PLAN_GROUPS.map(([t, f]) => { const it = World.rb.filter(r => f(r) && !r.hidden); return it.length ? `<optgroup label="${t}">${it.map(r => `<option value="${r.id}" ${r.id === sel ? 'selected' : ''}>${esc(r.def.name)}</option>`).join('')}</optgroup>` : ''; }).join('');
+},
+render() {
+const p = $('#plan'); if (!p) return;
+if (!this.ship) this.ship = this.shipDef().id;
+this._lastHTML = null;
+p.innerHTML = `
+<header class="tp-head"><div><span class="tp-kicker">Herramienta</span><h2 id="plan-title">Planificador de viaje</h2></div><button class="icon-btn" data-pl="close" aria-label="Cerrar">&times;</button></header>
+<div class="seg tp-tabs" role="radiogroup" aria-label="Modo de planificación">${[['simple', 'Modo simple'], ['orbital', 'Modo orbital']].map(([m, t]) => `<button role="radio" aria-checked="${this.mode === m}" class="${this.mode === m ? 'on' : ''}" data-pl="mode" data-m="${m}">${t}</button>`).join('')}</div>
+<div class="pl-form">
+<label>Origen<select id="pl-o">${this.optionsHTML(this.origin)}</select></label>
+<button class="icon-btn pl-swap" data-pl="swap" aria-label="Intercambiar origen y destino" data-tip="Intercambiar">⇄</button>
+<label>Destino<select id="pl-d">${this.optionsHTML(this.dest)}</select></label>
+<label>Nave<select id="pl-s">${SHIPS.map(s => `<option value="${s.id}" ${s.id === this.ship ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
+</div>
+<div id="pl-res"></div>
+<button class="txt-btn pl-win" id="pl-winb" data-pl="window" hidden>Ir a la fecha de la ventana de transferencia</button>
+<div class="pl-act">
+<button class="cta-ghost" data-pl="see-o">Ver origen</button><button class="cta-ghost" data-pl="see-d">Ver destino</button>
+<button class="cta-ghost${this.routeOn ? ' on' : ''}" data-pl="route">${this.routeOn ? 'Ocultar trayectoria' : 'Visualizar viaje'}</button>
+<button class="cta" data-pl="start">Iniciar viaje</button>
+</div>`;
+this.paintResults();
+},
+paintResults() {
+const el = $('#pl-res'); if (!el) return;
+const R = this.calc(), sh = R.sh;
+if (!R.o || !R.d) { this._lastHTML = null; el.innerHTML = '<p class="note">El origen o el destino no existe en la fecha simulada (por ejemplo, una nave aún no lanzada). Cambia la fecha o elige otro objeto.</p>'; return; }
+if (R.o === R.d) { this._lastHTML = null; el.innerHTML = '<p class="note">Elige un destino distinto del origen.</p>'; return; }
+const date = jd => UI.dateStr(jd), dist = km => km >= 1e6 ? fmt(km / 1e6, km >= 1e8 ? 0 : 1) + ' millones de km' : fmt(km, 0) + ' km';
+const fict = sh.info && sh.info.franquicia ? `Tecnología ficticia (${esc(sh.info.franquicia)})` : 'Nave conceptual de SOLARIS';
+let html = `<div class="pl-grid">
+<div><span>Distancia actual</span><b>${dist(R.km)}</b><small>${fmt(R.km, 0)} km · ${fmt(R.dAU, R.dAU < 0.01 ? 5 : 3)} UA</small></div>
+<div><span>Nave</span><b>${esc(sh.name)}</b><small>Velocidad máxima ${fmt(sh.maxSpeed, 0)} km/s · aceleración ${fmt(sh.accel / 9.81, 1)} g</small></div>
+<div><span>Tiempo estimado</span><b>${fmtDur(R.days)}</b><small>Acelerando, en crucero y frenando en línea recta</small></div>
+<div><span>Salida</span><b>${date(Time.jd)}</b><small>Fecha de la simulación</small></div>
+<div><span>Llegada aproximada</span><b>${date(R.arr)}</b><small>${UI.isSimulatedDate() ? 'Según la fecha simulada' : 'Saliendo ahora'}</small></div>
+</div>
+<p class="pl-note">${fict} — cálculo realizado con los parámetros internos de SOLARIS. Estimación simplificada basada en distancia y velocidad seleccionada. No representa una trayectoria orbital real${R.d.parent && !R.d.isSun ? ' ni el movimiento del destino durante el viaje' : ''}.</p>`;
+if (this.mode === 'orbital') {
+if (!R.hoh) html += `<p class="pl-note">El modo orbital necesita dos cuerpos que orbiten directamente al Sol (por ejemplo, Tierra → Marte). Para lunas, naves o el propio Sol se muestra solo la estimación simple.</p>`;
+else {
+const H = R.hoh, deg = x => fmt(x * 180 / Math.PI, 0) + '°';
+html += `<h4 class="pl-h">Transferencia orbital simplificada (Hohmann)</h4><div class="pl-grid">
+<div><span>Duración de la transferencia</span><b>${fmtDur(H.T)}</b><small>Media elipse entre ${fmt(H.r1, 2)} y ${fmt(H.r2, 2)} UA</small></div>
+<div><span>Δv heliocéntrico</span><b>${fmt(H.dv1 + H.dv2, 1)} km/s</b><small>${fmt(H.dv1, 2)} al salir + ${fmt(H.dv2, 2)} al llegar</small></div>
+<div><span>Próxima ventana de transferencia</span><b>${H.win != null ? date(Time.jd + H.win) : 'No disponible'}</b><small>${H.win != null ? (H.win < 1 ? 'Ventana abierta ahora (dentro del margen de esta aproximación)' : 'Dentro de ' + fmtDur(H.win)) + (H.syn ? ' · se repite cada ' + fmtDur(H.syn) : '') : ''}</small></div>
+<div><span>Ángulo de fase</span><b>${H.phase != null ? deg(H.phase) : 'No disponible'}</b><small>${H.phi != null ? 'Necesario para partir: ' + deg(H.phi) : ''}</small></div>
+<div><span>Velocidad relativa actual</span><b>${R.vrel != null ? fmt(R.vrel, 1) + ' km/s' : 'No disponible'}</b><small>Entre ambos cuerpos alrededor del Sol</small></div>
+</div>
+<p class="pl-note">Simplificaciones: órbitas circulares y coplanarias con el radio medio de cada cuerpo; solo gravedad del Sol; el Δv no incluye escapar del planeta de origen ni la captura en el destino. Al visualizarla, la trayectoria parte de la posición del origen en la próxima ventana. Es una aproximación educativa, no un cálculo de misión.</p>`;
+}
+}
+if (html !== this._lastHTML) { el.innerHTML = html; this._lastHTML = html; }          // solo si cambió (no recrea nodos sin necesidad)
+const wb = $('#pl-winb'), want = !!(R.hoh && R.hoh.win != null && R.hoh.win >= 1); if (wb && wb.hidden === want) wb.hidden = !want;
+},
+buildRoute() {
+const R = this.calc(); if (!R.o || !R.d || R.o === R.d) { this.route = null; return; }
+if (R.hoh) {
+const H = R.hoh, e = Math.abs(H.r2 - H.r1) / (H.r2 + H.r1), out = H.r2 > H.r1;
+const lon0 = Math.atan2(R.o.helio[1], R.o.helio[0]) + (H.win || 0) * 2 * Math.PI / Info.periodDays(R.o).v, N = 160, pts = [];
+for (let i = 0; i < N; i++) { const nu = (out ? 0 : Math.PI) + Math.PI * i / (N - 1), r = H.a * (1 - e * e) / (1 + e * Math.cos(nu)), ang = lon0 + (out ? nu : nu - Math.PI); pts.push([r * Math.cos(ang), r * Math.sin(ang), 0]); }
+this.route = { kind: 'hohmann', pts };
+} else this.route = { kind: 'line', o: R.o.id, d: R.d.id };
+},
+showRoute() {
+this.buildRoute(); if (!this.route) return;
+this.routeOn = true; this.close();
+const o = World.byId[this.origin], d = World.byId[this.dest];
+if (this.route.kind === 'hohmann') { const r = ScaleState.dist(Math.max(this.calc().hoh.r2, this.calc().hoh.r1)); Cam.travelTo([0, 0, 0], r * 3.2, 1.0); }
+else { const c = V.scale(V.add(o.posS, d.posS), 0.5), s = V.dist(o.posS, d.posS); Cam.travelTo(c, Math.max(s * 1.9, Math.max(o.rS, d.rS) * 8), 0.75); }
+UI.toast(this.route.kind === 'hohmann' ? 'Trayectoria de transferencia simplificada (Hohmann)' : 'Línea recta educativa: no representa la trayectoria física real');
+},
+hideRoute() { this.routeOn = false; this.route = null; const m = $('#pl-marks'); if (m) m.hidden = true; },
+scenePts() {
+const R = this.route; if (!R) return null;
+if (R.kind === 'line') { const o = World.byId[R.o], d = World.byId[R.d], N = 64, out = [];
+for (let i = 0; i < N; i++) out.push(V.add(o.posS, V.scale(V.sub(d.posS, o.posS), i / (N - 1)))); return out; }
+return R.pts.map(p => ScaleState.mapVec(Astro.eclToScene(p)));
+},
+marks() {
+let M = $('#pl-marks');
+if (!M) { M = document.createElement('div'); M.id = 'pl-marks'; M.innerHTML = '<span class="pl-mk" id="pl-mo"></span><span class="pl-mk" id="pl-md"></span>'; $('#labels').appendChild(M); }
+const show = this.routeOn && (World.cineK || 0) < 0.4 && !Flight.on; M.hidden = !show; if (!show) return;
+[['pl-mo', this.origin, 'Origen'], ['pl-md', this.dest, 'Destino']].forEach(([id, bid, t]) => {
+const rb = World.byId[bid], el = $('#' + id); if (!rb) { el.hidden = true; return; }
+const o = World.project(rb.posS, {}); el.hidden = !o.on; if (!o.on) return;
+el.style.transform = `translate(${o.x}px, ${o.y}px)`; const txt = t + ' · ' + rb.def.name; if (el.textContent !== txt) el.textContent = txt;
+});
+},
+start() {
+const R = this.calc(); if (!R.o || !R.d || R.o === R.d) return;
+let sid = R.o.id;
+if (!STARTS.some(s => s[0] === sid)) {       // el vuelo parte de una de las órbitas disponibles: la más cercana al origen
+sid = STARTS.map(s => s[0]).filter(id => id !== 'luna' || (R.o.parent && R.o.parent.id === 'tierra')).sort((a, b) => V.len(V.sub(World.byId[a].helio, R.o.helio)) - V.len(V.sub(World.byId[b].helio, R.o.helio)))[0];
+UI.toast('El vuelo comienza en la órbita disponible más cercana: ' + STARTS.find(s => s[0] === sid)[1]);
+}
+this.close(); this.hideRoute();
+Flight.startId = sid; Flight.openHangar();
+const i = SHIPS.findIndex(s => s.id === R.sh.id); if (i >= 0) Flight.setShip(i);
+Flight.renderHangar(); Flight.launch();
+Flight.setTarget(R.d); if (!Flight.intercept) Flight.toggle('intercept');
+},
+};
+UI.TOOL_ROWS = (UI.TOOL_ROWS || []).concat([['planner', ICON.travel, 'Planificador de viaje', 'Distancia, tiempo y transferencia orbital entre dos objetos']]);
+UI.TOOL_ACTIONS = Object.assign(UI.TOOL_ACTIONS || {}, { planner: () => Planner.open() });
+document.addEventListener('click', e => { const b = e.target.closest('#info-plan'); if (b) Planner.open({ dest: b.dataset.plan }); });
 const App = {
 last: 0, scaleRatio: null, ready: false,
 qualityParams() {
@@ -6513,7 +6702,7 @@ const sg = $('#start-tours'); sg.disabled = false; sg.addEventListener('click', 
 const sf = $('#start-fly'); sf.disabled = false; sf.addEventListener('click', () => { this.begin(); Flight.openHangar(); });
 this.ready = true;
 if (Settings.state.general.startup === 'explore' && location.hash !== '#creditos') this.begin();
-window.Solaris = { World, Cam, UI, Time, S, select: id => UI.select(World.byId[id], { fly: true }), App, Flight, Music, SFX, Settings, Keys, Gfx, GLX, I18N, BODY, PackedModels, Assets, Compare, TL, Sci, ScaleState };
+window.Solaris = { World, Cam, UI, Time, S, select: id => UI.select(World.byId[id], { fly: true }), App, Flight, Music, SFX, Settings, Keys, Gfx, GLX, I18N, BODY, PackedModels, Assets, Compare, TL, Sci, ScaleState, Planner, Flight };
 requestAnimationFrame(t => this.loop(t));
 },
 home() {
