@@ -1142,7 +1142,7 @@ return true;
 },
 };
 const ASSET_MANIFEST = {"music": {"webm": "assets/audio/metamorphosis.webm", "mp3": "assets/audio/metamorphosis.mp3"}, "bodyMeshes": {"fobos": {"url": "assets/models/moons/fobos.bin", "k": 1.26255}, "deimos": {"url": "assets/models/moons/deimos.bin", "k": 1.37497}, "haumea": {"url": "assets/models/dwarfs/haumea.bin", "k": 1.44255}}};
-const SOLARIS_BUILD = '2026.10.06-0756-web';
+const SOLARIS_BUILD = '2026.10.06-0824-web';
 console.info('SOLARIS · versión ' + SOLARIS_BUILD);
 const Assets = {
 cache: new Map(), busyN: new Map(),
@@ -3023,7 +3023,7 @@ o_col = outc(mix(u_color, u_edge, e), u_alpha * (0.2 * g + 0.65 * e));
 }`;
 SH.FS_BH = SH.HEAD + SH.FRAG + SH.NOISE + `
 in vec2 v_uv;
-uniform vec3 u_camR; uniform vec3 u_camU; uniform vec3 u_camF; uniform vec2 u_tan; uniform vec3 u_cam;
+uniform vec3 u_camR; uniform vec3 u_camU; uniform vec3 u_camF; uniform vec2 u_tan; uniform vec2 u_off; uniform vec3 u_cam;
 uniform int u_steps; uniform float u_rin; uniform float u_rout; uniform float u_reveal; uniform float u_heat; uniform float u_spin;
 float h3(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
 vec3 lensStars(vec3 d){
@@ -3046,7 +3046,7 @@ return vec4(col * I * 1.55 * u_heat, clamp(I * 1.45, 0.0, 1.0));
 }
 void main(){
 vec2 ndc = v_uv * 2.0 - 1.0;
-vec3 dir = normalize(u_camF + ndc.x * u_tan.x * u_camR + ndc.y * u_tan.y * u_camU);
+vec3 dir = normalize(u_camF + (ndc.x + u_off.x) * u_tan.x * u_camR + (ndc.y + u_off.y) * u_tan.y * u_camU);   // incluye el desplazamiento óptico
 vec3 x = u_cam;
 float RI = u_rout * 1.7;                                   // región de influencia apreciable
 float tca = -dot(x, dir), b = length(cross(x, dir));
@@ -3165,10 +3165,10 @@ out vec2 v_uv;
 void main(){ vec2 p = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2)); v_uv = p; gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0); }`;
 SH.FS_SKY = SH.HEAD + SH.FRAG + `
 in vec2 v_uv;
-uniform samplerCube u_sky; uniform vec3 u_camR; uniform vec3 u_camU; uniform vec3 u_camF; uniform vec2 u_tan; uniform float u_skyB; uniform vec2 u_shift;
+uniform samplerCube u_sky; uniform vec3 u_camR; uniform vec3 u_camU; uniform vec3 u_camF; uniform vec2 u_tan; uniform vec2 u_off; uniform float u_skyB; uniform vec2 u_shift;
 void main(){
 vec2 ndc = v_uv * 2.0 - 1.0 + u_shift;
-vec3 d = normalize(u_camF + u_camR * ndc.x * u_tan.x + u_camU * ndc.y * u_tan.y);
+vec3 d = normalize(u_camF + u_camR * (ndc.x + u_off.x) * u_tan.x + u_camU * (ndc.y + u_off.y) * u_tan.y);
 o_col = outc(texture(u_sky, d).rgb * u_skyB, 1.0);
 }`;
 SH.VS_BELT = SH.HEAD + `
@@ -3754,7 +3754,7 @@ GLX.beginScene();
 if (L.deepSky && Settings.state.graphics.nebulae) {
 GLX.state({ depthTest: false, depthWrite: false, cull: 'none', blend: 'none' });
 const pr = useP(P.sky), v = this.view, f = 1 / this.proj[5];
-GLX.setAll(pr, { u_sky: this.sky, u_camR: [v[0], v[4], v[8]], u_camU: [v[1], v[5], v[9]], u_camF: [-v[2], -v[6], -v[10]], u_tan: [f * GLX.W / GLX.H, f], u_shift: [this.proj[8], this.proj[9]], u_skyB: 1.0 });
+GLX.setAll(pr, { u_sky: this.sky, u_camR: [v[0], v[4], v[8]], u_camU: [v[1], v[5], v[9]], u_camF: [-v[2], -v[6], -v[10]], u_tan: [1 / this.proj[0], 1 / this.proj[5]], u_off: [this.proj[8], this.proj[9]], u_shift: [this.proj[8], this.proj[9]], u_skyB: 1.0 });
 gl.bindVertexArray(GLX.fsTri); gl.drawArrays(gl.TRIANGLES, 0, 3);
 }
 if (L.stars) {
@@ -4212,7 +4212,7 @@ const preset = Settings.state.graphics.preset; let steps = { low: 60, medium: 10
 const dist = Math.max(V.len(V.sub(this.cam, bh.posS)), 1e-6), cover = clamp((G.disk.out * 1.7 * G.H / dist) / f, 0, 3);
 steps = Math.round(steps * clamp(1.35 - cover * 0.45, 0.45, 1));
 GLX.state({ depthTest: false, depthWrite: false, cull: 'none', blend: 'premul' });
-GLX.setAll(pr, { u_camR: [v[0], v[4], v[8]], u_camU: [v[1], v[5], v[9]], u_camF: [-v[2], -v[6], -v[10]], u_tan: [f * GLX.W / GLX.H, f],
+GLX.setAll(pr, { u_camR: [v[0], v[4], v[8]], u_camU: [v[1], v[5], v[9]], u_camF: [-v[2], -v[6], -v[10]], u_tan: [1 / this.proj[0], 1 / this.proj[5]], u_off: [this.proj[8], this.proj[9]],
 u_cam: V.scale(V.sub(this.cam, bh.posS), 1 / G.H), u_steps: steps, u_rin: G.disk.in, u_rout: G.disk.out, u_reveal: this.bhReveal,
 u_heat: 1 + (this.bhBoost || 0), u_spin: UI.reducedMotion ? 0.12 : 0.45 });
 GLX.gl.bindVertexArray(GLX.fsTri); GLX.gl.drawArrays(GLX.gl.TRIANGLES, 0, 3);
