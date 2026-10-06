@@ -1142,7 +1142,7 @@ return true;
 },
 };
 const ASSET_MANIFEST = {"music": {"webm": "assets/audio/metamorphosis.webm", "mp3": "assets/audio/metamorphosis.mp3"}, "bodyMeshes": {"fobos": {"url": "assets/models/moons/fobos.bin", "k": 1.26255}, "deimos": {"url": "assets/models/moons/deimos.bin", "k": 1.37497}, "haumea": {"url": "assets/models/dwarfs/haumea.bin", "k": 1.44255}}};
-const SOLARIS_BUILD = '2026.10.06-0842-web';
+const SOLARIS_BUILD = '2026.10.06-0855-web';
 console.info('SOLARIS · versión ' + SOLARIS_BUILD);
 const Assets = {
 cache: new Map(), busyN: new Map(),
@@ -6952,20 +6952,15 @@ const Dilation = {
 RATIO: 7 * 365.25 * 24,                          // horas externas por hora local ≈ 61,362
 t: 0, run: true, last: 0, timer: 0,
 html() {
-return `<section class="gx-dil"><h3>Dilatación temporal <span class="gx-tag fic">Universo de Interstellar</span></h3>
-<p class="gx-ratio">1 hora local ≈ 7 años externos <small>(factor ≈ ${fmt(this.RATIO, 0)})</small></p>
-<div class="gx-clocks"><div><span>Tiempo en Miller</span><b id="dil-local">00:00:00</b></div><div><span>Tiempo externo equivalente</span><b id="dil-ext">0 días</b></div></div>
-<div class="gx-dil-act"><button class="txt-btn" id="dil-play">Pausar</button><button class="txt-btn" id="dil-reset">Reiniciar</button><button class="txt-btn" data-dil="600">10 min</button><button class="txt-btn" data-dil="3600">1 h</button><button class="txt-btn" data-dil="11520">3 h 12 min</button></div>
-<p class="note">Cálculo: tiempo externo = tiempo local × 61,362. Es la relación que usa la película; SOLARIS la representa con fines educativos y visuales. La dilatación temporal gravitacional es real, pero este valor concreto pertenece al escenario ficticio de Interstellar.</p></section>`;
+const ex = [[600, '10 minutos'], [3600, '1 hora'], [3 * 3600, '3 horas']];
+return `<section class="gx-dil" id="info-dil"><h3>Dilatación temporal <span class="gx-tag fic">Universo de Interstellar</span></h3>
+<p>En Miller, la intensa gravedad asociada a su proximidad a Gargantúa provoca una enorme diferencia entre el tiempo local y el tiempo experimentado lejos del planeta dentro del escenario de Interstellar.</p>
+<p class="gx-ratio">1 hora en Miller ≈ 7 años externos <small>(factor ≈ ${fmt(MILLER_TIME.RATIO, 0)})</small></p>
+<div class="gx-clocks"><div><span>Tiempo en Miller</span><b id="dil-local">00:00:00</b></div><div><span>Tiempo externo equivalente</span><b id="dil-ext">0 horas</b></div></div>
+<p class="gx-ex">${ex.map(([s, t]) => `${t} → ${MillerFX.ext(s)}`).join(' · ')}</p>
+<p class="note">El contador sigue el reloj de la ambientación sonora de Miller: cada tic llega cada ${fmt(MILLER_TIME.TICK_T, 4)} s locales (≈ ${fmt(MILLER_TIME.TICK_T * MILLER_TIME.RATIO / 3600, 1)} horas externas). La dilatación temporal gravitacional es real; esta relación concreta pertenece a la película.</p></section>`;
 },
-start() {
-this.t = 0; this.run = true; this.last = performance.now(); clearInterval(this.timer);
-$('#dil-play').addEventListener('click', () => { this.run = !this.run; $('#dil-play').textContent = this.run ? 'Pausar' : 'Continuar'; this.last = performance.now(); });
-$('#dil-reset').addEventListener('click', () => { this.t = 0; this.paint(); });
-document.querySelectorAll('[data-dil]').forEach(b => b.addEventListener('click', () => { this.t = +b.dataset.dil; this.run = false; $('#dil-play').textContent = 'Continuar'; this.paint(); }));
-this.timer = setInterval(() => { if (!$('#dil-local')) { clearInterval(this.timer); return; } const n = performance.now(); if (this.run) this.t += (n - this.last) / 1000; this.last = n; this.paint(); }, 250);
-this.paint();
-},
+start() { /* sin reloj propio: lo actualiza MillerFX con el reloj de audio */ },
 paint() {
 const el = $('#dil-local'), ex = $('#dil-ext'); if (!el) return;
 const s = Math.floor(this.t), p2 = n => String(n).padStart(2, '0');
@@ -7027,7 +7022,7 @@ this.sfx('start');
 exit(opts) {
 opts = opts || {}; const R = this.run; if (!R) return;
 const st = R.M.stages[R.i]; if (st && st.exit) st.exit(this.ctx);
-this.run = null; this.ctx.cleanup();
+this.run = null; this.ctx.cleanup(); if (MillerFX.active) MillerFX.exit();
 $('#app').classList.remove('in-mission', 'mission-cine', 'mission-hide', 'ms-active');
 const s = R.saved;
 Time.jd = s.time.jd; Time.paused = s.time.paused; Time.idx = s.time.idx; Time.live = s.time.live; UI.refreshTime();
@@ -7202,12 +7197,10 @@ exit() { World.bhBoost = 0; } },
 { id: 'MILLER', label: 'Miller', dur: 24, sfx: 'whoosh',
 enter(c) { const m = c.rb('miller'); c.shot(() => c.poseBehind(m, bh(), 7, 0.95, 0.16), 9); },
 update(c, t) {
-if (t > 8.5) c.once('cap', () => { c.caption('PLANETA DE MILLER', 'Dilatación temporal extrema · 1 hora local ≈ 7 años externos', 7000); c.dilation(true, 120); });
+if (t > 8.5) c.once('cap', () => { c.caption('PLANETA DE MILLER', 'Dilatación temporal extrema · 1 hora local ≈ 7 años externos', 7000); MillerFX.enter({ mission: true }); });
 if (t > 13) c.once('drift', () => c.shot(() => c.poseBehind(c.rb('miller'), bh(), 5.5, 1.2, 0.18), 10));
-const d = $('#ms-dil'); if (d && t > 8.5) { const loc = (t - 8.5) * 120; const days = loc * 7 * 365.25 * 24 / 86400; const y = Math.floor(days / 365.25), mo = Math.round((days - y * 365.25) / 30.44), p2 = n => String(n).padStart(2, '0'), s = Math.floor(loc);
-d.innerHTML = `<span>Tiempo en Miller</span><b>${p2(Math.floor(s / 3600))}:${p2(Math.floor(s / 60) % 60)}:${p2(s % 60)}</b><span>Tiempo externo</span><b>≈ ${y ? y + (y === 1 ? ' año ' : ' años ') : ''}${mo} ${mo === 1 ? 'mes' : 'meses'}</b><small>Contador acelerado ×120 · relación de la película Interstellar</small>`; }
 },
-exit(c) { c.dilation(false); } },
+exit(c) { MillerFX.exit(); } },
 { id: 'MANN', label: 'Mann', dur: 26, sfx: 'whoosh',
 enter(c) { const m = c.rb('miller'), mid = V.scale(V.add(m.posS, [0, 0, 0]), 0.55); c.shot({ target: mid, dist: H() * 26, az: Cam.az + 0.4, el: 0.22 }, 6); },
 update(c, t) {
@@ -7257,6 +7250,149 @@ if (!Missions.run || e.target.closest && e.target.closest('input, textarea, sele
 if (e.key === 'Escape') { e.stopImmediatePropagation(); e.preventDefault(); Missions.exit({ restore: true }); }
 else if (e.key === ' ') { e.stopImmediatePropagation(); e.preventDefault(); Missions.pause(); }
 }, true);
+const MILLER_TIME = {
+RATIO: 7 * 365.25 * 24,              // horas externas por hora local (relación de Interstellar) ≈ 61,362
+TICK_FIRST: 0.614, TICK_T: 1.2535,
+};
+const MillerFX = {
+active: false, paused: false, src: null, nodes: null, t0: 0, pausedAt: 0, lastTick: -1, raf: 0, sched: 0, prevDuck: 1,
+ctx() { try { return SFX.ensure ? SFX.ensure() : SFX.ctx; } catch (e) { return null; } },
+level() { const A = Settings.state.audio; return (A.musicOn === false || A.muted) ? 0 : (A.music != null ? A.music : 0.6); },
+clock() {
+if (!this.active) return 0;
+if (this.paused) return this.pausedAt;
+if (this.src === 'track' && this.el) return this.el.currentTime;
+const c = this.ctx(); return this.useAudio && c ? Math.max(0, c.currentTime - this.t0) : Math.max(0, performance.now() / 1000 - this.t0);
+},
+enter(opts) {
+opts = opts || {};
+if (this.active) { this.exit({ quick: true }); }                       // volver a Miller: la experiencia se reinicia sincronizada
+this.active = true; this.paused = false; this.lastTick = -1; this.mission = !!opts.mission;
+this.prevDuck = Music.duck; Music.setDuck(0);                           // fundido cruzado: la música principal baja
+const c = this.ctx(), M = ASSET_MANIFEST.millerTrack;
+if (M) this.startTrack(M); else this.startSynth(c);
+this.hud(); this.loop();
+},
+exit(opts) {
+opts = opts || {}; if (!this.active) return;
+this.active = false; cancelAnimationFrame(this.raf); clearInterval(this.sched);
+const c = this.ctx(), N = this.nodes, fade = opts.quick ? 0.25 : 1.6;
+if (N && c) { const t = c.currentTime; N.out.gain.cancelScheduledValues(t); N.out.gain.setValueAtTime(N.out.gain.value, t); N.out.gain.linearRampToValueAtTime(0, t + fade);
+setTimeout(() => { try { N.oscs.forEach(o => o.stop()); N.out.disconnect(); } catch (e) {} }, fade * 1000 + 100); }
+if (this.el) { const el = this.el; const g = this.trackGain; if (g && c) g.gain.linearRampToValueAtTime(0, c.currentTime + fade); setTimeout(() => { el.pause(); }, fade * 1000); }
+this.nodes = null;
+Music.setDuck(this.prevDuck || 1);                                      // la música principal vuelve
+const h = $('#mx-hud'); if (h) { h.classList.remove('on'); setTimeout(() => { if (!this.active) h.remove(); }, 700); }
+},
+pause(v) {
+if (!this.active || v === this.paused) return;
+const c = this.ctx();
+if (v) { this.pausedAt = this.clock(); this.paused = true; clearInterval(this.sched); if (this.nodes && c) { this.nodes.out.gain.setTargetAtTime(0, c.currentTime, 0.08); this.tickBus.gain.setValueAtTime(0, c.currentTime); } if (this.el) this.el.pause(); this.tickUI(); }
+else { this.paused = false; this.t0 = (this.useAudio && c ? c.currentTime : performance.now() / 1000) - this.pausedAt;
+if (this.nodes && c) { this.nodes.out.gain.setTargetAtTime(this.level() * 0.55, c.currentTime, 0.15);
+const nb = c.createGain(); nb.gain.value = 1; nb.connect(this.nodes.out); this.tickBus = nb;      // los tics ya programados quedan en el bus silenciado
+this.nextTick = Math.ceil((this.pausedAt - MILLER_TIME.TICK_FIRST) / MILLER_TIME.TICK_T); }
+if (this.el) this.el.play().catch(() => {}); else this.schedule(); }
+},
+startSynth(c) {
+this.src = 'synth';
+this.useAudio = !!(c && c.state === 'running');
+if (!this.useAudio) { this.t0 = performance.now() / 1000; return; }       // audio aún no permitido: reloj del navegador, igual de continuo
+const out = c.createGain(); out.gain.value = 0; out.connect(SFX.bus && SFX.bus.music ? SFX.bus.music : c.destination);
+const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 900; lp.connect(out);
+const oscs = [];
+[[110, 'sine', 0.22], [164.81, 'sine', 0.13], [220.5, 'triangle', 0.06], [329.6, 'sine', 0.035]].forEach(([f, type, g]) => {
+const o = c.createOscillator(), gn = c.createGain(), lfo = c.createOscillator(), lg = c.createGain();
+o.type = type; o.frequency.value = f; gn.gain.value = g; lfo.frequency.value = 0.05 + Math.random() * 0.05; lg.gain.value = g * 0.45;
+lfo.connect(lg); lg.connect(gn.gain); o.connect(gn); gn.connect(lp); o.start(); lfo.start(); oscs.push(o, lfo);
+});
+this.tickBus = c.createGain(); this.tickBus.gain.value = 1; this.tickBus.connect(out);
+this.nodes = { out, oscs };
+this.t0 = c.currentTime + 0.05;
+out.gain.setValueAtTime(0, c.currentTime); out.gain.linearRampToValueAtTime(this.level() * 0.55, c.currentTime + 2.5);   // entrada suave
+this.nextTick = 0; this.schedule();
+},
+schedule() {
+clearInterval(this.sched);
+const c = this.ctx(); if (!c || !this.nodes) return;
+const run = () => {
+if (!this.active || this.paused) return;
+this.tickUI();                                                      // la interfaz no depende de los FPS del dibujo 3D
+const local = this.clock(), horizon = local + 6;                    // antelación amplia: inmune a bloqueos largos del navegador
+let k = Math.max(this.nextTick, Math.ceil((local - MILLER_TIME.TICK_FIRST) / MILLER_TIME.TICK_T));
+for (; MILLER_TIME.TICK_FIRST + k * MILLER_TIME.TICK_T < horizon; k++) {
+const at = this.t0 + MILLER_TIME.TICK_FIRST + k * MILLER_TIME.TICK_T; if (at < c.currentTime) continue;
+const o = c.createOscillator(), g = c.createGain(), bp = c.createBiquadFilter();
+o.type = 'square'; o.frequency.value = 2100; bp.type = 'bandpass'; bp.frequency.value = 3200; bp.Q.value = 6;
+g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(0.09, at + 0.0015); g.gain.exponentialRampToValueAtTime(0.0008, at + 0.035);
+o.connect(bp); bp.connect(g); g.connect(this.tickBus); o.start(at); o.stop(at + 0.05);
+(this.sched_log = this.sched_log || []).push(+(at - this.t0).toFixed(4)); if (this.sched_log.length > 32) this.sched_log.shift();   // diagnóstico
+}
+this.nextTick = k;
+};
+run(); this.sched = setInterval(run, 90);
+},
+startTrack(url) {
+this.src = 'track';
+const el = this.el || (this.el = new Audio()); el.src = url; el.preload = 'auto'; el.currentTime = 0;
+const c = this.ctx();
+if (c && !this.trackNode) { try { this.trackNode = c.createMediaElementSource(el); this.trackGain = c.createGain(); this.trackNode.connect(this.trackGain); this.trackGain.connect(SFX.bus.music); } catch (e) {} }
+if (this.trackGain && c) { this.trackGain.gain.setValueAtTime(0, c.currentTime); this.trackGain.gain.linearRampToValueAtTime(this.level(), c.currentTime + 2.5); }
+if (el.readyState < 3) this.loading(true); el.oncanplay = () => this.loading(false);
+el.play().catch(() => {});
+},
+loading(v) { const h = $('#mx-hud'); if (h) h.classList.toggle('loading', v); },
+hud() {
+let h = $('#mx-hud');
+if (!h) { h = document.createElement('div'); h.id = 'mx-hud'; h.setAttribute('role', 'status'); $('#app').appendChild(h); }
+h.innerHTML = `<span class="mx-k">Dilatación temporal</span>
+<div class="mx-row"><span>Miller</span><b id="mx-loc">00:00:00</b></div>
+<div class="mx-row mx-ext"><span>Exterior</span><b id="mx-ext">0 horas</b></div>
+<div class="mx-line"><i id="mx-dot"></i></div>
+<small class="mx-rel">1 hora ≈ 7 años · relación de Interstellar</small>
+<span class="mx-load">Preparando audio de Miller…</span>
+<div class="mx-min"><b>MILLER</b><span>1 hora ≈ 7 años</span></div>`;
+requestAnimationFrame(() => h.classList.add('on'));
+},
+ext(localS) {
+const days = localS * MILLER_TIME.RATIO / 86400;
+if (days < 1) return '≈ ' + fmt(days * 24, 1) + ' horas';
+if (days < 60) return '≈ ' + fmt(days, 1) + ' días';
+let y = Math.floor(days / 365.25), m = Math.round((days - y * 365.25) / 30.44); if (m === 12) { y++; m = 0; }
+return '≈ ' + (y ? y + (y === 1 ? ' año' : ' años') + (m ? ' y ' : '') : '') + (m || !y ? m + (m === 1 ? ' mes' : ' meses') : '');
+},
+paint(local) {
+const s = Math.floor(local), p2 = n => String(n).padStart(2, '0'), L = `${p2(Math.floor(s / 3600))}:${p2(Math.floor(s / 60) % 60)}:${p2(s % 60)}`, E = this.ext(local);
+['mx-loc', 'dil-local'].forEach(id => { const e = $('#' + id); if (e && e.textContent !== L) e.textContent = L; });
+['mx-ext', 'dil-ext'].forEach(id => { const e = $('#' + id); if (e && e.textContent !== E) e.textContent = E; });
+const ph = ((local - MILLER_TIME.TICK_FIRST) % MILLER_TIME.TICK_T + MILLER_TIME.TICK_T) % MILLER_TIME.TICK_T / MILLER_TIME.TICK_T;
+const d = $('#mx-dot'); if (d) d.style.transform = `translateX(${(ph * 100).toFixed(1)}%)`;
+},
+tickUI() {
+if (!this.active) return;
+const local = this.clock(), k = Math.floor((local - MILLER_TIME.TICK_FIRST) / MILLER_TIME.TICK_T);
+this.paint(local);
+if (k > this.lastTick && local >= MILLER_TIME.TICK_FIRST) {         // tic: pulsación sutil del tiempo externo
+this.lastTick = k;
+['mx-hud', 'info-dil'].forEach(id => { const e = $('#' + id); if (e) { e.classList.remove('tick'); void e.offsetWidth; e.classList.add('tick'); } });
+}
+},
+loop() {
+const step = () => { if (!this.active) return; this.tickUI(); this.raf = requestAnimationFrame(step); };
+this.raf = requestAnimationFrame(step);
+if (!this.nodes) { clearInterval(this.sched); this.sched = setInterval(() => this.tickUI(), 90); }   // sin audio: misma actualización periódica
+},
+};
+const _selectMX = UI.select;
+UI.select = function (rb, opts) {
+const r = _selectMX.call(this, rb, opts);
+if (Missions.run) return r;                                          // en la misión, la etapa MILLER controla la experiencia
+if (rb && rb.id === 'miller') { if (!MillerFX.active) MillerFX.enter(); }
+else if (MillerFX.active) MillerFX.exit();
+return r;
+};
+const _msPause = Missions.pause.bind(Missions);
+Missions.pause = function (v) { _msPause(v); if (MillerFX.active && Missions.run) MillerFX.pause(Missions.run.paused); };
 const App = {
 last: 0, scaleRatio: null, ready: false,
 qualityParams() {
@@ -7301,7 +7437,7 @@ const sg = $('#start-tours'); sg.disabled = false; sg.addEventListener('click', 
 const sf = $('#start-fly'); sf.disabled = false; sf.addEventListener('click', () => { this.begin(); Flight.openHangar(); });
 this.ready = true;
 if (Settings.state.general.startup === 'explore' && location.hash !== '#creditos') this.begin();
-window.Solaris = { World, Cam, UI, Time, S, select: id => UI.select(World.byId[id], { fly: true }), App, Flight, Music, SFX, Settings, Keys, Gfx, GLX, I18N, BODY, PackedModels, Assets, Compare, TL, Sci, ScaleState, Planner, Flight, Systems, Dilation, Missions, Cam: Cam };
+window.Solaris = { World, Cam, UI, Time, S, select: id => UI.select(World.byId[id], { fly: true }), App, Flight, Music, SFX, Settings, Keys, Gfx, GLX, I18N, BODY, PackedModels, Assets, Compare, TL, Sci, ScaleState, Planner, Flight, Systems, Dilation, Missions, Cam: Cam, MillerFX, Music };
 requestAnimationFrame(t => this.loop(t));
 },
 home() {
