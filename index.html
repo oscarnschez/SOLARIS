@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SOLARIS: Sistema Solar 3D</title>
+<link rel="icon" type="image/png" sizes="32x32" href="assets/images/favicon-32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/images/apple-touch-icon.png">
+<meta name="description" content="Simulador educativo en 3D del Sistema Solar con planetas, lunas, asteroides, cometas y constelaciones.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/solaris.css">
+</head>
+<body>
+<div id="app" class="booting">
+  <canvas id="gl" tabindex="0" aria-label="Vista 3D del Sistema Solar. Arrastra para girar y usa la rueda para acercarte."></canvas>
+  <div id="labels" aria-hidden="true"></div>
+  <div id="reticle" class="reticle" aria-hidden="true"></div>
+  <div id="reticle-hover" class="reticle hov" aria-hidden="true"></div>
+
+  <header id="top" class="ui">
+    <button id="btn-menu" class="icon-btn" aria-label="Abrir menú"></button>
+    <button id="home-btn" class="brand" aria-label="Volver a la pantalla inicial" data-tip="Volver a la pantalla inicial"><img data-logo="small" alt="SOLARIS" width="111" height="30"></button>
+    <div id="search" role="search">
+      <span id="search-ico"></span>
+      <input id="q" type="search" placeholder="Buscar planetas, lunas, cometas…" autocomplete="off" spellcheck="false" aria-label="Buscar un objeto" role="combobox" aria-expanded="false" aria-controls="results" aria-autocomplete="list">
+      <kbd aria-hidden="true">/</kbd>
+      <ul id="results" role="listbox" aria-label="Resultados"></ul>
+    </div>
+    <div id="modes" role="radiogroup" aria-label="Modo de visualización"></div>
+    <button id="fly-btn" class="fly-btn" data-tip="Pilotar una nave por el Sistema Solar (P)"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5c3 2.4 4.5 6 4.5 10.5l-2 3h-5l-2-3c0-4.5 1.5-8.1 4.5-10.5z"/><circle cx="12" cy="9.5" r="1.6"/><path d="M7.5 13l-3 3 3 .5M16.5 13l3 3-3 .5M10.5 18.5l1.5 3 1.5-3"/></svg><span>Pilotar</span></button>
+    <button id="settings-btn" class="icon-btn set-open" data-open-settings aria-label="Ajustes" data-tip="Ajustes"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 8.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M19.3 13.4l1.6 1.2-1.7 2.9-1.9-.6a7.4 7.4 0 0 1-1.8 1l-.4 2h-3.3l-.4-2a7.4 7.4 0 0 1-1.8-1l-1.9.6-1.7-2.9 1.6-1.2a7 7 0 0 1 0-2.1L4.4 10l1.7-2.9 1.9.6a7.4 7.4 0 0 1 1.8-1l.4-2h3.3l.4 2a7.4 7.4 0 0 1 1.8 1l1.9-.6L19.3 10l-1.6 1.2a7 7 0 0 1 0 2.2z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg><span>Ajustes</span></button>
+    <button id="music-btn" class="icon-btn music-btn" data-music aria-haspopup="dialog" aria-expanded="false" aria-label="Música"><svg class="mi" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path class="mi-note" d="M9 17.5V6.2l10-2.2v11.3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle class="mi-note" cx="6.6" cy="17.6" r="2.4" fill="none" stroke="currentColor" stroke-width="1.7"/><circle class="mi-note" cx="16.6" cy="15.4" r="2.4" fill="none" stroke="currentColor" stroke-width="1.7"/><path class="mi-off" d="M4 4l16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+    <button id="help-btn" class="icon-btn" aria-label="Atajos de teclado" data-tip="Atajos de teclado (?)"></button>
+  </header>
+
+  <nav id="rail" class="ui" aria-label="Secciones"></nav>
+  <aside id="drawer" class="ui panel" aria-hidden="true" aria-labelledby="drawer-title">
+    <div class="panel-head"><h2 id="drawer-title"></h2><button id="drawer-close" class="icon-btn" aria-label="Cerrar"></button></div>
+    <div id="drawer-body" class="panel-body"></div>
+  </aside>
+
+  <aside id="info" class="ui panel" aria-hidden="true" aria-labelledby="info-title">
+    <button id="info-close" class="icon-btn close-float" aria-label="Cerrar ficha"></button>
+    <div id="info-body" class="panel-body"></div>
+  </aside>
+
+  <div id="camtools" class="ui" role="toolbar" aria-label="Cámara"></div>
+
+  <div id="bottom" class="ui">
+    <div id="scalebadge" aria-live="polite"></div>
+    <div id="timebar" role="group" aria-label="Control del tiempo">
+      <button id="t-slower" class="tool" aria-label="Más lento" data-tip="Más lento ( , )"></button>
+      <button id="t-play" class="tool play" aria-label="Pausar"></button>
+      <button id="t-faster" class="tool" aria-label="Más rápido" data-tip="Más rápido ( . )"></button>
+      <div class="speed-wrap">
+        <button id="t-speed" class="speed" aria-haspopup="menu" aria-expanded="false"></button>
+        <div id="speed-menu" role="menu" aria-label="Velocidad"></div>
+      </div>
+      <div class="date"><span id="t-date"></span><span id="t-clock"></span></div>
+      <span id="rot-flag" data-tip="A esta velocidad la rotación de los planetas se muestra ralentizada para evitar parpadeos">rotación ralentizada</span>
+      <div class="pick"><button id="t-cal" class="tool" aria-label="Elegir fecha" data-tip="Elegir una fecha"></button><input id="t-pick" type="date" min="1600-01-01" max="2400-12-31" aria-label="Fecha de la simulación" tabindex="-1"></div>
+      <button id="t-now" class="txt-btn" data-tip="Volver a la fecha actual en tiempo real">Hoy</button>
+      <button id="t-reset" class="tool" aria-label="Restablecer velocidad" data-tip="Restablecer velocidad (R)"></button>
+    </div>
+  </div>
+
+  <div id="minimap-wrap" class="ui">
+    <canvas id="minimap" aria-label="Minimapa del Sistema Solar visto desde arriba. Haz clic en un planeta para viajar."></canvas>
+    <button id="mm-toggle" class="icon-btn" aria-label="Mostrar u ocultar minimapa" data-tip="Minimapa (M)"></button>
+  </div>
+
+  <div id="tip" role="tooltip"></div>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <section id="tourbar" aria-live="polite" aria-label="Recorrido guiado">
+    <header class="tb-head">
+      <div><p id="tb-tour"></p><p id="tb-step"></p></div>
+      <button id="tb-x" class="tb-x" aria-label="Salir del recorrido" data-tip="Salir del recorrido (Esc)">&times;</button>
+    </header>
+    <div id="tb-dots" class="tb-track"><i id="tb-prog"></i></div>
+    <div class="tb-body">
+      <span id="tb-kicker"></span><h3 id="tb-title"></h3>
+      <p id="tb-text"></p>
+      <p id="tb-note" class="tb-note" hidden></p>
+      <dl id="tb-data"></dl>
+      <p id="tb-live" class="tb-live"></p>
+      <p id="tb-phase" class="tb-phase"></p>
+    </div>
+    <div class="tb-done"><h3>Recorrido completado</h3><p id="tb-done-txt"></p>
+      <div class="tb-done-act"><button class="cta" id="tb-again">Repetir recorrido</button><button class="cta-ghost" id="tb-other">Elegir otro recorrido</button></div></div>
+    <footer class="tb-ctrl">
+      <button id="tb-prev" class="tb-btn" aria-label="Parada anterior" data-tip="Anterior (←)"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M7 5v14M19 5l-9 7 9 7z" fill="currentColor"/></svg></button>
+      <button id="tb-play" class="tb-btn tb-main" aria-label="Pausar recorrido"></button>
+      <button id="tb-next" class="tb-btn" aria-label="Parada siguiente" data-tip="Siguiente (→)"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M17 5v14M5 5l9 7-9 7z" fill="currentColor"/></svg></button>
+      <button id="tb-restart" class="tb-btn" aria-label="Reiniciar recorrido" data-tip="Reiniciar recorrido"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3M4.5 4.5v3.7h3.7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <span id="tb-paused" class="tb-paused"></span>
+      <span class="tb-links"><button id="tb-cine" class="txt-btn tb-cine" data-tip="Ver el recorrido sin interfaz, órbitas ni etiquetas"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M7 5v14M17 5v14M3 9.5h4M3 14.5h4M17 9.5h4M17 14.5h4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>Modo Cine</button><button id="tb-card" class="txt-btn">Ver ficha</button><button id="tb-exit" class="txt-btn">Salir</button></span>
+    </footer>
+  </section>
+  <div id="letterbox" aria-hidden="true"><i></i><i></i></div>
+  <div id="asset-load" role="status" aria-live="polite"><i></i><span>Cargando modelo…</span></div>
+  <div id="cine-ctl" role="toolbar" aria-label="Controles del recorrido en Modo Cine"></div>
+  <div id="cine-cap" aria-live="polite"></div>
+  <button id="cine-exit" class="txt-btn">Salir del modo cine</button>
+
+  <div id="help" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="help-title">
+    <div class="help-card">
+      <h2 id="help-title">Atajos de teclado</h2>
+      <div class="help-grid" id="help-keys"></div>
+      <button id="help-guide" class="txt-btn">Ver instrucciones completas</button><button id="help-close" class="txt-btn">Cerrar</button>
+    </div>
+  </div>
+
+
+  <div id="guide" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="guide-title">
+    <div class="guide-card">
+      <button id="guide-x" class="guide-x" aria-label="Cerrar instrucciones">&times;</button>
+      <p class="guide-kicker">Instrucciones</p>
+      <h2 id="guide-title">Bienvenido a SOLARIS</h2>
+      <p class="guide-lead">Estás a punto de recorrer el Sistema Solar tal como está en este momento: el Sol, los planetas, sus lunas, asteroides, cometas y satélites artificiales reales, en posiciones calculadas a partir de datos científicos. Explóralo con libertad, viaja en el tiempo o navega por el sistema solar en una nave espacial.</p>
+      <h3>Cómo moverte</h3><dl><dt>Arrastrar</dt><dd>Girar la cámara (un dedo en pantallas táctiles)</dd><dt><kbd>Rueda</kbd> o pellizcar</dt><dd>Acercar y alejar</dd><dt><kbd>Mayús</kbd> + arrastrar</dt><dd>Desplazar la vista (dos dedos en táctil)</dd><dt>Clic</dt><dd>Seleccionar un objeto y abrir su ficha</dd><dt>Doble clic</dt><dd>Viajar muy cerca del objeto</dd></dl>
+      <h3>Teclas del explorador</h3><div class="guide-grid" id="guide-keys-explore"></div>
+      <h3>Teclas de vuelo</h3><div class="guide-grid" id="guide-keys-flight"></div>
+      <h3>Consejos</h3><ul class="guide-tips"><li>Si es tu primera vez, prueba los <b>recorridos guiados</b> (botón en la pantalla inicial o tecla <kbd>T</kbd>): planetas, lunas, exploración humana, asteroides y cometas.</li><li>Lo que ves está en <b>tiempo real</b>. Acelera el tiempo con las flechas de la barra inferior para ver girar planetas y lunas, y vuelve al presente con <b>Hoy</b>.</li><li>Con el <b>calendario</b> de la barra de tiempo puedes ver dónde estaban los planetas en un día especial, como tu cumpleaños.</li><li>Abre la <b>ficha</b> de cualquier objeto para conocer su tamaño, su gravedad, su distancia actual y curiosidades.</li><li>Cambia la <b>escala</b> en Configuración: la escala real muestra lo inmensamente vacío que es el espacio.</li><li>Acércate a Júpiter o a Saturno: verás las sombras de sus lunas sobre las nubes y la sombra de los anillos sobre el planeta.</li><li>Para pilotar, empieza con el <b>Colibrí</b> en modo asistido. Elige un objetivo con <kbd>T</kbd> y deja que el piloto automático <kbd>I</kbd> te lleve.</li><li>Si la animación va lenta, baja la <b>calidad gráfica</b> en Configuración.</li><li>El botón de <b>nota musical</b> abre el control de audio: pausa la música y ajusta por separado el volumen general, la música, los efectos de interfaz y las naves. También puedes desactivar los sonidos al pasar el cursor o silenciarlo todo.</li></ul>
+      <div class="guide-end"><p><b>¡Disfruta SOLARIS!</b> El universo es enorme y fascinante; ojalá este viaje despierte tu curiosidad. Buen viaje, explorador.</p>
+      <button id="guide-ok" class="cta">Entendido</button></div>
+    </div>
+  </div>
+
+
+  <div id="tours" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="tours-title">
+    <div class="tours-card">
+      <button id="tours-x" class="guide-x" aria-label="Cerrar recorridos">&times;</button>
+      <p class="guide-kicker">Recorridos guiados</p>
+      <h2 id="tours-title">Descubre el Sistema Solar sin mover un dedo</h2>
+      <p class="guide-lead">La cámara viaja sola de un objeto a otro, se detiene en cada parada y te muestra sus datos científicos. Puedes pausar, avanzar o retroceder cuando quieras.</p>
+      <div id="tours-list" class="tours-grid"></div>
+    </div>
+  </div>
+
+  <div id="about" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="about-title">
+    <div class="about-card">
+      <button id="about-x" class="guide-x" aria-label="Cerrar">&times;</button>
+      <p class="about-brand"><img data-logo="big" alt="SOLARIS" width="1100" height="300"></p>
+      <h2 id="about-title" data-no-i18n>Un proyecto educativo hecho en México</h2>
+      <div class="about-text" data-no-i18n>
+        <p>SOLARIS es un proyecto educativo y sin fines de lucro creado en México con el propósito de acercar el conocimiento del Sistema Solar y la exploración espacial a más personas de una manera visual, interactiva y accesible.</p>
+        <p>Este proyecto fue desarrollado por un creador mexicano con el apoyo de Claude, utilizando tecnología como herramienta para transformar información científica en una experiencia de aprendizaje más atractiva.</p>
+        <p>SOLARIS busca despertar la curiosidad, fomentar el interés por la astronomía, la ciencia y la tecnología, y facilitar el acceso a información sobre planetas, lunas, asteroides, cometas, misiones espaciales y otros objetos de nuestro entorno cósmico.</p>
+        <p>Su objetivo no es comercial, sino educativo: aprender, explorar y compartir conocimiento.</p>
+        <p class="about-close-line">SOLARIS nace de la idea de que entender mejor el universo también puede inspirarnos a seguir preguntando, investigando y descubriendo.</p>
+      </div>
+      <div class="about-foot"><button id="about-credits" class="txt-btn">Créditos y propiedad intelectual</button><button id="about-ok" class="cta">Cerrar</button></div>
+    </div>
+  </div>
+
+  <section id="credits" aria-labelledby="cr-title" aria-hidden="true">
+    <div class="cr-bg" aria-hidden="true"></div>
+    <header class="cr-top">
+      <button id="cr-back" class="cr-back"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Volver al inicio</button>
+      <img class="cr-top-logo" data-logo="small" alt="SOLARIS" width="89" height="24">
+    </header>
+    <div id="cr-scroll" class="cr-scroll">
+      <article class="cr-page" data-no-i18n>
+        <div class="cr-hero cr-in">
+          <img class="cr-logo" data-logo="big" alt="SOLARIS" width="1100" height="300">
+          <h1 id="cr-title">Créditos, Licencias y Propiedad Intelectual</h1>
+          <p class="cr-tag">Proyecto educativo independiente · México · Sin fines de lucro</p>
+        </div>
+        <nav class="cr-index cr-in" aria-label="Secciones">
+          <a href="#cr-sobre">Sobre SOLARIS</a><a href="#cr-recursos">Modelos 3D y recursos</a><a href="#cr-musica">Música y audio</a><a href="#cr-interstellar">Interstellar</a><a href="#cr-marcas">Marcas registradas</a><a href="#cr-ciencia">Información científica</a><a href="#cr-agencias">Agencias y misiones</a><a href="#cr-ia">Inteligencia artificial</a><a href="#cr-finalidad">Finalidad no comercial</a><a href="#cr-solicitudes">Solicitudes</a><a href="#cr-gracias">Agradecimientos</a>
+        </nav>
+        <div class="cr-panel">
+          <section id="cr-sobre" class="cr-sec cr-in">
+            <h2>Sobre SOLARIS</h2>
+            <p><b>SOLARIS</b> es un proyecto independiente de carácter educativo y sin fines de lucro, creado en México con el propósito de acercar la astronomía, la exploración espacial y el conocimiento del Sistema Solar a más personas mediante una experiencia visual e interactiva.</p>
+            <p>El proyecto ha sido desarrollado con apoyo de herramientas de inteligencia artificial, incluyendo <b>Claude</b> y <b>ChatGPT</b>, así como distintas tecnologías y recursos digitales utilizados durante su desarrollo.</p>
+            <p>SOLARIS no representa, pertenece ni está afiliado oficialmente con ninguna agencia espacial, estudio cinematográfico, empresa, universidad, institución científica o titular de propiedad intelectual mencionado dentro del sitio, salvo que expresamente se indique lo contrario.</p>
+          </section>
+          <section id="cr-recursos" class="cr-sec cr-in">
+            <h2>Modelos 3D y recursos de terceros</h2>
+            <p>Algunos modelos 3D, texturas, imágenes, materiales u otros recursos visuales utilizados dentro de SOLARIS pueden haber sido creados por terceros y obtenidos de plataformas públicas, repositorios, bibliotecas digitales o sitios especializados.</p>
+            <p>La autoría de dichos recursos corresponde exclusivamente a sus respectivos creadores.</p>
+            <p>Cuando corresponda, SOLARIS procura respetar las condiciones de uso y atribución establecidas por cada autor, plataforma o licencia.</p>
+            <p>La inclusión de un recurso de terceros dentro del proyecto:</p>
+            <ul class="cr-list"><li>No implica que SOLARIS sea propietario de dicho recurso.</li><li>No implica transferencia de derechos de autor.</li><li>No implica afiliación o colaboración con su creador.</li><li>No implica que el creador respalde o patrocine SOLARIS.</li></ul>
+            <p>Cuando la licencia requiera atribución, el nombre del autor, la fuente y la licencia correspondiente deberán mostrarse dentro de esta sección o junto al recurso utilizado.</p>
+            <h3>Formato de atribución</h3>
+            <dl class="cr-format">
+              <div><dt>Nombre del recurso</dt><dd>[Nombre del modelo o recurso]</dd></div>
+              <div><dt>Autor</dt><dd>[Nombre del creador]</dd></div>
+              <div><dt>Fuente</dt><dd>[Plataforma o sitio de origen]</dd></div>
+              <div><dt>Licencia</dt><dd>[Tipo de licencia]</dd></div>
+              <div><dt>Enlace original</dt><dd>[URL del recurso]</dd></div>
+            </dl>
+            <h3>Recursos de terceros utilizados en SOLARIS</h3>
+            <p class="cr-note">Atribuciones de los recursos incluidos actualmente, presentadas con el formato anterior.</p>
+            <div id="cr-assets" class="cr-assets"></div>
+          </section>
+          <section id="cr-musica" class="cr-sec cr-in">
+            <h2>Música y audio</h2>
+            <h3>Tema musical principal de SOLARIS</h3>
+            <div class="cr-track"><svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true"><path d="M9 17.5V6.2l10-2.2v11.3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6.6" cy="17.6" r="2.4" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="16.6" cy="15.4" r="2.4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><div><b class="cr-track-t">Metamorphosis</b><span>Música por <b>Laura Platt</b></span></div></div>
+            <p>Utilizada como soundtrack principal y ambientación musical de SOLARIS.</p>
+            <dl class="cr-format cr-music-meta">
+              <div><dt>Licencia</dt><dd><span class="cr-na">Por especificar</span></dd></div>
+              <div><dt>Enlace de origen</dt><dd><span class="cr-na">Por especificar</span></dd></div>
+            </dl>
+            <p class="cr-note">El archivo proporcionado identifica el título y la artista; la licencia y el enlace de origen se añadirán en cuanto estén disponibles.</p>
+            <p class="cr-note">Los efectos de sonido de la interfaz, de la navegación entre objetos y del modo de vuelo (motores, propulsores y alertas) son originales de SOLARIS y se generan por síntesis en tiempo real.</p>
+          </section>
+          <section id="cr-interstellar" class="cr-sec cr-in">
+            <h2>Referencias a Interstellar</h2>
+            <p>SOLARIS puede incluir determinadas referencias visuales o culturales relacionadas con la película <b>Interstellar</b>, únicamente dentro del contexto de una experiencia educativa, de exploración espacial y sin fines de lucro.</p>
+            <p><b>Interstellar</b>, sus logotipos, nombres, elementos visuales, diseños, personajes y demás propiedad intelectual relacionada pertenecen a sus respectivos titulares.</p>
+            <p>SOLARIS no reclama propiedad sobre estos elementos.</p>
+            <p>La utilización de cualquier referencia a <i>Interstellar</i> dentro del proyecto:</p>
+            <ul class="cr-list"><li>No implica afiliación oficial con los productores, distribuidores o titulares de la película.</li><li>No implica patrocinio, aprobación o respaldo por parte de sus propietarios.</li><li>No pretende sustituir, reproducir comercialmente ni competir con la obra original.</li><li>Se presenta únicamente como referencia cultural dentro de un proyecto independiente y educativo.</li></ul>
+            <p class="cr-callout">El hecho de que SOLARIS sea un proyecto sin fines de lucro <b>no debe interpretarse como una autorización, licencia o cesión de derechos por parte de los titulares de la propiedad intelectual correspondiente</b>.</p>
+            <p>Si algún elemento relacionado con <i>Interstellar</i> requiere autorización específica de sus titulares, dicha autorización prevalecerá sobre cualquier declaración contenida en esta página.</p>
+          </section>
+          <section id="cr-marcas" class="cr-sec cr-in">
+            <h2>Marcas registradas</h2>
+            <p>Todos los nombres comerciales, marcas, logotipos, denominaciones, productos, misiones, organizaciones y empresas mencionados dentro de SOLARIS pertenecen a sus respectivos propietarios.</p>
+            <p>Su aparición dentro del proyecto se realiza únicamente con fines:</p>
+            <ul class="cr-list"><li>Informativos.</li><li>Educativos.</li><li>Descriptivos.</li><li>De identificación.</li></ul>
+            <p>SOLARIS no pretende sugerir una relación comercial, patrocinio, licencia, asociación o respaldo oficial cuando dicha relación no exista.</p>
+          </section>
+          <section id="cr-ciencia" class="cr-sec cr-in">
+            <h2>Información científica</h2>
+            <p>SOLARIS busca presentar información astronómica y científica de manera clara, visual y educativa.</p>
+            <p>Parte de la información puede basarse en datos publicados por organismos científicos, agencias espaciales, observatorios, universidades y otras fuentes públicas.</p>
+            <p>Cuando sea posible, se procurará identificar las fuentes utilizadas.</p>
+            <p>Debido a la naturaleza del simulador, algunos elementos pueden encontrarse:</p>
+            <ul class="cr-list"><li>Visualmente escalados.</li><li>Simplificados.</li><li>Representados mediante aproximaciones.</li><li>Adaptados para mejorar la navegación o comprensión del usuario.</li></ul>
+            <p>Las posiciones, distancias, tamaños, velocidades o trayectorias mostradas pueden no representar siempre una reproducción científica de precisión absoluta.</p>
+            <p class="cr-callout">SOLARIS debe entenderse como una herramienta educativa y de divulgación, no como un sistema profesional de navegación, ingeniería aeroespacial o investigación astronómica.</p>
+          </section>
+          <section id="cr-agencias" class="cr-sec cr-in">
+            <h2>Uso de nombres de agencias y misiones</h2>
+            <p>Los nombres de agencias espaciales, telescopios, sondas, misiones y vehículos espaciales incluidos dentro de SOLARIS se utilizan únicamente con fines educativos y descriptivos.</p>
+            <p>Por ejemplo:</p>
+            <ul class="cr-chips"><li>NASA</li><li>ESA</li><li>JAXA</li><li>SpaceX</li><li>James Webb Space Telescope</li><li>Hubble Space Telescope</li><li>Voyager</li><li>New Horizons</li><li>Parker Solar Probe</li></ul>
+            <p>Todas las marcas, nombres y elementos relacionados continúan perteneciendo a sus respectivos titulares.</p>
+            <p>Su inclusión no implica afiliación oficial con SOLARIS.</p>
+          </section>
+          <section id="cr-ia" class="cr-sec cr-in">
+            <h2>Inteligencia artificial</h2>
+            <p>Parte del desarrollo conceptual, técnico, textual y de programación de SOLARIS ha sido realizado con apoyo de herramientas de inteligencia artificial.</p>
+            <p>Entre ellas se encuentran:</p>
+            <div class="cr-cols">
+              <div class="cr-card"><h3>Claude</h3><p><b>Claude</b>, desarrollado por Anthropic, ha sido utilizado como herramienta de apoyo durante distintas etapas del desarrollo del proyecto, incluyendo:</p><ul class="cr-list"><li>Programación.</li><li>Desarrollo de funcionalidades.</li><li>Resolución de problemas técnicos.</li><li>Organización de componentes.</li><li>Diseño conceptual del simulador.</li><li>Estructuración de sistemas e interfaces.</li></ul></div>
+              <div class="cr-card"><h3>ChatGPT</h3><p><b>ChatGPT</b>, desarrollado por OpenAI, ha sido utilizado principalmente como herramienta de apoyo para la <b>redacción, revisión, estructuración y mejora de textos</b> utilizados dentro de SOLARIS.</p><p>Su participación ha incluido apoyo en:</p><ul class="cr-list"><li>Redacción de descripciones.</li><li>Textos educativos.</li><li>Mensajes institucionales.</li><li>Créditos y avisos informativos.</li><li>Organización de contenido.</li><li>Mejora de instrucciones y documentación.</li><li>Revisión de estilo y claridad.</li></ul></div>
+            </div>
+            <p>Las herramientas de inteligencia artificial han sido utilizadas como apoyo durante el proceso creativo y técnico.</p>
+            <p>La dirección, selección, integración, revisión y finalidad general del proyecto corresponden a su creador.</p>
+          </section>
+          <section id="cr-finalidad" class="cr-sec cr-in">
+            <h2>Finalidad no comercial</h2>
+            <p>SOLARIS ha sido creado como un proyecto educativo y de divulgación.</p>
+            <p>Su finalidad principal es:</p>
+            <p class="cr-quote">explorar, aprender, enseñar y fomentar el interés por la astronomía, la ciencia, la tecnología y la exploración espacial.</p>
+            <p>El proyecto no pretende apropiarse de obras, marcas, modelos, diseños ni recursos pertenecientes a terceros.</p>
+            <p>Cuando un recurso externo sea utilizado, se procurará respetar las condiciones establecidas por su autor o propietario.</p>
+            <p>La naturaleza no comercial del proyecto no modifica ni elimina los derechos que legalmente correspondan a terceros.</p>
+          </section>
+          <section id="cr-solicitudes" class="cr-sec cr-in">
+            <h2>Solicitudes de atribución, corrección o retiro</h2>
+            <p>SOLARIS busca respetar el trabajo de artistas, desarrolladores, instituciones y titulares de derechos.</p>
+            <p>Si eres propietario o autor de algún modelo, imagen, textura, diseño, marca u otro recurso utilizado dentro del proyecto y consideras que:</p>
+            <ul class="cr-list"><li>La atribución es incorrecta.</li><li>Falta información sobre tu autoría.</li><li>El recurso requiere una licencia diferente.</li><li>El recurso no debe aparecer en SOLARIS.</li><li>Deseas solicitar su modificación o retiro.</li></ul>
+            <p>puedes comunicarte con el responsable del proyecto para solicitar una revisión.</p>
+            <p>Las solicitudes legítimas serán revisadas y, cuando corresponda, se realizarán las modificaciones necesarias.</p>
+            <div class="cr-contact"><span>Contacto</span><a href="mailto:oscarasanchez.c@outlook.com">oscarasanchez.c@outlook.com</a></div>
+          </section>
+          <section id="cr-gracias" class="cr-sec cr-in">
+            <h2>Agradecimientos</h2>
+            <p>SOLARIS reconoce y agradece el trabajo de científicos, astrónomos, ingenieros, artistas 3D, desarrolladores, divulgadores, instituciones y comunidades que hacen posible el acceso público al conocimiento y a recursos relacionados con la exploración espacial.</p>
+            <p>También se reconoce el apoyo de herramientas de inteligencia artificial como <b>Claude</b> y <b>ChatGPT</b>, utilizadas durante distintas etapas del desarrollo, programación, documentación y redacción del proyecto.</p>
+            <p>Este proyecto existe con una intención sencilla:</p>
+            <p class="cr-quote">hacer que explorar el universo sea una experiencia accesible, visual y capaz de despertar curiosidad.</p>
+          </section>
+        </div>
+        <footer class="cr-foot cr-in">
+          <img data-logo="small" alt="SOLARIS" width="111" height="30">
+          <p>Proyecto educativo independiente · México<br>Sin fines de lucro</p>
+          <button id="cr-back2" class="cta-ghost">← Volver al inicio</button>
+        </footer>
+      </article>
+    </div>
+  </section>
+
+  <div id="music-pop" role="dialog" aria-label="Audio" aria-hidden="true">
+    <p class="mp-title">Audio</p>
+    <div class="mp-head"><svg class="mp-ico" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path class="mi-note" d="M9 17.5V6.2l10-2.2v11.3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle class="mi-note" cx="6.6" cy="17.6" r="2.4" fill="none" stroke="currentColor" stroke-width="1.7"/><circle class="mi-note" cx="16.6" cy="15.4" r="2.4" fill="none" stroke="currentColor" stroke-width="1.7"/><path class="mi-off" d="M4 4l16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><div><span>Tema musical principal</span><b>Metamorphosis</b><small>Laura Platt</small></div></div>
+    <button id="music-toggle" class="mp-toggle">Pausar música</button>
+    <div class="mp-mix"></div>
+    <button id="music-credits" class="txt-btn mp-link">Ver créditos de la música</button>
+  </div>
+
+  <div id="settings" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="set-title">
+    <div class="set-card">
+      <header class="set-top"><span class="set-ico"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 8.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M19.3 13.4l1.6 1.2-1.7 2.9-1.9-.6a7.4 7.4 0 0 1-1.8 1l-.4 2h-3.3l-.4-2a7.4 7.4 0 0 1-1.8-1l-1.9.6-1.7-2.9 1.6-1.2a7 7 0 0 1 0-2.1L4.4 10l1.7-2.9 1.9.6a7.4 7.4 0 0 1 1.8-1l.4-2h3.3l.4 2a7.4 7.4 0 0 1 1.8 1l1.9-.6L19.3 10l-1.6 1.2a7 7 0 0 1 0 2.2z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span><h2 id="set-title">Ajustes</h2><button id="set-close" class="guide-x" aria-label="Cerrar ajustes">&times;</button></header>
+      <div class="set-main"><nav id="set-nav" class="set-nav" role="tablist" aria-label="Categorías de ajustes"></nav><div id="set-body" class="set-body" role="tabpanel" aria-labelledby="set-cat-title"></div></div>
+      <footer class="set-foot"><span class="set-live">Los cambios se aplican al instante y se guardan automáticamente.</span><button id="set-reset" class="txt-btn">Restaurar valores</button><button id="set-done" class="cta">Cerrar</button></footer>
+    </div>
+  </div>
+  <div id="confirm" role="alertdialog" aria-modal="true" aria-hidden="true" aria-labelledby="cf-title" aria-describedby="cf-text">
+    <div class="cf-card"><h3 id="cf-title"></h3><p id="cf-text"></p><div class="cf-act"><button id="cf-cancel" class="txt-btn"></button><button id="cf-ok" class="cta"></button></div></div>
+  </div>
+  <div id="flight"></div>
+
+  <section id="intro">
+    <button id="intro-music" class="intro-music music-btn" data-music aria-haspopup="dialog" aria-expanded="false" aria-label="Música"><svg class="mi" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path class="mi-note" d="M9 17.5V6.2l10-2.2v11.3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle class="mi-note" cx="6.6" cy="17.6" r="2.4" fill="none" stroke="currentColor" stroke-width="1.7"/><circle class="mi-note" cx="16.6" cy="15.4" r="2.4" fill="none" stroke="currentColor" stroke-width="1.7"/><path class="mi-off" d="M4 4l16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+    <button id="about-btn" class="intro-about" aria-haspopup="dialog"><span>Acerca de</span><img class="about-logo" src="assets/images/logo-solaris-pequeno.png" alt="SOLARIS" width="78" height="21"></button>
+    <div class="intro-inner">
+      <h1 class="intro-logo"><img src="assets/images/logo-solaris.png" alt="SOLARIS" width="1100" height="300"></h1>
+      <p class="intro-sub">Explora el Sistema Solar en una simulación 3D interactiva. Navega entre mundos, observa sus órbitas a través del tiempo y descubre los datos científicos detrás de cada planeta, luna, asteroide y cometa.</p>
+      <div class="intro-actions"><button id="start" class="cta" disabled>Explorar el Sistema Solar</button><button id="start-tours" class="cta-ghost" disabled>Recorridos guiados</button><button id="start-fly" class="cta-ghost" disabled>Pilotar una nave</button><button id="guide-btn" class="intro-mini" aria-haspopup="dialog"><svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M9.6 9.3a2.5 2.5 0 1 1 3.6 2.3c-.8.4-1.2 1-1.2 1.8v.4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="12" cy="16.9" r="1" fill="currentColor"/></svg>Instrucciones</button><button id="intro-settings" class="intro-mini" data-open-settings><svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M12 8.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M19.3 13.4l1.6 1.2-1.7 2.9-1.9-.6a7.4 7.4 0 0 1-1.8 1l-.4 2h-3.3l-.4-2a7.4 7.4 0 0 1-1.8-1l-1.9.6-1.7-2.9 1.6-1.2a7 7 0 0 1 0-2.1L4.4 10l1.7-2.9 1.9.6a7.4 7.4 0 0 1 1.8-1l.4-2h3.3l.4 2a7.4 7.4 0 0 1 1.8 1l1.9-.6L19.3 10l-1.6 1.2a7 7 0 0 1 0 2.2z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>Ajustes</button><button id="credits-btn" class="intro-mini"><svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M7 3.5h7.5L19 8v12.5H7z M14.5 3.5V8H19 M10 12h6 M10 15.5h6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg>Créditos y propiedad intelectual</button></div>
+      <p class="intro-author"><svg class="mx-flag" viewBox="0 0 28 16" width="25" height="14" role="img" aria-label="Bandera de México"><rect width="9.34" height="16" fill="#006847"/><rect x="9.33" width="9.34" height="16" fill="#fff"/><rect x="18.66" width="9.34" height="16" fill="#ce1126"/><path d="M11.6 9.9 Q14 11.9 16.4 9.9" fill="none" stroke="#3f7f3a" stroke-width=".7"/><ellipse cx="14" cy="7.6" rx="1.7" ry="2.1" fill="#8a5a24"/><circle cx="14.9" cy="5.7" r=".75" fill="#8a5a24"/></svg><span>Autor: Oscar A. Sánchez</span></p>
+      <div class="loader"><div class="bar"><i id="load-bar"></i></div><span id="load-msg" aria-live="polite">Preparando la escena</span></div>
+    </div>
+  </section>
+</div>
+<script src="js/solaris.js"></script>
+</body>
+</html>
