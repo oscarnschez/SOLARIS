@@ -1142,6 +1142,8 @@ return true;
 },
 };
 const ASSET_MANIFEST = {"music": {"webm": "assets/audio/metamorphosis.webm", "mp3": "assets/audio/metamorphosis.mp3"}, "bodyMeshes": {"fobos": {"url": "assets/models/moons/fobos.bin", "k": 1.26255}, "deimos": {"url": "assets/models/moons/deimos.bin", "k": 1.37497}}};
+const SOLARIS_BUILD = '2026.10.06-0339-web';
+console.info('SOLARIS · versión ' + SOLARIS_BUILD);
 const Assets = {
 cache: new Map(), busyN: new Map(),
 isURL: s => typeof s === 'string' && /^(\.\/)?assets\//.test(s),
@@ -5604,6 +5606,7 @@ const SETTINGS_SCHEMA = [
 { type: 'toggle', path: 'general.confirmExit', label: 'Confirmar antes de salir de una simulación', desc: 'Pide confirmación al abandonar un vuelo en curso.' },
 { type: 'toggle', path: 'general.tips', label: 'Mostrar consejos y ayuda contextual', desc: 'Descripciones al pasar el cursor y mensajes de ayuda.' },
 { type: 'action', id: 'reset-all', label: 'Restaurar valores predeterminados', desc: 'Devuelve todos los ajustes a su configuración inicial.', danger: true },
+{ type: 'note', label: 'Versión de SOLARIS: ' + SOLARIS_BUILD },
 { type: 'link', id: 'open-credits', label: 'Fuentes, créditos y licencias', desc: 'Datos de NASA, JPL y MPC; modelos 3D y música con sus atribuciones.' },
 ] },
 { id: 'audio', title: 'Audio', items: [
