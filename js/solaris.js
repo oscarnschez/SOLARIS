@@ -4502,6 +4502,15 @@ const norm = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const escNum = s => esc(s).replace(/^((?:[≈~]\s?)?[-−+]?\d[\d.,]*)/, '<span class="num">$1</span>');   // cifra inicial en tipografía técnica
 const $ = s => document.querySelector(s);
+const GLOBE_TEX = new Set(['ariel', 'calisto', 'ceres', 'ganimedes', 'io', 'jupiter', 'luna', 'makemake', 'marte', 'mercurio', 'miranda', 'neptuno', 'oberon', 'pluton', 'quaoar', 'rea', 'saturno', 'sedna', 'sol', 'tierra', 'titan', 'urano', 'venus']);
+const Globe = {
+// esfera dibujada con CSS a partir de una miniatura equirectangular (assets/images/globes); sin textura usa el color del cuerpo
+ok(d) { if (!['star', 'planet', 'dwarf', 'tno', 'moon'].includes(d.type)) return false; const s = d.shape; return !s || Math.max(...s) / Math.min(...s) < 1.15; },
+html(d, size, cls, style) {
+const tex = GLOBE_TEX.has(d.id) ? `<b style="background-image:url(assets/images/globes/${d.id}.webp)"></b>` : '';   // url en línea: se resuelve respecto al documento en todos los navegadores
+return `<i class="globe${d.id === 'saturno' ? ' ringed' : ''}${d.type === 'star' ? ' star' : ''}${cls ? ' ' + cls : ''}" style="--s:${size}px;--c:${d.color || '#94a0b6'};${style || ''}" aria-hidden="true"><span>${tex}</span></i>`;
+},
+};
 const Info = {
 orbitA(rb) { const o = rb.def.orbit; if (!o) return null; if (o.t === 'jpl') return o.el[0]; if (o.t === 'kep') return o.a; return null; },
 periodDays(rb) {
@@ -4992,6 +5001,7 @@ if (rb.isCraft) sub = d.sub;
 const moons = rb.children.filter(c => c.def.type === 'moon');
 P.innerHTML = `
 <header class="info-head">
+${Globe.ok(d) ? Globe.html(d, 210, 'info-globe') : ''}
 <span class="kind"><i class="dot" style="--c:${d.color}"></i>${esc(sub)}</span>
 <h2 id="info-title">${esc(d.name)}</h2>
 <p class="desc">${esc(d.info.desc)}</p>
@@ -5007,6 +5017,7 @@ ${rb.parent && !rb.parent.isSun && !(rb.isCraft && rb.def.orbit.t === 'lpoint') 
 ${moons.length ? `<p class="rel">Lunas incluidas: ${moons.map(m => `<button class="link" data-go="${m.id}" style="--c:${m.def.color || '#94a0b6'}">${esc(m.def.name)}</button>`).join('')}</p>` : ''}
 </header>
 <section class="live"><h3>Ahora mismo <em class="tag sim" data-tip="Calculado por la simulación para la fecha mostrada; no es una efeméride de alta precisión">sim.</em></h3><div id="live-rows"></div></section>
+${this.earthCmpHTML(rb)}
 ${rb.isCraft ? `<section><h3>Misión</h3><dl>${craftF.map(row).join('')}</dl></section><p class="note">${Info.craftNote(rb)}</p>` : `<section><h3>Datos físicos</h3><dl>${F.phys.map(row).join('')}</dl></section>
 <section><h3>Rotación y órbita</h3><dl>${F.orb.map(row).join('')}</dl></section>
 ${F.comp.length ? `<section><h3>Composición</h3><dl>${F.comp.map(row).join('')}</dl></section>` : ''}`}
@@ -5021,6 +5032,22 @@ $('#info-close2').addEventListener('click', () => { this.userActed(); Cam.travel
 P.querySelectorAll('[data-go]').forEach(el => el.addEventListener('click', () => this.select(World.byId[el.dataset.go], { fly: true })));
 this.updateLive(true);
 this.refreshCamButtons();
+},
+earthCmpHTML(rb) {
+const E = World.byId.tierra;
+if (!E || rb === E || !Compare.can(rb)) return '';
+const keys = [['diam', 'Diámetro'], ['mass', 'Masa'], ['grav', 'Gravedad']];
+if (!['moon', 'star'].includes(rb.def.type)) keys.push(['per', 'Duración del año']);
+const fr = r => r >= 100 ? fmt(r, 0) : r >= 10 ? fmt(r, 1) : r >= 0.1 ? fmt(r, 2) : r >= 1e-6 ? fmt(r, Math.ceil(-Math.log10(r)) + 1) : '< 0.000001';
+const tiles = keys.map(([k, label]) => {
+const v = Compare.num(rb, k), e = Compare.num(E, k);
+if (!v || !e) return '';
+const r = v / e, p = clamp(Math.log10(r) / 4, -1, 1);      // escala logarítmica: ±4 órdenes de magnitud alrededor de la Tierra
+const a = 50 + Math.min(p, 0) * 50, w = Math.abs(p) * 50;
+return `<div class="vs-tile"><span>${label}</span><b class="num">${fr(r)}×</b><i class="vs-bar" aria-hidden="true"><i class="vs-fill${r < 1 ? ' less' : ''}" style="left:${a.toFixed(1)}%;width:${w.toFixed(1)}%"></i><i class="vs-dot" style="left:${(50 + p * 50).toFixed(1)}%"></i></i></div>`;
+}).filter(Boolean);
+if (tiles.length < 2) return '';
+return `<section class="vs"><h3>Comparado con la Tierra <em class="tag calc" data-tip="Cociente entre el valor de este objeto y el de la Tierra (Tierra = 1×). Las barras usan escala logarítmica.">calc.</em></h3><div class="vs-grid">${tiles.join('')}</div></section>`;
 },
 creditHTML(c) {
 if (!c.url) return esc(c.note.charAt(0).toUpperCase() + c.note.slice(1)) + '.';
@@ -5274,13 +5301,19 @@ stops: [['ceres', 'Cinturón de asteroides'], ['vesta', 'Cinturón de asteroides
 layers: ['orbits'],
 stops: TOUR.map(s => ({ id: s.id, kind: 'classic', hold: 7.5, txt: s.txt })) },
 ];
-const TOUR_ICONS = {
-planetas: '<circle cx="12" cy="12" r="4.2"/><ellipse cx="12" cy="12" rx="9.5" ry="3.4" transform="rotate(-20 12 12)"/>',
-lunas: '<circle cx="10" cy="13" r="6"/><circle cx="19" cy="6" r="2.2"/>',
-exploracion: '<path d="M4 14l4-1 3 3-1 4M9 15l7-7c2-2 4-3 5-3 0 1-1 3-3 5l-7 7"/><circle cx="15.5" cy="8.5" r="1.3"/>',
-menores: '<path d="M3 21l7-7"/><circle cx="14" cy="10" r="4.5"/><path d="M5 9c1-2 3-3 5-3"/>',
-clasico: '<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="7.5" stroke-dasharray="2 3"/><circle cx="19.5" cy="12" r="1.4"/>',
+const TOUR_FEATURED = 'clasico';
+const TOUR_COVERS = {     // [cuerpo, tamaño en px, izquierda %, arriba %] del centro de cada esfera
+clasico: [['sol', 190, -4, 50], ['mercurio', 9, 17, 60], ['venus', 15, 23, 56], ['tierra', 16, 29.5, 52], ['marte', 11, 35.5, 49], ['jupiter', 58, 50, 42], ['saturno', 40, 67, 47], ['urano', 24, 81, 54], ['neptuno', 22, 92, 58]],
+planetas: [['jupiter', 150, 80, 64], ['tierra', 30, 26, 40], ['marte', 17, 44, 66]],
+lunas: [['luna', 360, 50, 182], ['tierra', 34, 66, 34]],
+exploracion: [['tierra', 104, 70, 58]],
+menores: [['ceres', 70, 80, 52]],
 };
+const TOUR_COVER_EXTRA = {
+exploracion: '<i class="tc-orbit" style="left:70%;top:58%"></i><i class="tc-orbit front" style="left:70%;top:58%"><b class="tc-sat"></b></i>',
+menores: '<i class="tc-comet" style="left:12%;top:30%"></i><i class="tc-rock" style="left:46%;top:70%;--r:6px"></i><i class="tc-rock" style="left:56%;top:38%;--r:4px"></i><i class="tc-rock" style="left:36%;top:52%;--r:3px"></i><i class="tc-rock" style="left:62%;top:78%;--r:3px"></i>',
+};
+const tourCoverHTML = id => (TOUR_COVERS[id] || []).map(([b, sz, x, y]) => BODY[b] ? Globe.html(BODY[b], sz, 'tc-globe', `left:${x}%;top:${y}%`) : '').join('') + (TOUR_COVER_EXTRA[id] || '');
 const tourDuration = t => t.stops.reduce((s, x) => s + x.hold + (x.kind === 'minor' ? 6 : 3.5), 0);
 Object.assign(UI, {
 tour: null, tourRB: null,
@@ -5298,13 +5331,16 @@ B('tb-again', () => this.restartTour()); B('tb-other', () => { this.stopTour(); 
 $('#tb-play').innerHTML = ICON.pause;
 },
 renderTourCards() {
-$('#tours-list').innerHTML = TOURS.map(tr => `
-<article class="tour-card">
-<div class="tour-ico"><svg viewBox="0 0 24 24" aria-hidden="true">${TOUR_ICONS[tr.id]}</svg></div>
+const order = [...TOURS].sort((a, b) => (b.id === TOUR_FEATURED) - (a.id === TOUR_FEATURED));   // el recorrido destacado va primero y a doble ancho
+$('#tours-list').innerHTML = order.map((tr, i) => `
+<article class="tour-card${tr.id === TOUR_FEATURED ? ' featured' : ''}" style="--i:${i}">
+<div class="tour-cover" aria-hidden="true"><div class="tc-scene">${tourCoverHTML(tr.id)}</div>${tr.id === TOUR_FEATURED ? '<span class="tour-badge">Ideal para empezar</span>' : ''}</div>
+<div class="tour-body">
 <h3>${tr.name}</h3>
 <p>${tr.desc}</p>
-<p class="tour-meta">${tr.stops.length} paradas · ≈ ${Math.max(1, Math.round(tourDuration(tr) / 60))} min</p>
-<div class="tour-act"><button class="cta" data-tour="${tr.id}">Iniciar recorrido</button><button class="cta-ghost tour-cine-btn" data-tour="${tr.id}" data-cine="1"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M7 5v14M17 5v14M3 9.5h4M3 14.5h4M17 9.5h4M17 14.5h4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>Iniciar en Modo Cine</button></div>
+<ul class="tour-chips"><li>${tr.stops.length} paradas</li><li>≈ ${Math.max(1, Math.round(tourDuration(tr) / 60))} min</li></ul>
+<div class="tour-act"><button class="cta" data-tour="${tr.id}" aria-label="Iniciar recorrido: ${tr.name}">Iniciar recorrido</button><button class="cta-ghost tour-cine-btn" data-tour="${tr.id}" data-cine="1" aria-label="Iniciar ${tr.name} en Modo Cine"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M7 5v14M17 5v14M3 9.5h4M3 14.5h4M17 9.5h4M17 14.5h4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>Modo Cine</button></div>
+</div>
 </article>`).join('');
 },
 toggleTours(v) {
@@ -5499,7 +5535,7 @@ const fromCredit = (use, c) => ({ use, name: c.title, author: c.author, source: 
 const groups = [
 ['Telescopios, estaciones y sondas', [['Telescopio espacial James Webb', 'jwst'], ['Telescopio espacial Hubble', 'hubble'], ['Voyager 1 y Voyager 2', 'voyager'], ['Estación Espacial Internacional', 'iss'], ['Estación espacial Tiangong', 'tiangong'], ['Sonda solar Parker', 'parker'], ['Sonda New Horizons', 'newhorizons']]
 .filter(([, k]) => MODEL_CREDITS[k]).map(([u, k]) => fromCredit(u, MODEL_CREDITS[k]))],
-['El Sol, planetas y lunas', Object.keys(PLANET_TEX).map(id => fromCredit(BODY[id].name, BODY[id].credit))],
+['El Sol, planetas y lunas', Object.keys(PLANET_TEX).map(id => { const a = fromCredit(BODY[id].name, BODY[id].credit); if (GLOBE_TEX.has(id)) a.note = (a.note ? a.note + '; ' : '') + 'también se muestra reducida como miniatura en las fichas y los recorridos'; return a; })],
 ['Naves del modo de vuelo', SHIPS.filter(sh => MODEL_CREDITS[sh.id]).map(sh => fromCredit('Nave ' + sh.name, MODEL_CREDITS[sh.id]))],
 ['Recursos utilizados en versiones anteriores', PREV_CREDITS.map(p => fromCredit(BODY[p.id].name + ' (versión anterior)', p.credit))],
 ['Música', [{ use: 'Tema musical principal de SOLARIS', name: MUSIC_INFO.title, author: MUSIC_INFO.artist, source: 'Archivo aportado por el creador del proyecto', license: null, url: null }]],
