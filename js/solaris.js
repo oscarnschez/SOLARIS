@@ -6964,7 +6964,7 @@ World.setSystem(id);
 const app = $('#app'); Object.keys(SYSTEMS).forEach(k => app.classList.toggle('sys-' + k, k === id));
 UI.SECTIONS = SECTIONS_BY_SYSTEM[id] || SECTIONS_SOLAR;
 $('#rail').innerHTML = UI.railHTML();
-const sb = $('#sys-btn'); if (sb) sb.querySelector('span').textContent = SYSTEMS[id].name;
+const sb = $('#sys-btn'); if (sb) { sb.querySelector('span').textContent = SYSTEMS[id].name; sb.dataset.tip = SYSTEMS[id].fiction ? 'Universo de Interstellar · sistema ficticio. Cambiar de sistema' : 'Cambiar de sistema'; }
 },
 enterGargantua() {
 const G = SYSTEMS.gargantua, reduce = UI.reducedMotion, f = $('#sys-fade') || this.mkFade(), app = $('#app');
@@ -7063,7 +7063,6 @@ ex.textContent = days < 1 ? fmt(days * 24, 1) + ' horas' : '≈ ' + [y ? y + (y 
 const b = document.createElement('button'); b.id = 'sys-btn'; b.className = 'sys-btn'; b.setAttribute('aria-haspopup', 'dialog'); b.dataset.tip = 'Cambiar de sistema';
 b.innerHTML = ICON.systems + '<span>Sistema Solar</span>'; const fly = $('#fly-btn'); fly.parentNode.insertBefore(b, fly);
 const w = document.createElement('div'); w.id = 'bh-warn'; w.className = 'ui'; w.setAttribute('role', 'status'); w.innerHTML = '<b>PROXIMIDAD A GARGANTÚA</b><span>Campo gravitacional extremo · la cámara no puede acercarse más al horizonte de sucesos</span>'; $('#app').appendChild(w);
-const chip = document.createElement('div'); chip.id = 'sys-chip'; chip.className = 'ui'; chip.innerHTML = '<b>SISTEMA GARGANTÚA</b><span>Universo de Interstellar · sistema ficticio</span>'; $('#app').appendChild(chip);
 })();
 Systems.frame = function () {
 if (World.system !== 'gargantua') return;
