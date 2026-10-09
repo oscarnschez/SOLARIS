@@ -1056,6 +1056,21 @@ display: grid; text-align: center; gap: 2px; opacity: 0; transition: opacity .5s
 .gx-clocks { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; } .gx-clocks div { display: grid; gap: 2px; }
 .gx-clocks span { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .gx-clocks b { font-size: 20px; font-weight: 300; font-variant-numeric: tabular-nums; color: #fff; }
+/* Secreto de Miller: reloj discreto junto al tiempo local; enlace real con área táctil de 44 px que no altera el diseño */
+.gx-clocks span:has(.gx-egg) { display: inline-flex; align-items: center; gap: 6px; }
+.gx-egg { position: relative; display: inline-grid; place-items: center; width: 16px; height: 16px; color: var(--muted); opacity: .6; border-radius: 50%; transition: color .3s, opacity .3s; -webkit-tap-highlight-color: transparent; }
+.gx-egg::after { content: ""; position: absolute; inset: -14px; }
+.gx-egg::before { content: ""; position: absolute; inset: 0; border-radius: 50%; border: 1px solid rgba(240, 178, 102, .55); opacity: 0; pointer-events: none; }
+.gx-egg svg { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; overflow: visible; }
+.gx-egg .egg-h, .gx-egg .egg-m { transform-box: view-box; transform-origin: 12px 12px; }
+.gx-egg:hover, .gx-egg:focus-visible, .gx-egg:active { color: #f0c48a; opacity: 1; }
+.gx-egg:hover .egg-m, .gx-egg:focus-visible .egg-m { animation: egg-spin 2.4s linear infinite; }
+.gx-egg:hover .egg-h, .gx-egg:focus-visible .egg-h { animation: egg-spin 28.8s linear infinite; }
+.gx-egg:hover::before, .gx-egg:focus-visible::before, .gx-egg:active::before { animation: egg-wave 1.8s ease-out infinite; }
+#info-dil.tick .gx-egg:not(:hover):not(:focus-visible) .egg-m { animation: egg-tick .5s cubic-bezier(.2, 1.6, .4, 1); }
+@keyframes egg-spin { to { transform: rotate(360deg); } }
+@keyframes egg-tick { from { transform: rotate(-14deg); } }
+@keyframes egg-wave { from { opacity: .9; transform: scale(1); } to { opacity: 0; transform: scale(2.6); } }
 .gx-dil-act { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; } .gx-dil-act .txt-btn { font-size: 12.5px; padding: 0; }
 .sys-note { color: #e2c9a6 !important; }
 .sys-cta { border-color: rgba(240, 178, 102, .35) !important; }
@@ -1153,3 +1168,4 @@ html.hc #info::after, html.hc #drawer::after, html.hc #tourbar::after { --hc: rg
 html.hc #more-menu { background: rgba(2, 4, 10, .96); }
 @media (max-width: 760px) { #more-menu #help-btn { display: none; } }
 #app:has(#more-menu:not([hidden])) #toast { opacity: 0; }
+@media (max-width: 760px) { #app:has(#info.open) #mx-hud { opacity: 0; } }   /* en móvil la ficha (hoja inferior) ya muestra los mismos contadores y el HUD la tapaba */
