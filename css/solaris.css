@@ -224,8 +224,29 @@ kbd { font-family: var(--mono); font-size: 11.5px; border: 1px solid var(--line-
 #intro { position: fixed; inset: 0; z-index: 70; display: flex; align-items: flex-end; padding: 0 0 calc(var(--bot) + 6vh) 6vw; background: radial-gradient(120% 90% at 0% 100%, rgba(2, 4, 10, .78) 0%, rgba(2, 4, 10, .25) 55%, transparent 80%); transition: opacity 1s ease, visibility 1s; }
 .intro-inner { max-width: 640px; }
 #intro h1 { margin: 0 0 22px; line-height: 0; }
-.intro-logo img { width: clamp(280px, 46vw, 700px); height: auto; margin-left: -1.4%; filter: drop-shadow(0 0 24px rgba(2, 4, 10, .6)); }
-.intro-sub { font-size: clamp(16px, 1.5vw, 19px); line-height: 1.55; color: var(--text-3); max-width: 52ch; margin: 0 0 30px; }
+.intro-logo img { width: clamp(280px, 46vw, 700px); height: auto; }
+/* Logo animado: la imagen se corta en una franja por letra (marcado en index.html); la imagen queda para el texto alternativo y el tamaño */
+.lg-wrap { position: relative; display: inline-block; margin-left: -1.4%; }
+.lg-wrap img { opacity: 0; }
+.lg-anim { position: absolute; inset: 0; filter: drop-shadow(0 0 24px rgba(2, 4, 10, .6)); }
+.lg-l { position: absolute; top: 0; bottom: 0; background-image: url(../assets/images/logo-solaris.png); background-repeat: no-repeat; animation: lg-in 1.1s cubic-bezier(.16, 1, .3, 1) both; animation-delay: calc(var(--i) * 85ms + 350ms); }
+@keyframes lg-in { from { opacity: 0; transform: translateY(26%) scale(.96); } }   /* solo opacity/transform: corre en el compositor aunque el JS esté cargando */
+.lg-l.lg-sun { z-index: 1; transform-origin: 49.6% 50.3%; animation: lg-sun 1.8s cubic-bezier(.16, 1, .3, 1) .15s both; }
+@keyframes lg-sun { 0% { opacity: 0; transform: scale(.3); } 40% { opacity: 1; } 100% { transform: none; } }
+.lg-flare, .lg-corona { position: absolute; left: 25.1%; top: 50.3%; border-radius: 50%; pointer-events: none; }
+.lg-flare { z-index: 2; width: 34%; aspect-ratio: 1; margin: -17% 0 0 -17%; mix-blend-mode: screen; background: radial-gradient(circle, rgba(255, 250, 235, .95) 0, rgba(255, 214, 140, .6) 18%, rgba(255, 170, 60, .18) 42%, transparent 66%); animation: lg-flare 1.9s ease-out .3s both; }
+@keyframes lg-flare { 0% { opacity: 0; transform: scale(.2); } 30% { opacity: 1; transform: scale(1.1); } 100% { opacity: 0; transform: scale(1.7); } }
+.lg-corona { z-index: 0; width: 40%; aspect-ratio: 1; margin: -20% 0 0 -20%; background: radial-gradient(circle, transparent 27%, rgba(255, 190, 90, .26) 34%, rgba(255, 170, 60, .09) 48%, transparent 68%); animation: lg-corona-in 1.2s ease-out 1.2s both, lg-corona 6s ease-in-out 2.4s infinite alternate; }
+@keyframes lg-corona-in { from { opacity: 0; transform: scale(.7); } to { opacity: .6; } }
+@keyframes lg-corona { from { opacity: .6; transform: scale(1); } to { opacity: 1; transform: scale(1.06); } }
+.intro-sub { font-size: clamp(16px, 1.5vw, 19px); line-height: 1.55; color: var(--text-3); max-width: 52ch; margin: 0 0 16px; }
+.intro-tele { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; min-height: 22px; margin: 0 0 26px; font: 400 12px/1.5 var(--mono); letter-spacing: .02em; color: var(--text-3); text-shadow: 0 0 6px #02040a, 0 0 2px #02040a, 0 0 12px #02040a; opacity: 0; transform: translateY(6px); transition: opacity .8s ease, transform .8s ease; }
+.intro-tele.on { opacity: 1; transform: none; }
+.intro-tele b { font-weight: 500; color: var(--text); }
+.it-live { display: inline-flex; align-items: center; gap: 7px; padding: 1px 9px 1px 7px; border-radius: 999px; font-weight: 500; font-size: 10.5px; letter-spacing: .12em; color: #8fe0b0; border: 1px solid rgba(127, 211, 166, .35); background: rgba(127, 211, 166, .08); }
+.it-live::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; box-shadow: 0 0 6px currentColor; animation: it-blink 2s ease-in-out infinite; }
+.it-live.sim { color: var(--sun); border-color: rgba(242, 200, 121, .35); background: var(--sun-dim); }
+@keyframes it-blink { 50% { opacity: .25; } }
 .cta { padding: 15px 26px; border-radius: var(--r-lg); font-size: 17px; font-weight: 500; color: var(--space); background: var(--sun); transition: transform .2s, box-shadow .2s, opacity .3s; box-shadow: 0 0 0 0 rgba(242, 200, 121, .0); }
 .cta:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 10px 40px -10px rgba(242, 200, 121, .55); }
 .cta:disabled { opacity: .35; cursor: progress; }
@@ -479,7 +500,7 @@ kbd { font-family: var(--mono); font-size: 11.5px; border: 1px solid var(--line-
 #app.fl-fly #fl-bar { row-gap: 4px; }
 @media (max-width: 760px) { .fb-grp + .fb-grp { border-left: 0; padding-left: 0; margin-left: 0; } .fb-grp { flex-wrap: wrap; justify-content: center; } }
 @media (max-width: 760px) { #hud-thr { width: 140px; padding: 8px 10px; bottom: calc(var(--bot) + 140px); } .thr-body { height: 130px; } .thr-head b { font-size: 18px; } #thr-name { display: none; } .hud-col { bottom: auto; top: calc(var(--top) + 90px); } }
-@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; } }
 #tourbar { position: fixed; left: 50%; bottom: calc(var(--bot) + 70px); transform: translate(-50%, 12px); width: min(740px, calc(100vw - 24px)); max-height: calc(100vh - var(--top) - var(--bot) - 96px); display: flex; flex-direction: column; overflow: hidden; border-radius: var(--r-xl); padding: 14px 20px 12px; opacity: 0; pointer-events: none; transition: opacity .45s ease, transform .45s ease; z-index: 14; }
 #tourbar.on { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
 #app.touring #minimap-wrap { opacity: 0; pointer-events: none; }
@@ -782,7 +803,7 @@ background: radial-gradient(1px 1px at 12% 22%, rgba(255, 255, 255, .7), transpa
 #app .ui, #tourbar, #flight .hud, #flight #fl-bar, .hg-panel, .hg-info { zoom: var(--uiz); }
 #app.hud-reduced #hud-l, #app.hud-reduced #hud-scale { display: none !important; }
 #app.hud-min #hud-l, #app.hud-min #hud-r, #app.hud-min #hud-scale, #app.hud-min #hud-top, #app.hud-min .thr-btns, #app.hud-min .thr-foot { display: none !important; }
-html.anim-reduced *, html.anim-reduced *::before, html.anim-reduced *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+html.anim-reduced *, html.anim-reduced *::before, html.anim-reduced *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; }
 html.ts-small #info, html.ts-small #drawer, html.ts-small .guide-card, html.ts-small .tours-card, html.ts-small #tourbar, html.ts-small .set-body, html.ts-small .cr-page, html.ts-small .help-card { font-size: 92%; }
 html.ts-large #info, html.ts-large #drawer, html.ts-large .guide-card, html.ts-large .tours-card, html.ts-large #tourbar, html.ts-large .set-body, html.ts-large .cr-page, html.ts-large .help-card { zoom: 1.14; }
 html.ts-small .lbl { font-size: 11.5px; } html.ts-large .lbl { font-size: 15.5px; } html.ts-large .lbl-moon, html.ts-large .lbl-asteroid, html.ts-large .lbl-comet, html.ts-large .lbl-craft { font-size: 14px; }
@@ -1089,3 +1110,19 @@ border: 1px solid rgba(160, 200, 225, .28); background: rgba(6, 10, 14, .48); ba
 .hud-col dd, .thr-head b, .fb-warp, .tl-ind b, .gx-clocks b, #ms-dil b, .mx-row b, .cc-step, .sp-row span, .pl-grid b,
 .mix-row output, .set-range output, .mp-vol output, .tl-j, .tl-ticks, .tl-card time, #h-warp { font-family: var(--mono); letter-spacing: -.01em; }
 .tl-ind b, .gx-clocks b, #ms-dil b, .mx-row b, .thr-head b { font-weight: 400; }
+/* Detalles HUD: esquinas tipo corchete en los paneles, retícula que se engancha al seleccionar y barrido al abrir la ficha */
+#info::after, #drawer::after, #tourbar::after { content: ""; position: absolute; inset: 7px; z-index: 3; pointer-events: none; opacity: 0; transform: scale(1.025); transition: opacity .5s ease .12s, transform .7s cubic-bezier(.16, 1, .3, 1) .12s;
+--hc: rgba(242, 200, 121, .5); --hl: 12px;
+background: linear-gradient(var(--hc), var(--hc)) 0 0 / var(--hl) 1px, linear-gradient(var(--hc), var(--hc)) 0 0 / 1px var(--hl),
+linear-gradient(var(--hc), var(--hc)) 100% 0 / var(--hl) 1px, linear-gradient(var(--hc), var(--hc)) 100% 0 / 1px var(--hl),
+linear-gradient(var(--hc), var(--hc)) 0 100% / var(--hl) 1px, linear-gradient(var(--hc), var(--hc)) 0 100% / 1px var(--hl),
+linear-gradient(var(--hc), var(--hc)) 100% 100% / var(--hl) 1px, linear-gradient(var(--hc), var(--hc)) 100% 100% / 1px var(--hl);
+background-repeat: no-repeat; }
+#info.open::after, #drawer.open::after, #tourbar.on::after { opacity: 1; transform: none; }
+#info::before { content: ""; position: absolute; left: 0; right: 0; top: -90px; height: 90px; z-index: 3; pointer-events: none; opacity: 0;
+background: linear-gradient(180deg, transparent, rgba(143, 195, 255, .06) 70%, rgba(143, 195, 255, .32) 98%, rgba(200, 225, 255, .6) 100%); }
+#info.scan::before { animation: hud-scan 1.1s cubic-bezier(.4, 0, .2, 1); }
+@keyframes hud-scan { 0% { top: -90px; opacity: 1; } 80% { opacity: 1; } 100% { top: 100%; opacity: 0; } }
+#reticle.lock { animation: ret-lock .6s cubic-bezier(.16, 1, .3, 1); }
+@keyframes ret-lock { from { scale: 1.9; rotate: 90deg; opacity: 0; } }
+html.hc #info::after, html.hc #drawer::after, html.hc #tourbar::after { --hc: rgba(255, 210, 122, .9); }

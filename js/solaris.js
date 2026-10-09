@@ -5025,7 +5025,7 @@ ${basic ? '<p class="note">Vista básica: activa la información científica ava
 ${d.info.feats && d.info.feats.length ? `<section><h3>Características principales</h3><ul class="facts">${d.info.feats.map(x => `<li>${esc(x)}</li>`).join('')}</ul></section>` : ''}
 ${d.info.facts && d.info.facts.length ? `<section><h3>Curiosidades</h3><ul class="facts">${d.info.facts.map(x => `<li>${esc(x)}</li>`).join('')}</ul></section>` : ''}
 <footer class="src"><p><b>Fuente:</b> ${esc(d.src)}</p>${d.credit && World.hd[d.model || d.id] ? `<p><b>Modelo 3D:</b> ${UI.creditHTML(d.credit)}</p>` : ''}<p class="legend"><em class="tag calc">calc.</em> derivado de otros datos <em class="tag sim">sim.</em> aproximación de la simulación</p>${this.scaleWarn(rb)}</footer>`;
-P.scrollTop = 0;
+P.scrollTop = 0; this.hudScan();
 $('#info-travel').addEventListener('click', () => { this.userActed(); Cam.travel(rb); });
 $('#info-follow').addEventListener('click', () => { this.userActed(); if (Cam.focus === rb && Cam.follow) Cam.follow = false; else { if (Cam.focus !== rb) Cam.travel(rb, { keepAngles: true, dist: clamp(Cam.dist, rb.rS * 1.3, Cam.maxDist()) }); Cam.follow = true; } this.refreshCamButtons(); });
 $('#info-close2').addEventListener('click', () => { this.userActed(); Cam.travel(rb, { close: true }); });
@@ -5033,6 +5033,23 @@ P.querySelectorAll('[data-go]').forEach(el => el.addEventListener('click', () =>
 this.updateLive(true);
 this.refreshCamButtons();
 },
+introTele() {
+const el = $('#intro-tele'), E = World.byId.tierra, V1 = World.byId.voyager1;
+if (!el || !E) return;
+el.innerHTML = `<span class="it-live"></span><span class="it-date"></span><span>Tierra a <b class="it-au"></b> UA del Sol</span>${V1 ? '<span title="Distancia actual entre la sonda Voyager 1 y la Tierra">Voyager 1 a <b class="it-v1"></b> km</span>' : ''}`;
+const q = c => el.querySelector(c), live = q('.it-live'), date = q('.it-date'), au = q('.it-au'), v1 = q('.it-v1');
+const tick = () => {
+if (this.started) return;
+const sim = this.isSimulatedDate();
+live.textContent = sim ? 'SIMULACIÓN' : 'EN VIVO'; live.classList.toggle('sim', sim);
+date.textContent = jdToDate(Time.jd).toLocaleDateString(I18N.loc(), { day: 'numeric', month: 'short', year: 'numeric' });
+au.textContent = fmt(V.len(E.helio), 3);
+if (v1) v1.textContent = fmt(V.dist(V1.helio, E.helio) * AU_KM, 0);      // la distancia cambia en vivo: ~17 km/s de la sonda más el movimiento de la Tierra
+};
+tick(); setInterval(tick, 250);
+setTimeout(() => el.classList.add('on'), 600);
+},
+hudScan() { const I = $('#info'); I.classList.remove('scan'); void I.offsetWidth; I.classList.add('scan'); },
 earthCmpHTML(rb) {
 const E = World.byId.tierra;
 if (!E || rb === E || !Compare.can(rb)) return '';
@@ -5139,7 +5156,8 @@ if (ok) c.el.style.transform = `translate(${x.toFixed(0)}px, ${y.toFixed(0)}px) 
 c.el.classList.toggle('on', ok);
 }
 const ret = (el, rb) => {
-if (!rb || !rb.proj.on) { el.classList.remove('on'); return; }
+if (!rb || !rb.proj.on) { el.classList.remove('on'); if (!rb) el._rb = null; return; }
+if (el.id === 'reticle' && el._rb !== rb) { el._rb = rb; el.classList.remove('lock'); void el.offsetWidth; el.classList.add('lock'); }   // la retícula se "engancha" al nuevo objeto
 const s = Math.max(rb.proj.rpx * 2 + 16, 26);
 el.style.transform = `translate(${(rb.proj.x - s / 2).toFixed(1)}px, ${(rb.proj.y - s / 2).toFixed(1)}px)`;
 el.style.width = el.style.height = s + 'px';
@@ -6980,7 +6998,7 @@ P.innerHTML = `
 ${i.dilation ? Dilation.html() : ''}
 ${i.science ? `<section class="gx-sci"><h3><span class="gx-tag sci">Ciencia real</span></h3>${i.science.map(([k, v]) => `<div class="gx-concept"><b>${esc(k)}</b><p>${esc(v)}</p></div>`).join('')}${i.render ? `<p class="note">${esc(i.render)}</p>` : ''}</section>` : ''}
 <footer class="src"><p><b>Fuente:</b> ${esc(d.src)}</p><p class="sys-note">${esc(SYSTEMS.gargantua.note)}</p>${rb.def.orbit ? `<p class="note">${esc(SYSTEMS.gargantua.orbitsNote)}</p>` : ''}</footer>`;
-P.scrollTop = 0;
+P.scrollTop = 0; this.hudScan();
 $('#info-travel').addEventListener('click', () => { this.userActed(); Cam.travel(rb); });
 $('#info-follow').addEventListener('click', () => { this.userActed(); if (Cam.focus === rb && Cam.follow) Cam.follow = false; else Cam.travel(rb, { keepAngles: true }); this.refreshCamButtons(); });
 $('#info-close2').addEventListener('click', () => { this.userActed(); Cam.travel(rb, { close: true }); });
@@ -7472,6 +7490,7 @@ UI.init(); Input.init(cv);
 Cam.dist = Cam.dDist = ScaleState.get('overview') * 0.78; Cam.el = 0.34; Cam.az = 0.4; Cam.auto = UI.reducedMotion ? 0 : 0.03;
 $('#load-msg').textContent = 'Listo';
 $('#app').classList.add('ready');
+UI.introTele();
 const st = $('#start'); st.disabled = false; st.focus({ preventScroll: true });
 st.addEventListener('click', () => this.begin());
 const sg = $('#start-tours'); sg.disabled = false; sg.addEventListener('click', () => UI.toggleTours(true));
