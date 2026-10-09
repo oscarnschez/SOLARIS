@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/solaris.css?v=a448ff4239">
+<link rel="stylesheet" href="css/solaris.css?v=bf9848aab3">
 </head>
 <body>
 <div id="app" class="booting">
@@ -30,9 +30,15 @@
     </div>
     <div id="modes" role="radiogroup" aria-label="Modo de visualización"></div>
     <button id="fly-btn" class="fly-btn" data-tip="Pilotar una nave por el Sistema Solar (P)"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5c3 2.4 4.5 6 4.5 10.5l-2 3h-5l-2-3c0-4.5 1.5-8.1 4.5-10.5z"/><circle cx="12" cy="9.5" r="1.6"/><path d="M7.5 13l-3 3 3 .5M16.5 13l3 3-3 .5M10.5 18.5l1.5 3 1.5-3"/></svg><span>Pilotar</span></button>
-    <button id="settings-btn" class="icon-btn set-open" data-open-settings aria-label="Ajustes" data-tip="Ajustes"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 8.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M19.3 13.4l1.6 1.2-1.7 2.9-1.9-.6a7.4 7.4 0 0 1-1.8 1l-.4 2h-3.3l-.4-2a7.4 7.4 0 0 1-1.8-1l-1.9.6-1.7-2.9 1.6-1.2a7 7 0 0 1 0-2.1L4.4 10l1.7-2.9 1.9.6a7.4 7.4 0 0 1 1.8-1l.4-2h3.3l.4 2a7.4 7.4 0 0 1 1.8 1l1.9-.6L19.3 10l-1.6 1.2a7 7 0 0 1 0 2.2z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg><span>Ajustes</span></button>
-    <button id="music-btn" class="icon-btn music-btn" data-music aria-haspopup="dialog" aria-expanded="false" aria-label="Música"><svg class="mi" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path class="mi-note" d="M9 17.5V6.2l10-2.2v11.3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle class="mi-note" cx="6.6" cy="17.6" r="2.4" fill="none" stroke="currentColor" stroke-width="1.7"/><circle class="mi-note" cx="16.6" cy="15.4" r="2.4" fill="none" stroke="currentColor" stroke-width="1.7"/><path class="mi-off" d="M4 4l16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
-    <button id="help-btn" class="icon-btn" aria-label="Atajos de teclado" data-tip="Atajos de teclado (?)"></button>
+    <div class="more-wrap">
+      <button id="more-btn" class="icon-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="more-menu" aria-label="Más opciones" data-tip="Ajustes, música y ayuda"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="5.5" cy="12" r="1.7" fill="currentColor"/><circle cx="12" cy="12" r="1.7" fill="currentColor"/><circle cx="18.5" cy="12" r="1.7" fill="currentColor"/></svg></button>
+      <div id="more-menu" role="menu" aria-label="Más opciones" hidden>
+        <button id="settings-btn" class="mm-item" role="menuitem" data-open-settings><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 8.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M19.3 13.4l1.6 1.2-1.7 2.9-1.9-.6a7.4 7.4 0 0 1-1.8 1l-.4 2h-3.3l-.4-2a7.4 7.4 0 0 1-1.8-1l-1.9.6-1.7-2.9 1.6-1.2a7 7 0 0 1 0-2.1L4.4 10l1.7-2.9 1.9.6a7.4 7.4 0 0 1 1.8-1l.4-2h3.3l.4 2a7.4 7.4 0 0 1 1.8 1l1.9-.6L19.3 10l-1.6 1.2a7 7 0 0 1 0 2.2z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg><span>Ajustes</span></button>
+        <button id="music-btn" class="mm-item music-btn" role="menuitem" data-music aria-haspopup="dialog" aria-expanded="false"><svg class="mi" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path class="mi-note" d="M9 17.5V6.2l10-2.2v11.3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle class="mi-note" cx="6.6" cy="17.6" r="2.4" fill="none" stroke="currentColor" stroke-width="1.7"/><circle class="mi-note" cx="16.6" cy="15.4" r="2.4" fill="none" stroke="currentColor" stroke-width="1.7"/><path class="mi-off" d="M4 4l16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>Música y sonido</span><small class="mm-state"></small></button>
+        <button id="help-btn" class="mm-item" role="menuitem"><span>Atajos de teclado</span><kbd aria-hidden="true">?</kbd></button>
+        <button id="more-guide" class="mm-item" role="menuitem"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 5.5C6.5 4.5 9.5 4.6 12 6.3c2.5-1.7 5.5-1.8 8-.8v13c-2.5-1-5.5-.9-8 .8-2.5-1.7-5.5-1.8-8-.8z M12 6.3v13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg><span>Instrucciones</span></button>
+      </div>
+    </div>
   </header>
 
   <nav id="rail" class="ui" aria-label="Secciones"></nav>
@@ -354,6 +360,6 @@
     </div>
   </section>
 </div>
-<script src="js/solaris.js?v=a90cafbbcc"></script>
+<script src="js/solaris.js?v=05f16f8dad"></script>
 </body>
 </html>

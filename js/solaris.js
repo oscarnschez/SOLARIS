@@ -4617,7 +4617,9 @@ $('#btn-menu').addEventListener('click', () => this.openSection(this.section ? n
 $('#drawer-close').innerHTML = ICON.close; $('#drawer-close').addEventListener('click', () => this.openSection(null));
 $('#info-close').innerHTML = ICON.close; $('#info-close').addEventListener('click', () => this.select(null));
 $('#mm-toggle').innerHTML = ICON.map; $('#mm-toggle').addEventListener('click', () => this.toggleMinimap());
-$('#help-btn').innerHTML = ICON.help; $('#help-btn').addEventListener('click', () => this.toggleHelp(true));
+$('#help-btn').insertAdjacentHTML('afterbegin', ICON.help); $('#help-btn').addEventListener('click', () => this.toggleHelp(true));
+$('#more-guide').addEventListener('click', () => this.toggleGuide(true));
+this.initMoreMenu();
 $('#help-close').addEventListener('click', () => this.toggleHelp(false));
 $('#help-guide').addEventListener('click', () => { this.toggleHelp(false); this.toggleGuide(true); });
 $('#guide-btn').addEventListener('click', () => this.toggleGuide(true));
@@ -4647,9 +4649,25 @@ if (innerWidth < 760) { this.mmOn = false; }
 this.refreshMinimap();
 this.updateScaleBadge();
 },
+initMoreMenu() {
+const btn = $('#more-btn'), menu = $('#more-menu'), items = () => [...menu.querySelectorAll('.mm-item')].filter(b => b.offsetParent);
+const set = v => { menu.hidden = !v; btn.setAttribute('aria-expanded', String(v)); btn.classList.toggle('on', v); };
+btn.addEventListener('click', e => { e.stopPropagation(); const v = menu.hidden; set(v); this.tipEl.classList.remove('on'); if (v) { const f = items()[0]; if (f) f.focus({ preventScroll: true }); } });
+menu.addEventListener('click', () => setTimeout(() => set(false)), true);      // se cierra después de que el elemento ejecute su acción
+menu.addEventListener('keydown', e => {
+const it = items(), i = it.indexOf(document.activeElement);
+if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); it[(i + (e.key === 'ArrowDown' ? 1 : -1) + it.length) % it.length].focus(); }
+else if (e.key === 'Home' || e.key === 'End') { e.preventDefault(); it[e.key === 'Home' ? 0 : it.length - 1].focus(); }
+else if (e.key === 'Escape') { set(false); btn.focus(); }
+else if (e.key === 'Tab') set(false);
+else return;
+e.stopPropagation();
+});
+addEventListener('pointerdown', e => { if (!menu.hidden && !e.target.closest('.more-wrap')) set(false); }, true);
+},
 hint(msg, ms) { if (Settings.state.general.tips && !this.tourCine) this.toast(msg, ms); },
 showTip(t) {
-if (!Settings.state.general.tips) return;
+if (!Settings.state.general.tips || t.closest('#more-menu')) return;
 const r = t.getBoundingClientRect(), el = this.tipEl;
 el.textContent = t.dataset.tip; el.classList.add('on');
 const w = el.offsetWidth, h = el.offsetHeight;
@@ -4667,10 +4685,21 @@ SECTIONS: [
 ['explorar', 'Explorar'], ['sistema', 'Sistema Solar'], ['planetas', 'Planetas'], ['lunas', 'Lunas'], ['enanos', 'Planetas enanos'],
 ['asteroides', 'Asteroides'], ['cometas', 'Cometas'], ['naves', 'Naves espaciales'], ['constelaciones', 'Constelaciones'], ['capas', 'Capas'], ['config', 'Ajustes'],
 ],
+RAIL_GROUP: { explorar: 'Navegar', sistema: 'Navegar', gargantua: 'Navegar', planetas: 'Objetos', lunas: 'Objetos', enanos: 'Objetos', asteroides: 'Objetos', cometas: 'Objetos', naves: 'Objetos', constelaciones: 'Objetos', herramientas: 'Herramientas y ajustes', capas: 'Herramientas y ajustes', config: 'Herramientas y ajustes' },
+railHTML() {
+// el riel se expande al pasar el cursor y muestra las etiquetas; los grupos se separan con una línea (contraído) o un título (expandido)
+let g = null;
+return this.SECTIONS.map(([id, label]) => {
+const grp = this.RAIL_GROUP[id] || 'Herramientas', head = grp !== g ? `<span class="rail-grp${g === null ? ' first' : ''}" aria-hidden="true">${grp}</span>` : '';
+g = grp;
+return `${head}<button class="rail-btn" data-sec="${id}" aria-label="${label}">${ICON[id] || ICON.herramientas}<span>${label}</span></button>`;
+}).join('');
+},
 buildRail() {
 const r = $('#rail');
-r.innerHTML = this.SECTIONS.map(([id, label]) => `<button class="rail-btn" data-sec="${id}" aria-label="${label}" data-tip="${label}" data-tip-side="right">${ICON[id]}<span>${label}</span></button>`).join('');
-r.addEventListener('click', e => { const b = e.target.closest('[data-sec]'); if (!b) return; if (b.dataset.sec === 'config') { this.openSettings(); return; } this.openSection(this.section === b.dataset.sec ? null : b.dataset.sec); });
+r.innerHTML = this.railHTML();
+r.addEventListener('mouseleave', () => r.classList.remove('quiet'));
+r.addEventListener('click', e => { const b = e.target.closest('[data-sec]'); if (!b) return; r.classList.add('quiet'); if (b.dataset.sec === 'config') { this.openSettings(); return; } this.openSection(this.section === b.dataset.sec ? null : b.dataset.sec); });
 },
 openSection(id) {
 this.section = id;
@@ -5915,7 +5944,7 @@ Object.assign(UI, {
 initMusic() {
 const pop = $('#music-pop');
 const open = btn => {
-const r = btn.getBoundingClientRect(), w = 270;
+const r = btn.getBoundingClientRect(), w = pop.offsetWidth || 300;
 pop.style.left = clamp(r.right - w, 8, innerWidth - w - 8) + 'px';
 pop.style.top = (r.bottom + 8) + 'px';
 pop.classList.add('open'); pop.setAttribute('aria-hidden', 'false');
@@ -5924,7 +5953,7 @@ setTimeout(() => $('#music-toggle').focus({ preventScroll: true }), 30);
 };
 const close = () => { pop.classList.remove('open'); pop.setAttribute('aria-hidden', 'true'); if (this._musicBtn) this._musicBtn.setAttribute('aria-expanded', 'false'); };
 this.closeMusic = close;
-document.querySelectorAll('[data-music]').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); pop.classList.contains('open') && this._musicBtn === b ? close() : open(b); }));
+document.querySelectorAll('[data-music]').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); const a = b.closest('#more-menu') ? $('#more-btn') : b; pop.classList.contains('open') && this._musicBtn === a ? close() : open(a); }));
 $('#music-toggle').addEventListener('click', () => Music.toggle());
 $('#music-pop .mp-mix').innerHTML = mixerHTML();
 $('#music-credits').addEventListener('click', () => { close(); this.openCredits(); setTimeout(() => { const t = $('#cr-musica'), sc = $('#cr-scroll'); if (t) sc.scrollTop = t.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop - 84; }, 120); });
@@ -5938,6 +5967,8 @@ refreshMusic() {
 if (!$('#music-pop')) return;
 const on = Music.prefs.on && (Music.playing || Music.waiting);
 document.querySelectorAll('[data-music]').forEach(b => { b.classList.toggle('muted', !on); b.setAttribute('aria-label', on ? 'Música: activada' : 'Música: desactivada'); b.dataset.tip = on ? 'Música: ' + MUSIC_INFO.title : 'Música desactivada'; });
+const st = $('#music-btn .mm-state'); if (st) st.textContent = on ? 'Activada' : 'Desactivada';
+const mb = $('#more-btn'); if (mb) mb.classList.toggle('music-on', !!on);   // !!: toggle con undefined alternaría la clase en vez de fijarla
 const t = $('#music-toggle');
 t.textContent = Music.unsupported ? 'No compatible con este navegador' : on ? (Music.playing ? 'Pausar música' : 'Comenzará al interactuar') : 'Reproducir música';
 t.disabled = !!Music.unsupported; t.classList.toggle('on', on);
@@ -6932,7 +6963,7 @@ apply(id) {
 World.setSystem(id);
 const app = $('#app'); Object.keys(SYSTEMS).forEach(k => app.classList.toggle('sys-' + k, k === id));
 UI.SECTIONS = SECTIONS_BY_SYSTEM[id] || SECTIONS_SOLAR;
-$('#rail').innerHTML = UI.SECTIONS.map(([sid, label]) => `<button class="rail-btn" data-sec="${sid}" aria-label="${label}" data-tip="${label}" data-tip-side="right">${ICON[sid] || ICON.herramientas}<span>${label}</span></button>`).join('');
+$('#rail').innerHTML = UI.railHTML();
 const sb = $('#sys-btn'); if (sb) sb.querySelector('span').textContent = SYSTEMS[id].name;
 },
 enterGargantua() {
