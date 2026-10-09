@@ -4500,7 +4500,17 @@ return t('{0} años ({1} días)', fmt(a / 365.25, a / 365.25 < 100 ? 2 : 0), fmt
 }
 const norm = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const escNum = s => esc(s).replace(/^((?:[≈~]\s?)?[-−+]?\d[\d.,]*)/, '<span class="num">$1</span>');   // cifra inicial en tipografía técnica
 const $ = s => document.querySelector(s);
+const GLOBE_TEX = new Set(['ariel', 'calisto', 'ceres', 'ganimedes', 'io', 'jupiter', 'luna', 'makemake', 'marte', 'mercurio', 'miranda', 'neptuno', 'oberon', 'pluton', 'quaoar', 'rea', 'saturno', 'sedna', 'sol', 'tierra', 'titan', 'urano', 'venus']);
+const Globe = {
+// esfera dibujada con CSS a partir de una miniatura equirectangular (assets/images/globes); sin textura usa el color del cuerpo
+ok(d) { if (!['star', 'planet', 'dwarf', 'tno', 'moon'].includes(d.type)) return false; const s = d.shape; return !s || Math.max(...s) / Math.min(...s) < 1.15; },
+html(d, size, cls, style) {
+const tex = GLOBE_TEX.has(d.id) ? `<b style="background-image:url(assets/images/globes/${d.id}.webp)"></b>` : '';   // url en línea: se resuelve respecto al documento en todos los navegadores
+return `<i class="globe${d.id === 'saturno' ? ' ringed' : ''}${d.type === 'star' ? ' star' : ''}${cls ? ' ' + cls : ''}" style="--s:${size}px;--c:${d.color || '#94a0b6'};${style || ''}" aria-hidden="true"><span>${tex}</span></i>`;
+},
+};
 const Info = {
 orbitA(rb) { const o = rb.def.orbit; if (!o) return null; if (o.t === 'jpl') return o.el[0]; if (o.t === 'kep') return o.a; return null; },
 periodDays(rb) {
@@ -4607,7 +4617,9 @@ $('#btn-menu').addEventListener('click', () => this.openSection(this.section ? n
 $('#drawer-close').innerHTML = ICON.close; $('#drawer-close').addEventListener('click', () => this.openSection(null));
 $('#info-close').innerHTML = ICON.close; $('#info-close').addEventListener('click', () => this.select(null));
 $('#mm-toggle').innerHTML = ICON.map; $('#mm-toggle').addEventListener('click', () => this.toggleMinimap());
-$('#help-btn').innerHTML = ICON.help; $('#help-btn').addEventListener('click', () => this.toggleHelp(true));
+$('#help-btn').insertAdjacentHTML('afterbegin', ICON.help); $('#help-btn').addEventListener('click', () => this.toggleHelp(true));
+$('#more-guide').addEventListener('click', () => this.toggleGuide(true));
+this.initMoreMenu();
 $('#help-close').addEventListener('click', () => this.toggleHelp(false));
 $('#help-guide').addEventListener('click', () => { this.toggleHelp(false); this.toggleGuide(true); });
 $('#guide-btn').addEventListener('click', () => this.toggleGuide(true));
@@ -4632,13 +4644,30 @@ document.addEventListener('mouseover', e => { const t = e.target.closest && e.ta
 document.addEventListener('mouseout', e => { const t = e.target.closest && e.target.closest('[data-tip]'); if (t) this.tipEl.classList.remove('on'); });
 document.addEventListener('focusin', e => { const t = e.target.closest && e.target.closest('[data-tip]'); if (t && t.matches(':focus-visible')) this.showTip(t); });
 document.addEventListener('focusout', () => this.tipEl.classList.remove('on'));
+document.addEventListener('pointerdown', () => this.tipEl.classList.remove('on'), true);
 if (innerWidth < 760) { this.mmOn = false; }
 this.refreshMinimap();
 this.updateScaleBadge();
 },
+initMoreMenu() {
+const btn = $('#more-btn'), menu = $('#more-menu'), items = () => [...menu.querySelectorAll('.mm-item')].filter(b => b.offsetParent);
+const set = v => { menu.hidden = !v; btn.setAttribute('aria-expanded', String(v)); btn.classList.toggle('on', v); };
+btn.addEventListener('click', e => { e.stopPropagation(); const v = menu.hidden; set(v); this.tipEl.classList.remove('on'); if (v) { const f = items()[0]; if (f) f.focus({ preventScroll: true }); } });
+menu.addEventListener('click', () => setTimeout(() => set(false)), true);      // se cierra después de que el elemento ejecute su acción
+menu.addEventListener('keydown', e => {
+const it = items(), i = it.indexOf(document.activeElement);
+if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); it[(i + (e.key === 'ArrowDown' ? 1 : -1) + it.length) % it.length].focus(); }
+else if (e.key === 'Home' || e.key === 'End') { e.preventDefault(); it[e.key === 'Home' ? 0 : it.length - 1].focus(); }
+else if (e.key === 'Escape') { set(false); btn.focus(); }
+else if (e.key === 'Tab') set(false);
+else return;
+e.stopPropagation();
+});
+addEventListener('pointerdown', e => { if (!menu.hidden && !e.target.closest('.more-wrap')) set(false); }, true);
+},
 hint(msg, ms) { if (Settings.state.general.tips && !this.tourCine) this.toast(msg, ms); },
 showTip(t) {
-if (!Settings.state.general.tips) return;
+if (!Settings.state.general.tips || t.closest('#more-menu')) return;
 const r = t.getBoundingClientRect(), el = this.tipEl;
 el.textContent = t.dataset.tip; el.classList.add('on');
 const w = el.offsetWidth, h = el.offsetHeight;
@@ -4656,10 +4685,21 @@ SECTIONS: [
 ['explorar', 'Explorar'], ['sistema', 'Sistema Solar'], ['planetas', 'Planetas'], ['lunas', 'Lunas'], ['enanos', 'Planetas enanos'],
 ['asteroides', 'Asteroides'], ['cometas', 'Cometas'], ['naves', 'Naves espaciales'], ['constelaciones', 'Constelaciones'], ['capas', 'Capas'], ['config', 'Ajustes'],
 ],
+RAIL_GROUP: { explorar: 'Navegar', sistema: 'Navegar', gargantua: 'Navegar', planetas: 'Objetos', lunas: 'Objetos', enanos: 'Objetos', asteroides: 'Objetos', cometas: 'Objetos', naves: 'Objetos', constelaciones: 'Objetos', herramientas: 'Herramientas y ajustes', capas: 'Herramientas y ajustes', config: 'Herramientas y ajustes' },
+railHTML() {
+// el riel se expande al pasar el cursor y muestra las etiquetas; los grupos se separan con una línea (contraído) o un título (expandido)
+let g = null;
+return this.SECTIONS.map(([id, label]) => {
+const grp = this.RAIL_GROUP[id] || 'Herramientas', head = grp !== g ? `<span class="rail-grp${g === null ? ' first' : ''}" aria-hidden="true">${grp}</span>` : '';
+g = grp;
+return `${head}<button class="rail-btn" data-sec="${id}" aria-label="${label}">${ICON[id] || ICON.herramientas}<span>${label}</span></button>`;
+}).join('');
+},
 buildRail() {
 const r = $('#rail');
-r.innerHTML = this.SECTIONS.map(([id, label]) => `<button class="rail-btn" data-sec="${id}" aria-label="${label}" data-tip="${label}" data-tip-side="right">${ICON[id]}<span>${label}</span></button>`).join('');
-r.addEventListener('click', e => { const b = e.target.closest('[data-sec]'); if (!b) return; if (b.dataset.sec === 'config') { this.openSettings(); return; } this.openSection(this.section === b.dataset.sec ? null : b.dataset.sec); });
+r.innerHTML = this.railHTML();
+r.addEventListener('mouseleave', () => r.classList.remove('quiet'));
+r.addEventListener('click', e => { const b = e.target.closest('[data-sec]'); if (!b) return; r.classList.add('quiet'); if (b.dataset.sec === 'config') { this.openSettings(); return; } this.openSection(this.section === b.dataset.sec ? null : b.dataset.sec); });
 },
 openSection(id) {
 this.section = id;
@@ -4837,7 +4877,7 @@ this.refreshCamButtons();
 camAction(a) {
 this.userActed();
 const s = this.sel || Cam.focus;
-if (a === 'explore') { if (s) Cam.travel(s); else this.toast('Selecciona primero un objeto: haz clic sobre él o búscalo.'); }
+if (a === 'explore') { if (s) Cam.travel(s); else this.toast(matchMedia('(pointer: coarse)').matches ? 'Selecciona primero un objeto: tócalo o búscalo.' : 'Selecciona primero un objeto: haz clic sobre él o búscalo.'); }
 if (a === 'center') { if (s) { if (Cam.focus !== s) Cam.travel(s, { keepAngles: true, dist: clamp(Cam.dist, s.rS * 1.3, Cam.maxDist()) }); else Cam.center(); } else this.toast('Selecciona un objeto para centrarlo.'); }
 if (a === 'follow') { if (s) { if (Cam.focus === s && Cam.follow) { Cam.follow = false; this.toast('Seguimiento desactivado'); } else { if (Cam.focus !== s) Cam.travel(s, { keepAngles: true, dist: clamp(Cam.dist, s.rS * 1.3, Cam.maxDist()) }); Cam.follow = true; this.toast('Siguiendo a ' + s.def.name); } } else this.toast('Selecciona un objeto para seguirlo.'); }
 if (a === 'in') Cam.zoom(0.55);
@@ -4899,10 +4939,13 @@ buildModes() {
 const m = $('#modes');
 m.innerHTML = this.MODES.map(([k, t, tip]) => `<button role="radio" data-mode="${k}" aria-checked="${k === S.mode}" class="${k === S.mode ? 'on' : ''}" data-tip="${tip}">${t}</button>`).join('');
 m.addEventListener('click', e => { const b = e.target.closest('[data-mode]'); if (b) this.setMode(b.dataset.mode); });
+const fade = () => { const max = m.scrollWidth - m.clientWidth; m.classList.toggle('fade-l', max > 2 && m.scrollLeft > 2); m.classList.toggle('fade-r', max > 2 && m.scrollLeft < max - 2); };
+m.addEventListener('scroll', fade, { passive: true }); addEventListener('resize', fade); requestAnimationFrame(fade);
 },
 setMode(k) {
 const prev = S.mode; S.mode = k;
 document.querySelectorAll('[data-mode]').forEach(b => { b.classList.toggle('on', b.dataset.mode === k); b.setAttribute('aria-checked', b.dataset.mode === k); });
+{ const m = $('#modes'), on = m.querySelector('.on'); if (on && m.scrollWidth > m.clientWidth) m.scrollTo({ left: on.offsetLeft - (m.clientWidth - on.offsetWidth) / 2, behavior: 'smooth' }); }
 const app = $('#app');
 app.classList.toggle('cine', k === 'cine');
 Cam.auto = k === 'cine' ? 0.035 : 0;
@@ -4979,7 +5022,7 @@ F = { phys: F.phys.filter(f => keep(f.label)), orb: F.orb.filter(f => keep(f.lab
 }
 const craftF = rb.isCraft ? Info.craftFields(rb).filter(f => !basic || /^(Agencia|Lanzamiento|Ubicación|Objetivo|Estado)/.test(f.label)) : null;
 const tag = k => k === 'calc' ? '<em class="tag calc" data-tip="Calculado a partir de otros datos de referencia">calc.</em>' : k === 'sim' ? '<em class="tag sim" data-tip="Aproximación de la simulación">sim.</em>' : '';
-const row = f => `<div class="kv"><dt>${esc(f.label)}</dt><dd>${f.val == null ? '<span class="na">No disponible</span>' : esc(f.val)} ${f.val == null ? '' : tag(f.kind)}</dd></div>`;
+const row = f => `<div class="kv"><dt>${esc(f.label)}</dt><dd>${f.val == null ? '<span class="na">No disponible</span>' : escNum(f.val)} ${f.val == null ? '' : tag(f.kind)}</dd></div>`;
 let sub = TYPE_LABEL[d.type];
 if (d.sub) sub = d.sub;
 if (d.type === 'moon') sub = 'Luna de ' + rb.parent.def.name;
@@ -4987,6 +5030,7 @@ if (rb.isCraft) sub = d.sub;
 const moons = rb.children.filter(c => c.def.type === 'moon');
 P.innerHTML = `
 <header class="info-head">
+${Globe.ok(d) ? Globe.html(d, 210, 'info-globe') : ''}
 <span class="kind"><i class="dot" style="--c:${d.color}"></i>${esc(sub)}</span>
 <h2 id="info-title">${esc(d.name)}</h2>
 <p class="desc">${esc(d.info.desc)}</p>
@@ -4997,11 +5041,12 @@ P.innerHTML = `
 ${Compare.pillHTML(rb)}
 <button class="pill" id="info-plan" data-plan="${rb.id}">Planificar viaje</button>
 </div>
-${rb.isCraft && rb.def.orbit.t === 'lpoint' ? `<p class="rel">En el punto L${rb.def.orbit.L} Sol-Tierra, cerca de <button class="link" data-go="${rb.parent.id}">${esc(rb.parent.def.name)}</button></p>` : ''}
-${rb.parent && !rb.parent.isSun && !(rb.isCraft && rb.def.orbit.t === 'lpoint') ? `<p class="rel">Orbita a <button class="link" data-go="${rb.parent.id}">${esc(rb.parent.def.name)}</button></p>` : ''}
-${moons.length ? `<p class="rel">Lunas incluidas: ${moons.map(m => `<button class="link" data-go="${m.id}">${esc(m.def.name)}</button>`).join('')}</p>` : ''}
+${rb.isCraft && rb.def.orbit.t === 'lpoint' ? `<p class="rel">En el punto L${rb.def.orbit.L} Sol-Tierra, cerca de <button class="link" data-go="${rb.parent.id}" style="--c:${rb.parent.def.color || '#94a0b6'}">${esc(rb.parent.def.name)}</button></p>` : ''}
+${rb.parent && !rb.parent.isSun && !(rb.isCraft && rb.def.orbit.t === 'lpoint') ? `<p class="rel">Orbita a <button class="link" data-go="${rb.parent.id}" style="--c:${rb.parent.def.color || '#94a0b6'}">${esc(rb.parent.def.name)}</button></p>` : ''}
+${moons.length ? `<p class="rel">Lunas incluidas: ${moons.map(m => `<button class="link" data-go="${m.id}" style="--c:${m.def.color || '#94a0b6'}">${esc(m.def.name)}</button>`).join('')}</p>` : ''}
 </header>
 <section class="live"><h3>Ahora mismo <em class="tag sim" data-tip="Calculado por la simulación para la fecha mostrada; no es una efeméride de alta precisión">sim.</em></h3><div id="live-rows"></div></section>
+${this.earthCmpHTML(rb)}
 ${rb.isCraft ? `<section><h3>Misión</h3><dl>${craftF.map(row).join('')}</dl></section><p class="note">${Info.craftNote(rb)}</p>` : `<section><h3>Datos físicos</h3><dl>${F.phys.map(row).join('')}</dl></section>
 <section><h3>Rotación y órbita</h3><dl>${F.orb.map(row).join('')}</dl></section>
 ${F.comp.length ? `<section><h3>Composición</h3><dl>${F.comp.map(row).join('')}</dl></section>` : ''}`}
@@ -5009,13 +5054,46 @@ ${basic ? '<p class="note">Vista básica: activa la información científica ava
 ${d.info.feats && d.info.feats.length ? `<section><h3>Características principales</h3><ul class="facts">${d.info.feats.map(x => `<li>${esc(x)}</li>`).join('')}</ul></section>` : ''}
 ${d.info.facts && d.info.facts.length ? `<section><h3>Curiosidades</h3><ul class="facts">${d.info.facts.map(x => `<li>${esc(x)}</li>`).join('')}</ul></section>` : ''}
 <footer class="src"><p><b>Fuente:</b> ${esc(d.src)}</p>${d.credit && World.hd[d.model || d.id] ? `<p><b>Modelo 3D:</b> ${UI.creditHTML(d.credit)}</p>` : ''}<p class="legend"><em class="tag calc">calc.</em> derivado de otros datos <em class="tag sim">sim.</em> aproximación de la simulación</p>${this.scaleWarn(rb)}</footer>`;
-P.scrollTop = 0;
+P.scrollTop = 0; this.hudScan();
 $('#info-travel').addEventListener('click', () => { this.userActed(); Cam.travel(rb); });
 $('#info-follow').addEventListener('click', () => { this.userActed(); if (Cam.focus === rb && Cam.follow) Cam.follow = false; else { if (Cam.focus !== rb) Cam.travel(rb, { keepAngles: true, dist: clamp(Cam.dist, rb.rS * 1.3, Cam.maxDist()) }); Cam.follow = true; } this.refreshCamButtons(); });
 $('#info-close2').addEventListener('click', () => { this.userActed(); Cam.travel(rb, { close: true }); });
 P.querySelectorAll('[data-go]').forEach(el => el.addEventListener('click', () => this.select(World.byId[el.dataset.go], { fly: true })));
 this.updateLive(true);
 this.refreshCamButtons();
+},
+introTele() {
+const el = $('#intro-tele'), E = World.byId.tierra, V1 = World.byId.voyager1;
+if (!el || !E) return;
+el.innerHTML = `<span class="it-live"></span><span class="it-date"></span><span>Tierra a <b class="it-au"></b> UA del Sol</span>${V1 ? '<span title="Distancia actual entre la sonda Voyager 1 y la Tierra">Voyager 1 a <b class="it-v1"></b> km</span>' : ''}`;
+const q = c => el.querySelector(c), live = q('.it-live'), date = q('.it-date'), au = q('.it-au'), v1 = q('.it-v1');
+const tick = () => {
+if (this.started) return;
+const sim = this.isSimulatedDate();
+live.textContent = sim ? 'SIMULACIÓN' : 'EN VIVO'; live.classList.toggle('sim', sim);
+date.textContent = jdToDate(Time.jd).toLocaleDateString(I18N.loc(), { day: 'numeric', month: 'short', year: 'numeric' });
+au.textContent = fmt(V.len(E.helio), 3);
+if (v1) v1.textContent = fmt(V.dist(V1.helio, E.helio) * AU_KM, 0);      // la distancia cambia en vivo: ~17 km/s de la sonda más el movimiento de la Tierra
+};
+tick(); setInterval(tick, 250);
+setTimeout(() => el.classList.add('on'), 600);
+},
+hudScan() { const I = $('#info'); I.classList.remove('scan'); void I.offsetWidth; I.classList.add('scan'); },
+earthCmpHTML(rb) {
+const E = World.byId.tierra;
+if (!E || rb === E || !Compare.can(rb)) return '';
+const keys = [['diam', 'Diámetro'], ['mass', 'Masa'], ['grav', 'Gravedad']];
+if (!['moon', 'star'].includes(rb.def.type)) keys.push(['per', 'Duración del año']);
+const fr = r => r >= 100 ? fmt(r, 0) : r >= 10 ? fmt(r, 1) : r >= 0.1 ? fmt(r, 2) : r >= 1e-6 ? fmt(r, Math.ceil(-Math.log10(r)) + 1) : '< 0.000001';
+const tiles = keys.map(([k, label]) => {
+const v = Compare.num(rb, k), e = Compare.num(E, k);
+if (!v || !e) return '';
+const r = v / e, p = clamp(Math.log10(r) / 4, -1, 1);      // escala logarítmica: ±4 órdenes de magnitud alrededor de la Tierra
+const a = 50 + Math.min(p, 0) * 50, w = Math.abs(p) * 50;
+return `<div class="vs-tile"><span>${label}</span><b class="num">${fr(r)}×</b><i class="vs-bar" aria-hidden="true"><i class="vs-fill${r < 1 ? ' less' : ''}" style="left:${a.toFixed(1)}%;width:${w.toFixed(1)}%"></i><i class="vs-dot" style="left:${(50 + p * 50).toFixed(1)}%"></i></i></div>`;
+}).filter(Boolean);
+if (tiles.length < 2) return '';
+return `<section class="vs"><h3>Comparado con la Tierra <em class="tag calc" data-tip="Cociente entre el valor de este objeto y el de la Tierra (Tierra = 1×). Las barras usan escala logarítmica.">calc.</em></h3><div class="vs-grid">${tiles.join('')}</div></section>`;
 },
 creditHTML(c) {
 if (!c.url) return esc(c.note.charAt(0).toUpperCase() + c.note.slice(1)) + '.';
@@ -5031,7 +5109,7 @@ if (!this.sel || (!force && now - this.lastLive < 250)) return;
 this.lastLive = now;
 const rows = Info.live(this.sel);
 const el = $('#live-rows'); if (!el) return;
-el.innerHTML = rows.map(r => `<div class="live-row"><span>${esc(r.label)}</span><b>${r.txt ? esc(r.txt) : esc(fmtKm(r.km))}</b>${r.au != null && r.au >= 0.001 ? `<small>${fmtAU(r.au)}</small>` : ''}</div>`).join('');
+el.innerHTML = rows.map(r => `<div class="live-row"><span>${esc(r.label)}</span><b>${escNum(r.txt || fmtKm(r.km))}</b>${r.au != null && r.au >= 0.001 ? `<small>${escNum(fmtAU(r.au))}</small>` : ''}</div>`).join('');
 },
 buildLabels() {
 const host = $('#labels');
@@ -5107,7 +5185,8 @@ if (ok) c.el.style.transform = `translate(${x.toFixed(0)}px, ${y.toFixed(0)}px) 
 c.el.classList.toggle('on', ok);
 }
 const ret = (el, rb) => {
-if (!rb || !rb.proj.on) { el.classList.remove('on'); return; }
+if (!rb || !rb.proj.on) { el.classList.remove('on'); if (!rb) el._rb = null; return; }
+if (el.id === 'reticle' && el._rb !== rb) { el._rb = rb; el.classList.remove('lock'); void el.offsetWidth; el.classList.add('lock'); }   // la retícula se "engancha" al nuevo objeto
 const s = Math.max(rb.proj.rpx * 2 + 16, 26);
 el.style.transform = `translate(${(rb.proj.x - s / 2).toFixed(1)}px, ${(rb.proj.y - s / 2).toFixed(1)}px)`;
 el.style.width = el.style.height = s + 'px';
@@ -5269,13 +5348,19 @@ stops: [['ceres', 'Cinturón de asteroides'], ['vesta', 'Cinturón de asteroides
 layers: ['orbits'],
 stops: TOUR.map(s => ({ id: s.id, kind: 'classic', hold: 7.5, txt: s.txt })) },
 ];
-const TOUR_ICONS = {
-planetas: '<circle cx="12" cy="12" r="4.2"/><ellipse cx="12" cy="12" rx="9.5" ry="3.4" transform="rotate(-20 12 12)"/>',
-lunas: '<circle cx="10" cy="13" r="6"/><circle cx="19" cy="6" r="2.2"/>',
-exploracion: '<path d="M4 14l4-1 3 3-1 4M9 15l7-7c2-2 4-3 5-3 0 1-1 3-3 5l-7 7"/><circle cx="15.5" cy="8.5" r="1.3"/>',
-menores: '<path d="M3 21l7-7"/><circle cx="14" cy="10" r="4.5"/><path d="M5 9c1-2 3-3 5-3"/>',
-clasico: '<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="7.5" stroke-dasharray="2 3"/><circle cx="19.5" cy="12" r="1.4"/>',
+const TOUR_FEATURED = 'clasico';
+const TOUR_COVERS = {     // [cuerpo, tamaño en px, izquierda %, arriba %] del centro de cada esfera
+clasico: [['sol', 190, -4, 50], ['mercurio', 9, 17, 60], ['venus', 15, 23, 56], ['tierra', 16, 29.5, 52], ['marte', 11, 35.5, 49], ['jupiter', 58, 50, 42], ['saturno', 40, 67, 47], ['urano', 24, 81, 54], ['neptuno', 22, 92, 58]],
+planetas: [['jupiter', 150, 80, 64], ['tierra', 30, 26, 40], ['marte', 17, 44, 66]],
+lunas: [['luna', 360, 50, 182], ['tierra', 34, 66, 34]],
+exploracion: [['tierra', 104, 70, 58]],
+menores: [['ceres', 70, 80, 52]],
 };
+const TOUR_COVER_EXTRA = {
+exploracion: '<i class="tc-orbit" style="left:70%;top:58%"></i><i class="tc-orbit front" style="left:70%;top:58%"><b class="tc-sat"></b></i>',
+menores: '<i class="tc-comet" style="left:12%;top:30%"></i><i class="tc-rock" style="left:46%;top:70%;--r:6px"></i><i class="tc-rock" style="left:56%;top:38%;--r:4px"></i><i class="tc-rock" style="left:36%;top:52%;--r:3px"></i><i class="tc-rock" style="left:62%;top:78%;--r:3px"></i>',
+};
+const tourCoverHTML = id => (TOUR_COVERS[id] || []).map(([b, sz, x, y]) => BODY[b] ? Globe.html(BODY[b], sz, 'tc-globe', `left:${x}%;top:${y}%`) : '').join('') + (TOUR_COVER_EXTRA[id] || '');
 const tourDuration = t => t.stops.reduce((s, x) => s + x.hold + (x.kind === 'minor' ? 6 : 3.5), 0);
 Object.assign(UI, {
 tour: null, tourRB: null,
@@ -5293,13 +5378,16 @@ B('tb-again', () => this.restartTour()); B('tb-other', () => { this.stopTour(); 
 $('#tb-play').innerHTML = ICON.pause;
 },
 renderTourCards() {
-$('#tours-list').innerHTML = TOURS.map(tr => `
-<article class="tour-card">
-<div class="tour-ico"><svg viewBox="0 0 24 24" aria-hidden="true">${TOUR_ICONS[tr.id]}</svg></div>
+const order = [...TOURS].sort((a, b) => (b.id === TOUR_FEATURED) - (a.id === TOUR_FEATURED));   // el recorrido destacado va primero y a doble ancho
+$('#tours-list').innerHTML = order.map((tr, i) => `
+<article class="tour-card${tr.id === TOUR_FEATURED ? ' featured' : ''}" style="--i:${i}">
+<div class="tour-cover" aria-hidden="true"><div class="tc-scene">${tourCoverHTML(tr.id)}</div>${tr.id === TOUR_FEATURED ? '<span class="tour-badge">Ideal para empezar</span>' : ''}</div>
+<div class="tour-body">
 <h3>${tr.name}</h3>
 <p>${tr.desc}</p>
-<p class="tour-meta">${tr.stops.length} paradas · ≈ ${Math.max(1, Math.round(tourDuration(tr) / 60))} min</p>
-<div class="tour-act"><button class="cta" data-tour="${tr.id}">Iniciar recorrido</button><button class="cta-ghost tour-cine-btn" data-tour="${tr.id}" data-cine="1"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M7 5v14M17 5v14M3 9.5h4M3 14.5h4M17 9.5h4M17 14.5h4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>Iniciar en Modo Cine</button></div>
+<ul class="tour-chips"><li>${tr.stops.length} paradas</li><li>≈ ${Math.max(1, Math.round(tourDuration(tr) / 60))} min</li></ul>
+<div class="tour-act"><button class="cta" data-tour="${tr.id}" aria-label="Iniciar recorrido: ${tr.name}">Iniciar recorrido</button><button class="cta-ghost tour-cine-btn" data-tour="${tr.id}" data-cine="1" aria-label="Iniciar ${tr.name} en Modo Cine"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M7 5v14M17 5v14M3 9.5h4M3 14.5h4M17 9.5h4M17 14.5h4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>Modo Cine</button></div>
+</div>
 </article>`).join('');
 },
 toggleTours(v) {
@@ -5494,7 +5582,7 @@ const fromCredit = (use, c) => ({ use, name: c.title, author: c.author, source: 
 const groups = [
 ['Telescopios, estaciones y sondas', [['Telescopio espacial James Webb', 'jwst'], ['Telescopio espacial Hubble', 'hubble'], ['Voyager 1 y Voyager 2', 'voyager'], ['Estación Espacial Internacional', 'iss'], ['Estación espacial Tiangong', 'tiangong'], ['Sonda solar Parker', 'parker'], ['Sonda New Horizons', 'newhorizons']]
 .filter(([, k]) => MODEL_CREDITS[k]).map(([u, k]) => fromCredit(u, MODEL_CREDITS[k]))],
-['El Sol, planetas y lunas', Object.keys(PLANET_TEX).map(id => fromCredit(BODY[id].name, BODY[id].credit))],
+['El Sol, planetas y lunas', Object.keys(PLANET_TEX).map(id => { const a = fromCredit(BODY[id].name, BODY[id].credit); if (GLOBE_TEX.has(id)) a.note = (a.note ? a.note + '; ' : '') + 'también se muestra reducida como miniatura en las fichas y los recorridos'; return a; })],
 ['Naves del modo de vuelo', SHIPS.filter(sh => MODEL_CREDITS[sh.id]).map(sh => fromCredit('Nave ' + sh.name, MODEL_CREDITS[sh.id]))],
 ['Recursos utilizados en versiones anteriores', PREV_CREDITS.map(p => fromCredit(BODY[p.id].name + ' (versión anterior)', p.credit))],
 ['Música', [{ use: 'Tema musical principal de SOLARIS', name: MUSIC_INFO.title, author: MUSIC_INFO.artist, source: 'Archivo aportado por el creador del proyecto', license: null, url: null }]],
@@ -5856,7 +5944,7 @@ Object.assign(UI, {
 initMusic() {
 const pop = $('#music-pop');
 const open = btn => {
-const r = btn.getBoundingClientRect(), w = 270;
+const r = btn.getBoundingClientRect(), w = pop.offsetWidth || 300;
 pop.style.left = clamp(r.right - w, 8, innerWidth - w - 8) + 'px';
 pop.style.top = (r.bottom + 8) + 'px';
 pop.classList.add('open'); pop.setAttribute('aria-hidden', 'false');
@@ -5865,7 +5953,7 @@ setTimeout(() => $('#music-toggle').focus({ preventScroll: true }), 30);
 };
 const close = () => { pop.classList.remove('open'); pop.setAttribute('aria-hidden', 'true'); if (this._musicBtn) this._musicBtn.setAttribute('aria-expanded', 'false'); };
 this.closeMusic = close;
-document.querySelectorAll('[data-music]').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); pop.classList.contains('open') && this._musicBtn === b ? close() : open(b); }));
+document.querySelectorAll('[data-music]').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); const a = b.closest('#more-menu') ? $('#more-btn') : b; pop.classList.contains('open') && this._musicBtn === a ? close() : open(a); }));
 $('#music-toggle').addEventListener('click', () => Music.toggle());
 $('#music-pop .mp-mix').innerHTML = mixerHTML();
 $('#music-credits').addEventListener('click', () => { close(); this.openCredits(); setTimeout(() => { const t = $('#cr-musica'), sc = $('#cr-scroll'); if (t) sc.scrollTop = t.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop - 84; }, 120); });
@@ -5879,6 +5967,8 @@ refreshMusic() {
 if (!$('#music-pop')) return;
 const on = Music.prefs.on && (Music.playing || Music.waiting);
 document.querySelectorAll('[data-music]').forEach(b => { b.classList.toggle('muted', !on); b.setAttribute('aria-label', on ? 'Música: activada' : 'Música: desactivada'); b.dataset.tip = on ? 'Música: ' + MUSIC_INFO.title : 'Música desactivada'; });
+const st = $('#music-btn .mm-state'); if (st) st.textContent = on ? 'Activada' : 'Desactivada';
+const mb = $('#more-btn'); if (mb) mb.classList.toggle('music-on', !!on);   // !!: toggle con undefined alternaría la clase en vez de fijarla
 const t = $('#music-toggle');
 t.textContent = Music.unsupported ? 'No compatible con este navegador' : on ? (Music.playing ? 'Pausar música' : 'Comenzará al interactuar') : 'Reproducir música';
 t.disabled = !!Music.unsupported; t.classList.toggle('on', on);
@@ -6873,7 +6963,7 @@ apply(id) {
 World.setSystem(id);
 const app = $('#app'); Object.keys(SYSTEMS).forEach(k => app.classList.toggle('sys-' + k, k === id));
 UI.SECTIONS = SECTIONS_BY_SYSTEM[id] || SECTIONS_SOLAR;
-$('#rail').innerHTML = UI.SECTIONS.map(([sid, label]) => `<button class="rail-btn" data-sec="${sid}" aria-label="${label}" data-tip="${label}" data-tip-side="right">${ICON[sid] || ICON.herramientas}<span>${label}</span></button>`).join('');
+$('#rail').innerHTML = UI.railHTML();
 const sb = $('#sys-btn'); if (sb) sb.querySelector('span').textContent = SYSTEMS[id].name;
 },
 enterGargantua() {
@@ -6939,7 +7029,7 @@ P.innerHTML = `
 ${i.dilation ? Dilation.html() : ''}
 ${i.science ? `<section class="gx-sci"><h3><span class="gx-tag sci">Ciencia real</span></h3>${i.science.map(([k, v]) => `<div class="gx-concept"><b>${esc(k)}</b><p>${esc(v)}</p></div>`).join('')}${i.render ? `<p class="note">${esc(i.render)}</p>` : ''}</section>` : ''}
 <footer class="src"><p><b>Fuente:</b> ${esc(d.src)}</p><p class="sys-note">${esc(SYSTEMS.gargantua.note)}</p>${rb.def.orbit ? `<p class="note">${esc(SYSTEMS.gargantua.orbitsNote)}</p>` : ''}</footer>`;
-P.scrollTop = 0;
+P.scrollTop = 0; this.hudScan();
 $('#info-travel').addEventListener('click', () => { this.userActed(); Cam.travel(rb); });
 $('#info-follow').addEventListener('click', () => { this.userActed(); if (Cam.focus === rb && Cam.follow) Cam.follow = false; else Cam.travel(rb, { keepAngles: true }); this.refreshCamButtons(); });
 $('#info-close2').addEventListener('click', () => { this.userActed(); Cam.travel(rb, { close: true }); });
@@ -7431,6 +7521,7 @@ UI.init(); Input.init(cv);
 Cam.dist = Cam.dDist = ScaleState.get('overview') * 0.78; Cam.el = 0.34; Cam.az = 0.4; Cam.auto = UI.reducedMotion ? 0 : 0.03;
 $('#load-msg').textContent = 'Listo';
 $('#app').classList.add('ready');
+UI.introTele();
 const st = $('#start'); st.disabled = false; st.focus({ preventScroll: true });
 st.addEventListener('click', () => this.begin());
 const sg = $('#start-tours'); sg.disabled = false; sg.addEventListener('click', () => UI.toggleTours(true));
@@ -7459,7 +7550,7 @@ UI.started = true; Cam.auto = 0;
 Time.startState(); UI.refreshTime();
 if (!opts.quiet) {
 Cam.travelTo([0, 0, 0], ScaleState.get('overview'), 0.42);
-setTimeout(() => UI.hint(I18N.t('Haz clic en cualquier objeto o búscalo por su nombre'), 4200), 900);
+setTimeout(() => UI.hint(I18N.t(matchMedia('(pointer: coarse)').matches ? 'Toca cualquier objeto o búscalo por su nombre' : 'Haz clic en cualquier objeto o búscalo por su nombre'), 4200), 900);
 }
 $('#gl').focus({ preventScroll: true });
 },
