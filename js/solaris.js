@@ -1142,7 +1142,7 @@ return true;
 },
 };
 const ASSET_MANIFEST = {"music": {"webm": "assets/audio/metamorphosis.webm", "mp3": "assets/audio/metamorphosis.mp3"}, "bodyMeshes": {"fobos": {"url": "assets/models/moons/fobos.bin", "k": 1.26255}, "deimos": {"url": "assets/models/moons/deimos.bin", "k": 1.37497}, "haumea": {"url": "assets/models/dwarfs/haumea.bin", "k": 1.44255}}};
-const SOLARIS_BUILD = '2026.10.09-0756-web';
+const SOLARIS_BUILD = '2026.10.09-0807-web';
 console.info('SOLARIS · versión ' + SOLARIS_BUILD);
 const Assets = {
 cache: new Map(), busyN: new Map(),
@@ -5585,7 +5585,7 @@ const groups = [
 ['El Sol, planetas y lunas', Object.keys(PLANET_TEX).map(id => { const a = fromCredit(BODY[id].name, BODY[id].credit); if (GLOBE_TEX.has(id)) a.note = (a.note ? a.note + '; ' : '') + 'también se muestra reducida como miniatura en las fichas y los recorridos'; return a; })],
 ['Naves del modo de vuelo', SHIPS.filter(sh => MODEL_CREDITS[sh.id]).map(sh => fromCredit('Nave ' + sh.name, MODEL_CREDITS[sh.id]))],
 ['Recursos utilizados en versiones anteriores', PREV_CREDITS.map(p => fromCredit(BODY[p.id].name + ' (versión anterior)', p.credit))],
-['Música', [{ use: 'Tema musical principal de SOLARIS', name: MUSIC_INFO.title, author: MUSIC_INFO.artist, source: 'Archivo aportado por el creador del proyecto', license: null, url: null }]],
+['Música', [{ use: 'Tema musical principal de SOLARIS', name: MUSIC_INFO.title, author: MUSIC_INFO.artist, source: 'YouTube', license: null, url: MUSIC_INFO.url }]],
 ['Referencias culturales', SHIPS.filter(sh => sh.brand && sh.brand.credit).map(sh => ({ use: 'Ficha de la nave ' + sh.name, name: sh.brand.credit.name, author: sh.brand.credit.author, source: 'Imagen aportada por el creador del proyecto',
 license: sh.id === 'ranger' ? 'Marca y obra protegidas; se muestran como referencia cultural (ver «Referencias a Interstellar»)' : 'Información de atribución pendiente; marca de sus titulares, mostrada como referencia cultural (ver «Referencias a ' + sh.brand.alt + '»)', url: null }))],
 ];
@@ -5840,7 +5840,7 @@ document.querySelectorAll('.mix').forEach(m => m.classList.toggle('all-muted', S
 document.querySelectorAll('[data-music]').forEach(b => b.classList.toggle('all-muted', SFX.prefs.muted));
 },
 });
-const MUSIC_INFO = { title: 'Metamorphosis', artist: 'Laura Platt', role: 'Tema musical principal' };
+const MUSIC_INFO = { title: 'Metamorphosis', artist: 'Laura Platt', role: 'Tema musical principal', url: 'https://www.youtube.com/watch?v=G7-1z_8Mn5M' };
 const Music = {
 el: null, url: null, ctx: null, gain: null, ready: false, playing: false, duck: 1, waiting: false, fadeTimer: null,
 get prefs() { return Settings.state.audio; },

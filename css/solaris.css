@@ -661,7 +661,7 @@ background: radial-gradient(1px 1px at 12% 22%, rgba(255, 255, 255, .7), transpa
 .cr-asset .cr-use { margin-bottom: 8px; color: var(--sun); font-size: 14.5px; font-weight: 500; }
 .cr-asset > div:not(.cr-use):not(.cr-adapt) { display: grid; grid-template-columns: 112px 1fr; gap: 10px; padding: 3px 0; }
 .cr-asset dt { color: var(--muted); } .cr-asset dd { margin: 0; color: var(--text-2); overflow-wrap: anywhere; }
-.cr-asset a, .cr-contact a { color: var(--ice); text-decoration: underline; text-decoration-color: rgba(143, 195, 255, .35); text-underline-offset: 2px; }
+.cr-asset a, .cr-contact a, .cr-format a { color: var(--ice); text-decoration: underline; text-decoration-color: rgba(143, 195, 255, .35); text-underline-offset: 2px; }
 .cr-adapt { margin-top: 6px; color: var(--dim); font-size: 12.5px; }
 .cr-na { color: var(--dim); }
 .cr-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; padding: 0; list-style: none; }
