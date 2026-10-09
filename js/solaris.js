@@ -1142,7 +1142,7 @@ return true;
 },
 };
 const ASSET_MANIFEST = {"music": {"webm": "assets/audio/metamorphosis.webm", "mp3": "assets/audio/metamorphosis.mp3"}, "bodyMeshes": {"fobos": {"url": "assets/models/moons/fobos.bin", "k": 1.26255}, "deimos": {"url": "assets/models/moons/deimos.bin", "k": 1.37497}, "haumea": {"url": "assets/models/dwarfs/haumea.bin", "k": 1.44255}}};
-const SOLARIS_BUILD = '2026.10.09-0946-web';
+const SOLARIS_BUILD = '2026.10.09-0955-web';
 console.info('SOLARIS · versión ' + SOLARIS_BUILD);
 const Assets = {
 cache: new Map(), busyN: new Map(),
@@ -7046,7 +7046,7 @@ const ex = [[600, '10 minutos'], [3600, '1 hora'], [3 * 3600, '3 horas']];
 return `<section class="gx-dil" id="info-dil"><h3>Dilatación temporal <span class="gx-tag fic">Universo de Interstellar</span></h3>
 <p>En Miller, la intensa gravedad asociada a su proximidad a Gargantúa provoca una enorme diferencia entre el tiempo local y el tiempo experimentado lejos del planeta dentro del escenario de Interstellar.</p>
 <p class="gx-ratio">1 hora en Miller ≈ 7 años externos <small>(factor ≈ ${fmt(MILLER_TIME.RATIO, 0)})</small></p>
-<div class="gx-clocks"><div><span>Tiempo en Miller</span><b id="dil-local">00:00:00</b></div><div><span>Tiempo externo equivalente</span><b id="dil-ext">0 horas</b></div></div>
+<div class="gx-clocks"><div><span>Tiempo en Miller<a class="gx-egg" href="https://www.youtube.com/watch?v=60h6lpnSgck" target="_blank" rel="noopener noreferrer" aria-label="El tiempo no espera… (abre un video en una pestaña nueva)" data-tip="El tiempo no espera…"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><circle cx="12" cy="12" r="8.2"/><path class="egg-h" d="M12 12V8.2"/><path class="egg-m" d="M12 12l3.4 2"/></svg></a></span><b id="dil-local">00:00:00</b></div><div><span>Tiempo externo equivalente</span><b id="dil-ext">0 horas</b></div></div>
 <p class="gx-ex">${ex.map(([s, t]) => `${t} → ${MillerFX.ext(s)}`).join(' · ')}</p>
 <p class="note">El contador sigue el reloj de la ambientación sonora de Miller: cada tic llega cada ${fmt(MILLER_TIME.TICK_T, 4)} s locales (≈ ${fmt(MILLER_TIME.TICK_T * MILLER_TIME.RATIO / 3600, 1)} horas externas). La dilatación temporal gravitacional es real; esta relación concreta pertenece a la película.</p></section>`;
 },
