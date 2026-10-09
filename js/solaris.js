@@ -4500,6 +4500,7 @@ return t('{0} años ({1} días)', fmt(a / 365.25, a / 365.25 < 100 ? 2 : 0), fmt
 }
 const norm = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const escNum = s => esc(s).replace(/^((?:[≈~]\s?)?[-−+]?\d[\d.,]*)/, '<span class="num">$1</span>');   // cifra inicial en tipografía técnica
 const $ = s => document.querySelector(s);
 const Info = {
 orbitA(rb) { const o = rb.def.orbit; if (!o) return null; if (o.t === 'jpl') return o.el[0]; if (o.t === 'kep') return o.a; return null; },
@@ -4632,6 +4633,7 @@ document.addEventListener('mouseover', e => { const t = e.target.closest && e.ta
 document.addEventListener('mouseout', e => { const t = e.target.closest && e.target.closest('[data-tip]'); if (t) this.tipEl.classList.remove('on'); });
 document.addEventListener('focusin', e => { const t = e.target.closest && e.target.closest('[data-tip]'); if (t && t.matches(':focus-visible')) this.showTip(t); });
 document.addEventListener('focusout', () => this.tipEl.classList.remove('on'));
+document.addEventListener('pointerdown', () => this.tipEl.classList.remove('on'), true);
 if (innerWidth < 760) { this.mmOn = false; }
 this.refreshMinimap();
 this.updateScaleBadge();
@@ -4837,7 +4839,7 @@ this.refreshCamButtons();
 camAction(a) {
 this.userActed();
 const s = this.sel || Cam.focus;
-if (a === 'explore') { if (s) Cam.travel(s); else this.toast('Selecciona primero un objeto: haz clic sobre él o búscalo.'); }
+if (a === 'explore') { if (s) Cam.travel(s); else this.toast(matchMedia('(pointer: coarse)').matches ? 'Selecciona primero un objeto: tócalo o búscalo.' : 'Selecciona primero un objeto: haz clic sobre él o búscalo.'); }
 if (a === 'center') { if (s) { if (Cam.focus !== s) Cam.travel(s, { keepAngles: true, dist: clamp(Cam.dist, s.rS * 1.3, Cam.maxDist()) }); else Cam.center(); } else this.toast('Selecciona un objeto para centrarlo.'); }
 if (a === 'follow') { if (s) { if (Cam.focus === s && Cam.follow) { Cam.follow = false; this.toast('Seguimiento desactivado'); } else { if (Cam.focus !== s) Cam.travel(s, { keepAngles: true, dist: clamp(Cam.dist, s.rS * 1.3, Cam.maxDist()) }); Cam.follow = true; this.toast('Siguiendo a ' + s.def.name); } } else this.toast('Selecciona un objeto para seguirlo.'); }
 if (a === 'in') Cam.zoom(0.55);
@@ -4899,10 +4901,13 @@ buildModes() {
 const m = $('#modes');
 m.innerHTML = this.MODES.map(([k, t, tip]) => `<button role="radio" data-mode="${k}" aria-checked="${k === S.mode}" class="${k === S.mode ? 'on' : ''}" data-tip="${tip}">${t}</button>`).join('');
 m.addEventListener('click', e => { const b = e.target.closest('[data-mode]'); if (b) this.setMode(b.dataset.mode); });
+const fade = () => { const max = m.scrollWidth - m.clientWidth; m.classList.toggle('fade-l', max > 2 && m.scrollLeft > 2); m.classList.toggle('fade-r', max > 2 && m.scrollLeft < max - 2); };
+m.addEventListener('scroll', fade, { passive: true }); addEventListener('resize', fade); requestAnimationFrame(fade);
 },
 setMode(k) {
 const prev = S.mode; S.mode = k;
 document.querySelectorAll('[data-mode]').forEach(b => { b.classList.toggle('on', b.dataset.mode === k); b.setAttribute('aria-checked', b.dataset.mode === k); });
+{ const m = $('#modes'), on = m.querySelector('.on'); if (on && m.scrollWidth > m.clientWidth) m.scrollTo({ left: on.offsetLeft - (m.clientWidth - on.offsetWidth) / 2, behavior: 'smooth' }); }
 const app = $('#app');
 app.classList.toggle('cine', k === 'cine');
 Cam.auto = k === 'cine' ? 0.035 : 0;
@@ -4979,7 +4984,7 @@ F = { phys: F.phys.filter(f => keep(f.label)), orb: F.orb.filter(f => keep(f.lab
 }
 const craftF = rb.isCraft ? Info.craftFields(rb).filter(f => !basic || /^(Agencia|Lanzamiento|Ubicación|Objetivo|Estado)/.test(f.label)) : null;
 const tag = k => k === 'calc' ? '<em class="tag calc" data-tip="Calculado a partir de otros datos de referencia">calc.</em>' : k === 'sim' ? '<em class="tag sim" data-tip="Aproximación de la simulación">sim.</em>' : '';
-const row = f => `<div class="kv"><dt>${esc(f.label)}</dt><dd>${f.val == null ? '<span class="na">No disponible</span>' : esc(f.val)} ${f.val == null ? '' : tag(f.kind)}</dd></div>`;
+const row = f => `<div class="kv"><dt>${esc(f.label)}</dt><dd>${f.val == null ? '<span class="na">No disponible</span>' : escNum(f.val)} ${f.val == null ? '' : tag(f.kind)}</dd></div>`;
 let sub = TYPE_LABEL[d.type];
 if (d.sub) sub = d.sub;
 if (d.type === 'moon') sub = 'Luna de ' + rb.parent.def.name;
@@ -4997,9 +5002,9 @@ P.innerHTML = `
 ${Compare.pillHTML(rb)}
 <button class="pill" id="info-plan" data-plan="${rb.id}">Planificar viaje</button>
 </div>
-${rb.isCraft && rb.def.orbit.t === 'lpoint' ? `<p class="rel">En el punto L${rb.def.orbit.L} Sol-Tierra, cerca de <button class="link" data-go="${rb.parent.id}">${esc(rb.parent.def.name)}</button></p>` : ''}
-${rb.parent && !rb.parent.isSun && !(rb.isCraft && rb.def.orbit.t === 'lpoint') ? `<p class="rel">Orbita a <button class="link" data-go="${rb.parent.id}">${esc(rb.parent.def.name)}</button></p>` : ''}
-${moons.length ? `<p class="rel">Lunas incluidas: ${moons.map(m => `<button class="link" data-go="${m.id}">${esc(m.def.name)}</button>`).join('')}</p>` : ''}
+${rb.isCraft && rb.def.orbit.t === 'lpoint' ? `<p class="rel">En el punto L${rb.def.orbit.L} Sol-Tierra, cerca de <button class="link" data-go="${rb.parent.id}" style="--c:${rb.parent.def.color || '#94a0b6'}">${esc(rb.parent.def.name)}</button></p>` : ''}
+${rb.parent && !rb.parent.isSun && !(rb.isCraft && rb.def.orbit.t === 'lpoint') ? `<p class="rel">Orbita a <button class="link" data-go="${rb.parent.id}" style="--c:${rb.parent.def.color || '#94a0b6'}">${esc(rb.parent.def.name)}</button></p>` : ''}
+${moons.length ? `<p class="rel">Lunas incluidas: ${moons.map(m => `<button class="link" data-go="${m.id}" style="--c:${m.def.color || '#94a0b6'}">${esc(m.def.name)}</button>`).join('')}</p>` : ''}
 </header>
 <section class="live"><h3>Ahora mismo <em class="tag sim" data-tip="Calculado por la simulación para la fecha mostrada; no es una efeméride de alta precisión">sim.</em></h3><div id="live-rows"></div></section>
 ${rb.isCraft ? `<section><h3>Misión</h3><dl>${craftF.map(row).join('')}</dl></section><p class="note">${Info.craftNote(rb)}</p>` : `<section><h3>Datos físicos</h3><dl>${F.phys.map(row).join('')}</dl></section>
@@ -5031,7 +5036,7 @@ if (!this.sel || (!force && now - this.lastLive < 250)) return;
 this.lastLive = now;
 const rows = Info.live(this.sel);
 const el = $('#live-rows'); if (!el) return;
-el.innerHTML = rows.map(r => `<div class="live-row"><span>${esc(r.label)}</span><b>${r.txt ? esc(r.txt) : esc(fmtKm(r.km))}</b>${r.au != null && r.au >= 0.001 ? `<small>${fmtAU(r.au)}</small>` : ''}</div>`).join('');
+el.innerHTML = rows.map(r => `<div class="live-row"><span>${esc(r.label)}</span><b>${escNum(r.txt || fmtKm(r.km))}</b>${r.au != null && r.au >= 0.001 ? `<small>${escNum(fmtAU(r.au))}</small>` : ''}</div>`).join('');
 },
 buildLabels() {
 const host = $('#labels');
@@ -7459,7 +7464,7 @@ UI.started = true; Cam.auto = 0;
 Time.startState(); UI.refreshTime();
 if (!opts.quiet) {
 Cam.travelTo([0, 0, 0], ScaleState.get('overview'), 0.42);
-setTimeout(() => UI.hint(I18N.t('Haz clic en cualquier objeto o búscalo por su nombre'), 4200), 900);
+setTimeout(() => UI.hint(I18N.t(matchMedia('(pointer: coarse)').matches ? 'Toca cualquier objeto o búscalo por su nombre' : 'Haz clic en cualquier objeto o búscalo por su nombre'), 4200), 900);
 }
 $('#gl').focus({ preventScroll: true });
 },
