@@ -1038,9 +1038,9 @@ background: radial-gradient(ellipse 60% 70% at 50% 50%, rgba(0, 0, 0, .45), tran
 .sys-title span { display: block; margin-top: 10px; font-size: 14px; letter-spacing: .3em; text-transform: uppercase; color: rgba(240, 210, 170, .8); }
 .sys-skip { position: absolute; right: 24px; bottom: calc(24px + var(--bot)); color: rgba(255, 255, 255, .6); opacity: 0; transition: opacity .4s; }
 #app.sys-intro .sys-skip { opacity: 1; }
-#sys-chip { position: fixed; z-index: 30; left: 50%; top: calc(var(--top) + 6px); transform: translateX(-50%); display: none; text-align: center; pointer-events: none; }
-#app.sys-gargantua #sys-chip { display: block; }
-#sys-chip b { display: block; font-size: 11px; letter-spacing: .3em; font-weight: 600; color: #f0c48a; } #sys-chip span { font-size: 11px; color: var(--dim); letter-spacing: .04em; }
+/* En Gargantúa el botón de sistema indica que es ficción (antes lo hacía una etiqueta flotante que chocaba con la barra superior) */
+#app.sys-gargantua .sys-btn::after { content: "Ficción"; padding: 1px 6px; border-radius: 999px; font: 500 9.5px/1.5 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: #f0c48a; border: 1px solid rgba(240, 178, 102, .45); background: rgba(240, 178, 102, .1); }
+@media (max-width: 760px) { #app.sys-gargantua .sys-btn { position: relative; } #app.sys-gargantua .sys-btn::after { content: ""; position: absolute; right: 5px; top: 5px; width: 6px; height: 6px; padding: 0; border: 0; border-radius: 50%; background: #f0b266; box-shadow: 0 0 6px rgba(240, 178, 102, .8); } }
 #bh-warn { position: fixed; z-index: 41; left: 50%; top: calc(var(--top) + 48px); transform: translateX(-50%); padding: 8px 16px; border-radius: var(--r-sm); border: 1px solid rgba(240, 150, 90, .55); background: rgba(40, 14, 4, .62);
 display: grid; text-align: center; gap: 2px; opacity: 0; transition: opacity .5s; pointer-events: none; }
 #bh-warn.on { opacity: 1; } #bh-warn b { font-size: 12px; letter-spacing: .22em; color: #ffb27a; } #bh-warn span { font-size: 12px; color: #f3d9c4; }
@@ -1061,7 +1061,7 @@ display: grid; text-align: center; gap: 2px; opacity: 0; transition: opacity .5s
 .sys-cta { border-color: rgba(240, 178, 102, .35) !important; }
 @media (max-width: 760px) { .sys-cards { grid-template-columns: 1fr; } .sys-btn span { display: none; } }
 .ms-cta { border-color: rgba(240, 178, 102, .35) !important; }
-#app.in-mission .ui, #app.in-mission #labels, #app.in-mission #sys-chip, #app.in-mission #bh-warn { opacity: 0 !important; pointer-events: none !important; transition: opacity .8s ease; }
+#app.in-mission .ui, #app.in-mission #labels, #app.in-mission #bh-warn { opacity: 0 !important; pointer-events: none !important; transition: opacity .8s ease; }
 #ms-ov { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; background: rgba(0, 0, 0, .55); opacity: 0; pointer-events: none; transition: opacity .5s; }
 #ms-ov.open { opacity: 1; pointer-events: auto; }
 .ms-card { width: min(560px, calc(100% - 32px)); padding: 26px 28px; border-radius: var(--r-xl); background: var(--glass); border: 1px solid rgba(240, 178, 102, .3); backdrop-filter: blur(var(--blur-3)); -webkit-backdrop-filter: blur(var(--blur-3)); text-align: center; }
