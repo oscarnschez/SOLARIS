@@ -545,6 +545,32 @@ facts: ['Los cálculos actuales descartan un impacto durante al menos los próxi
 }, src: SRC_SMALL,
 },
 {
+id: 'didymos', name: 'Didymos', aka: ['didymos', '65803 didymos', 'didimo'], type: 'asteroid', parent: 'sol',
+R: 0.38, shape: [1.08, 0.8, 1.05], mass: 5.6e11, rotH: 2.26, color: '#9a9186',
+orbit: { t: 'kep', a: 1.6427, e: 0.3839, i: 3.408, node: 73.20, peri: 319.32, fit: { date: '2022-10-04', earth: true } },
+vis: { style: 'rock', feat: 'rubble', c1: '#8f877c', c2: '#5c5650', c3: '#b3aa9e', crater: 0.35, seed: 171.4, irregular: 0.08 },
+info: {
+desc: 'Un asteroide cercano a la Tierra con una pequeña luna, Dimorphos: el escenario de la primera prueba de defensa planetaria.',
+age: '≈ 4,500 millones de años (material)', temp: 'No disponible', year: 770.1, moons: 1,
+comp: 'Rocoso, de tipo S (silicatos); probablemente un montón de escombros', atm: 'Ninguna',
+feats: ['Forma de trompo, de unos 780 m de diámetro y cubierta de rocas.', 'Gira muy rápido: una vuelta cada 2 h 16 min.'],
+facts: ['Su nombre significa "gemelo" en griego, porque es un asteroide doble.', 'No representa ningún peligro para la Tierra; por eso se eligió para la prueba de la misión DART.', 'La misión Hera (ESA), lanzada en 2024, tiene previsto llegar a finales de 2026 para estudiar los efectos del impacto.'],
+}, src: SRC_SMALL + ' · DART (NASA) · Hera (ESA)',
+},
+{
+id: 'dimorphos', name: 'Dimorphos', aka: ['dimorphos', 'dimorfo', 'didymoon', 'dart', 'mision dart', 'hera'], type: 'moon', parent: 'didymos',
+R: 0.0765, shape: [1.16, 0.76, 1.14], mass: 4.3e9, locked: true, color: '#a39b90',
+orbit: { t: 'moon', a: 1.152, P: 0.47383, i: 0, node: 0, L0: 90 },
+vis: { style: 'rock', feat: 'rubble', c1: '#9b9388', c2: '#615b54', c3: '#bdb4a8', crater: 0.2, seed: 181.9, irregular: 0.12 },
+info: {
+desc: 'La pequeña luna de Didymos, contra la que chocó la nave DART en 2022: la primera vez que la humanidad cambió a propósito el movimiento de un cuerpo celeste.',
+age: 'No disponible', temp: 'No disponible', moons: 0,
+comp: 'Montón de escombros: rocas sueltas unidas por su débil gravedad', atm: 'Ninguna',
+feats: ['Mide unos 150 m de diámetro.', 'Tras el impacto su forma se alargó y su órbita se acercó a Didymos.'],
+facts: ['El 26 de septiembre de 2022, la nave DART (NASA) chocó contra ella a unos 6.1 km/s (unos 22,000 km/h).', 'El choque acortó su órbita alrededor de Didymos en unos 33 minutos: de 11 h 55 min a 11 h 22 min.', 'Los escombros formaron una cola de más de 10,000 km, observada por los telescopios Hubble y Webb; el pequeño satélite italiano LICIACube fotografió el impacto de cerca.'],
+}, src: SRC_SMALL + ' · DART (NASA) · Hera (ESA)',
+},
+{
 id: 'halley', name: '1P/Halley', short: 'Halley', aka: ['halley', 'cometa halley'], type: 'comet', parent: 'sol',
 R: 5.5, shape: [1.4, 0.75, 0.75], mass: 2.2e14, rotH: 52.8, color: '#bfe3ff',
 orbit: { t: 'kep', a: 17.834, e: 0.96714, i: 162.262, node: 58.420, peri: 111.332, tp: '1986-02-09' },
@@ -610,6 +636,48 @@ facts: ['Último perihelio en diciembre de 1992; el próximo será en 2126.'],
 }, src: SRC_SMALL,
 },
 {
+id: 'oumuamua', name: 'ʻOumuamua', short: 'ʻOumuamua', aka: ['oumuamua', '1i', '1i/2017 u1', 'a/2017 u1'], type: 'asteroid', parent: 'sol', interstellar: true,
+sub: 'Objeto interestelar', R: 0.1, shape: [2.4, 0.5, 0.83], mass: null, rotH: 8.67, color: '#9c6b52',
+orbit: { t: 'hyp', q: 0.255916, e: 1.201134, i: 122.7417, node: 24.5969, peri: 241.8105, tp: '2017-09-09', tpFrac: 0.49 },
+vis: { style: 'rock', feat: 'generic', c1: '#8a5a44', c2: '#5a3a2c', c3: '#a8806a', crater: 0.2, seed: 191.7, irregular: 0.1 },
+info: {
+desc: 'El primer objeto interestelar descubierto: un pequeño cuerpo rojizo y muy alargado que atravesó el Sistema Solar en 2017.',
+sizeTxt: 'Entre unos 100 y 400 m de largo, muy alargado o aplanado; su forma exacta se desconoce',
+age: 'Desconocida: se formó alrededor de otra estrella', temp: 'No disponible', yearTxt: 'No aplica: su órbita es abierta', vTxt: 'No aplica (órbita abierta)', moons: 0, rotTxt: 'Gira dando tumbos, con un periodo principal de unas 8.7 h',
+comp: 'Desconocida; superficie rojiza', atm: 'Ninguna detectada',
+feats: ['Llegó desde la dirección de la constelación de Lira a unos 26 km/s.', 'Al alejarse del Sol se aceleró ligeramente sin mostrar una coma de gas visible, algo que todavía se debate.'],
+facts: ['Lo descubrió Robert Weryk el 19 de octubre de 2017 con el telescopio Pan-STARRS1, en Hawái.', 'Su nombre hawaiano significa, aproximadamente, "mensajero que llega primero desde lejos".', 'Cuando se descubrió ya se alejaba: había pasado por el perihelio el 9 de septiembre de 2017.'],
+}, src: SRC_SMALL + ' · Minor Planet Center',
+},
+{
+id: 'borisov', name: '2I/Borisov', short: 'Borisov', aka: ['borisov', '2i', '2i/borisov', 'c/2019 q4'], type: 'comet', parent: 'sol', interstellar: true,
+sub: 'Cometa interestelar', R: 0.4, mass: null, rotH: null, color: '#cfe0ff',
+orbit: { t: 'hyp', q: 2.00652, e: 3.3565, i: 44.0526, node: 308.1484, peri: 209.1236, tp: '2019-12-08', tpFrac: 0.55 },
+vis: { style: 'rock', feat: 'comet', c1: '#3a3632', c2: '#22201e', c3: '#57524c', crater: 0.2, seed: 201.3, irregular: 0.12 },
+info: {
+desc: 'El primer cometa interestelar confirmado, descubierto por un astrónomo aficionado en 2019.',
+sizeTxt: 'Núcleo de entre unos 0.4 y 1 km de diámetro (estimación del telescopio Hubble)',
+age: 'Desconocida: se formó alrededor de otra estrella', temp: 'No disponible', yearTxt: 'No aplica: su órbita es abierta', vTxt: 'No aplica (órbita abierta)', moons: 0,
+comp: 'Hielos y polvo, con una abundancia inusual de monóxido de carbono', atm: 'Coma y cola cerca del perihelio',
+feats: ['Su coma y su cola se parecían a las de los cometas del Sistema Solar, pero con mucho más monóxido de carbono.', 'Llegó a unos 32 km/s respecto al Sol.'],
+facts: ['Lo descubrió Guennadi Borísov el 30 de agosto de 2019, en Crimea, con un telescopio construido por él mismo.', 'Pasó por el perihelio el 8 de diciembre de 2019, a unas 2 UA del Sol.', 'En marzo de 2020 su núcleo sufrió estallidos y desprendió un fragmento.'],
+}, src: SRC_SMALL + ' · Minor Planet Center',
+},
+{
+id: 'atlas3i', name: '3I/ATLAS', short: '3I/ATLAS', aka: ['3i/atlas', '3i', 'atlas', 'c/2025 n1'], type: 'comet', parent: 'sol', interstellar: true,
+sub: 'Cometa interestelar', R: 1.0, mass: null, rotH: null, color: '#cfe0ff',
+orbit: { t: 'hyp', q: 1.3564, e: 6.139, i: 175.113, node: 322.157, peri: 128.01, tp: '2025-10-29', tpFrac: 0.48 },
+vis: { style: 'rock', feat: 'comet', c1: '#3a3632', c2: '#22201e', c3: '#57524c', crater: 0.2, seed: 211.4, irregular: 0.12 },
+info: {
+desc: 'El tercer objeto interestelar conocido: un cometa descubierto en 2025 que llegó más rápido que ningún otro visitante.',
+sizeTxt: 'Núcleo de entre unos 0.3 y 5.6 km de diámetro (estimación del telescopio Hubble)',
+age: 'Desconocida: se formó alrededor de otra estrella', temp: 'No disponible', yearTxt: 'No aplica: su órbita es abierta', vTxt: 'No aplica (órbita abierta)', moons: 0,
+comp: 'Hielos y polvo; rico en dióxido de carbono', atm: 'Coma y cola cerca del perihelio',
+feats: ['Llegó a unos 58 km/s respecto al Sol, casi el doble que Borisov.', 'Su órbita está casi en el plano de los planetas, pero la recorre en sentido contrario.'],
+facts: ['Lo descubrió el 1 de julio de 2025 el telescopio ATLAS de Río Hurtado, en Chile.', 'Pasó por el perihelio a finales de octubre de 2025, algo por dentro de la órbita de Marte.', 'A principios de octubre de 2025 pasó cerca de Marte, y naves en órbita marciana lo fotografiaron.', 'Por su velocidad y su dirección de llegada, podría ser más antiguo que el propio Sistema Solar.'],
+}, src: SRC_SMALL + ' · Minor Planet Center',
+},
+{
 id: 'luna', name: 'Luna', aka: ['moon', 'luna'], type: 'moon', parent: 'tierra',
 R: 1737.4, mass: 7.342e22, locked: true, color: '#cfcac2', orbit: { t: 'luna', a: 384400, P: 27.321661 },
 vis: { style: 'rock', feat: 'luna', c1: '#a7a29a', c2: '#57534e', c3: '#d6d1c8', crater: 1.0, seed: 1.7 },
@@ -646,6 +714,19 @@ comp: 'Probablemente roca rica en carbono', atm: 'Ninguna',
 feats: ['Superficie cubierta por una capa de regolito de decenas de metros.', 'Mide unos 15 × 12 × 11 km.'],
 facts: ['Desde Marte se ve como una estrella brillante.', 'Su nombre significa "terror" en griego.'],
 }, src: SRC_MOON,
+},
+{
+id: 'amaltea', name: 'Amaltea', aka: ['amalthea', 'amaltea', 'jupiter v'], type: 'moon', parent: 'jupiter',
+R: 83.5, shape: [1.5, 0.77, 0.87], mass: 2.08e18, locked: true, color: '#a2654a',
+orbit: { t: 'moon', a: 181366, P: 0.49817943, i: 0.374, node: 0, L0: 210 },
+vis: { style: 'rock', feat: 'rubble', c1: '#9a5a3c', c2: '#5e3626', c3: '#c88a64', crater: 0.6, seed: 231.4, irregular: 0.1 },
+info: {
+desc: 'La mayor de las lunas interiores de Júpiter y uno de los objetos más rojos del Sistema Solar.',
+age: '≈ 4,500 millones de años', moons: 0,
+comp: 'Hielo de agua y roca muy porosos; superficie teñida de rojo, quizá por azufre procedente de Ío', atm: 'Ninguna',
+feats: ['Forma alargada e irregular, de unos 250 × 146 × 128 km.', 'El polvo que le arrancan los impactos de micrometeoritos alimenta uno de los anillos tenues de Júpiter.'],
+facts: ['Edward Emerson Barnard la descubrió en 1892: fue la última luna encontrada observando directamente por el telescopio, sin fotografía.', 'La nave Galileo pasó a unos 160 km de ella en 2002 y mostró que es muy porosa, quizá un montón de escombros.', 'Completa una vuelta a Júpiter en menos de 12 horas.'],
+}, src: SRC_MOON + ' · Galileo (NASA)',
 },
 {
 id: 'io', name: 'Ío', aka: ['io'], type: 'moon', parent: 'jupiter',
@@ -778,6 +859,19 @@ facts: ['La sonda Huygens aterrizó en su superficie en 2005.', 'La misión Drag
 }, src: SRC_MOON,
 },
 {
+id: 'hiperion', name: 'Hiperión', aka: ['hyperion', 'hiperion'], type: 'moon', parent: 'saturno',
+R: 135, shape: [1.33, 0.76, 0.99], mass: 5.551e18, rotH: 312, color: '#b0a184',
+orbit: { t: 'moon', a: 1481010, P: 21.276609, i: 0.43, node: 0, L0: 160 },
+vis: { style: 'rock', feat: 'rubble', c1: '#b8a888', c2: '#5e5040', c3: '#d9cdb4', crater: 1.0, seed: 331.9, irregular: 0.16 },
+info: {
+desc: 'Una luna con aspecto de esponja que gira de forma caótica.',
+age: '≈ 4,500 millones de años', temp: '≈ −180 °C', moons: 0, rotTxt: 'Caótica: el eje y la velocidad de giro cambian de forma impredecible',
+comp: 'Principalmente hielo de agua, muy poroso', atm: 'Ninguna',
+feats: ['Su baja densidad (≈ 0.54 g/cm³) indica que casi la mitad de su interior es espacio vacío.', 'Cráteres profundos y de bordes afilados le dan su aspecto de esponja.'],
+facts: ['Es imposible predecir hacia dónde apuntará su eje a largo plazo: su rotación es caótica.', 'Da 3 vueltas a Saturno por cada 4 de Titán (resonancia 4:3).', 'La descubrieron en 1848 William y George Bond, y William Lassell, de forma independiente.'],
+}, src: SRC_MOON + ' · Cassini (NASA/ESA)',
+},
+{
 id: 'japeto', name: 'Jápeto', aka: ['iapetus', 'japeto'], type: 'moon', parent: 'saturno',
 R: 734.5, mass: 1.8056e21, locked: true, color: '#a49c90',
 orbit: { t: 'moon', a: 3560820, P: 79.3215, i: 15.47, node: 0, L0: 40 },
@@ -789,6 +883,19 @@ comp: 'Principalmente hielo, con poca roca', atm: 'Ninguna',
 feats: ['El hemisferio delantero está cubierto de material oscuro.', 'Una cresta ecuatorial de hasta unos 20 km de altura.'],
 facts: ['Su órbita está inclinada unos 15° respecto al plano de los anillos.', 'Giovanni Cassini notó en 1671 que sólo era visible en un lado de su órbita.'],
 }, src: SRC_MOON,
+},
+{
+id: 'febe', name: 'Febe', aka: ['phoebe', 'febe'], type: 'moon', parent: 'saturno',
+R: 106.5, shape: [1.03, 0.96, 1.02], mass: 8.292e18, rotH: 9.2736, color: '#5b5650',
+orbit: { t: 'moon', a: 12952000, P: 550.31, i: 151.78, node: 0, L0: 75 },
+vis: { style: 'rock', feat: 'generic', c1: '#4d4944', c2: '#2a2725', c3: '#6c6760', crater: 0.9, seed: 351.3 },
+info: {
+desc: 'Una luna oscura y lejana que orbita a Saturno en sentido contrario: probablemente un objeto capturado del Sistema Solar exterior.',
+age: '≈ 4,500 millones de años', temp: '≈ −200 °C', moons: 0,
+comp: 'Mezcla de roca, hielo y compuestos oscuros ricos en carbono', atm: 'Ninguna',
+feats: ['Órbita retrógrada, muy lejana e inclinada.', 'Superficie muy oscura: refleja sólo alrededor del 6 % de la luz.'],
+facts: ['Fue la primera luna descubierta en fotografías (William H. Pickering, 1899).', 'Alimenta un anillo gigantesco y tenue, detectado en 2009 por el telescopio espacial Spitzer; parte de ese polvo oscurece el hemisferio delantero de Jápeto.', 'Cassini la sobrevoló en junio de 2004, justo antes de entrar en órbita de Saturno.'],
+}, src: SRC_MOON + ' · Cassini (NASA/ESA)',
 },
 {
 id: 'miranda', name: 'Miranda', aka: ['miranda'], type: 'moon', parent: 'urano',
@@ -856,6 +963,19 @@ facts: ['William Herschel la descubrió en 1787, junto con Titania.'],
 }, src: SRC_MOON,
 },
 {
+id: 'proteo', name: 'Proteo', aka: ['proteus', 'proteo'], type: 'moon', parent: 'neptuno',
+R: 210, shape: [1.01, 0.93, 0.94], mass: null, locked: true, color: '#6f6c69',
+orbit: { t: 'moon', a: 117647, P: 1.122315, i: 0.524, node: 0, L0: 40 },
+vis: { style: 'rock', feat: 'generic', c1: '#5f5c59', c2: '#3a3836', c3: '#7d7a76', crater: 0.85, seed: 391.7, irregular: 0.1 },
+info: {
+desc: 'La segunda luna más grande de Neptuno: un cuerpo oscuro con forma de caja irregular.',
+age: '≈ 4,500 millones de años', temp: '≈ −222 °C', moons: 0,
+comp: 'Probablemente hielo y roca, cubiertos de material oscuro', atm: 'Ninguna',
+feats: ['Es casi tan grande como puede llegar a ser un cuerpo sin que su gravedad lo redondee.', 'Tiene un gran cráter, Pharos, de unos 230–260 km de diámetro.'],
+facts: ['La descubrió la Voyager 2 en 1989: es tan oscura y está tan cerca del brillo de Neptuno que los telescopios terrestres no la habían visto.', 'Es más grande que Nereida, pero se descubrió 40 años después que ella.'],
+}, src: SRC_MOON + ' · Voyager 2 (NASA)',
+},
+{
 id: 'triton', name: 'Tritón', aka: ['triton'], type: 'moon', parent: 'neptuno',
 R: 1353.4, mass: 2.139e22, locked: true, color: '#d8c8c0',
 orbit: { t: 'moon', a: 354759, P: 5.876854, i: 156.885, node: 0, L0: 300 },
@@ -879,6 +999,58 @@ age: '≈ 4,500 millones de años', temp: '≈ −220 °C', grav: 0.288, moons: 
 comp: 'Hielo de agua y roca', atm: 'Ninguna',
 feats: ['Región polar rojiza (Mordor Macula) teñida por material escapado de Plutón.', 'Cañones de hasta unos 9 km de profundidad.'],
 facts: ['Plutón y Caronte giran alrededor de un punto situado fuera de Plutón.', 'Ambos se muestran siempre la misma cara.'],
+}, src: SRC_MOON + ' · New Horizons (NASA)',
+},
+{
+id: 'estigia', name: 'Estigia', aka: ['styx', 'estigia'], type: 'moon', parent: 'pluton',
+R: 5.2, shape: [1.53, 0.76, 0.86], mass: null, rotH: 77.8, color: '#bdb7b0',
+orbit: { t: 'moon', a: 42656, P: 20.16155, i: 0.0, node: 0, L0: 120 },
+vis: { style: 'rock', feat: 'icy', c1: '#c4beb6', c2: '#8f8a84', c3: '#e2ddd6', crater: 0.4, seed: 421.2, irregular: 0.12 },
+info: {
+desc: 'La más pequeña e interior de las lunas menores de Plutón.',
+age: '≈ 4,500 millones de años', temp: '≈ −230 °C', moons: 0,
+comp: 'Hielo de agua', atm: 'Ninguna',
+feats: ['Mide apenas unos 16 × 9 × 8 km.', 'Orbita por fuera de Caronte, igual que las otras lunas menores.'],
+facts: ['La descubrió en 2012 un equipo que usaba el telescopio espacial Hubble para buscar peligros antes del paso de New Horizons.', 'Su nombre es el del río que separaba el mundo de los vivos del inframundo.'],
+}, src: SRC_MOON + ' · New Horizons (NASA)',
+},
+{
+id: 'nix', name: 'Nix', aka: ['nix', 'nyx'], type: 'moon', parent: 'pluton',
+R: 19.3, shape: [1.29, 0.85, 0.91], mass: null, rotH: 43.9, color: '#c9c3bb',
+orbit: { t: 'moon', a: 48694, P: 24.85463, i: 0.0, node: 0, L0: 250 },
+vis: { style: 'rock', feat: 'icy', c1: '#d2ccc4', c2: '#9a7e6c', c3: '#ebe7e1', crater: 0.45, seed: 431.8, irregular: 0.1 },
+info: {
+desc: 'Una pequeña luna alargada de Plutón, cubierta de hielo de agua y con una mancha rojiza.',
+age: '≈ 4,500 millones de años', temp: '≈ −230 °C', moons: 0,
+comp: 'Hielo de agua', atm: 'Ninguna',
+feats: ['Mide unos 50 × 35 × 33 km.', 'Su rotación es caótica: no se mantiene estable porque Plutón y Caronte tiran de ella a la vez.'],
+facts: ['La descubrió el telescopio espacial Hubble en 2005, junto con Hidra.', 'Su nombre es el de la diosa griega de la noche, madre de Caronte.'],
+}, src: SRC_MOON + ' · New Horizons (NASA)',
+},
+{
+id: 'cerbero', name: 'Cerbero', aka: ['kerberos', 'cerbero', 'cerberus'], type: 'moon', parent: 'pluton',
+R: 6.0, shape: [1.59, 0.75, 0.84], mass: null, rotH: 127.4, color: '#8f8a84',
+orbit: { t: 'moon', a: 57783, P: 32.16756, i: 0.0, node: 0, L0: 20 },
+vis: { style: 'rock', feat: 'bilobe', c1: '#9a948d', c2: '#6c6761', c3: '#bdb7b0', crater: 0.3, seed: 441.5, irregular: 0.1 },
+info: {
+desc: 'Una diminuta luna de Plutón formada por dos lóbulos unidos.',
+age: '≈ 4,500 millones de años', temp: '≈ −230 °C', moons: 0,
+comp: 'Hielo de agua', atm: 'Ninguna',
+feats: ['Mide unos 19 × 10 × 9 km.', 'Parece formada por dos cuerpos que se fundieron suavemente, como Arrokoth.'],
+facts: ['La descubrió el telescopio espacial Hubble en 2011.', 'Su nombre es el del perro de tres cabezas que guardaba la entrada del inframundo.'],
+}, src: SRC_MOON + ' · New Horizons (NASA)',
+},
+{
+id: 'hidra', name: 'Hidra', aka: ['hydra', 'hidra'], type: 'moon', parent: 'pluton',
+R: 19.2, shape: [1.32, 0.8, 0.94], mass: null, rotH: 10.31, color: '#d8d5d0',
+orbit: { t: 'moon', a: 64738, P: 38.20177, i: 0.0, node: 0, L0: 310 },
+vis: { style: 'rock', feat: 'icy', c1: '#dedbd6', c2: '#a6a29d', c3: '#f2f0ec', crater: 0.4, seed: 451.3, irregular: 0.1 },
+info: {
+desc: 'La luna más exterior de Plutón, con una superficie de hielo de agua casi puro.',
+age: '≈ 4,500 millones de años', temp: '≈ −230 °C', moons: 0,
+comp: 'Hielo de agua', atm: 'Ninguna',
+feats: ['Mide unos 51 × 36 × 31 km.', 'Gira muy rápido para su tamaño: una vez cada 10 horas, aproximadamente.'],
+facts: ['Los periodos de Estigia, Nix, Cerbero e Hidra son casi 3, 4, 5 y 6 veces el de Caronte.', 'Su nombre es el de la serpiente de nueve cabezas de la mitología griega.'],
 }, src: SRC_MOON + ' · New Horizons (NASA)',
 },
 ];
@@ -1015,6 +1187,164 @@ feats: ['Sobrevoló Plutón el 14 de julio de 2015.', 'Sobrevoló Arrokoth el 1 
 facts: ['Lleva parte de las cenizas de Clyde Tombaugh, el descubridor de Plutón.'],
 }, src: 'NASA/JHUAPL (New Horizons)',
 },
+{
+id: 'europaclipper', name: 'Europa Clipper', short: 'Europa Clipper', aka: ['europa clipper', 'clipper'], type: 'craft', parent: 'sol',
+sub: 'Sonda rumbo a Júpiter', R: 0.0153, color: '#e6d6a8', model: 'europaclipper', validFrom: '2024-10-14',
+orbit: { t: 'cruise', legs: [['2024-10-14', 'tierra'], ['2025-03-01', 'marte', 'Asistencia gravitatoria de Marte'], ['2026-12-03', 'tierra', 'Asistencia gravitatoria de la Tierra'], ['2030-04-11', 'jupiter', 'Llegada a Júpiter']],
+after: { parent: 'jupiter', a: 1670000, P: 14, i: 3, txt: 'En órbita de Júpiter, sobrevolando Europa una y otra vez' } },
+craft: { agency: 'NASA', launch: '2024-10-14', launchTxt: '14 de octubre de 2024 (Falcon Heavy, Cabo Cañaveral)', orbitTxt: 'En crucero hacia Júpiter: asistencia gravitatoria de Marte (marzo de 2025) y de la Tierra (diciembre de 2026); llegada prevista en abril de 2030', periodTxt: 'No aplica durante el crucero', dims: 'Paneles solares de 30.5 m de envergadura; antena principal de 3 m', mass: '≈ 6,065 kg al lanzamiento', goal: 'Investigar si el océano bajo el hielo de Europa podría albergar vida, con unos 49 sobrevuelos cercanos de la luna', status: 'En crucero hacia Júpiter' },
+info: {
+desc: 'La mayor nave que la NASA ha construido para una misión planetaria, en camino hacia Júpiter para investigar la luna Europa.',
+feats: ['Sus paneles solares, de más de 30 m de envergadura, son más largos que una cancha de baloncesto.', 'Lleva nueve instrumentos científicos y un experimento de gravedad.'],
+facts: ['Orbitará Júpiter, no Europa, para limitar la radiación que recibe, y pasará cerca de Europa en cada vuelta.', 'Lleva una placa con el poema «In Praise of Mystery», de Ada Limón, y los nombres de 2.6 millones de personas.'],
+}, src: 'NASA/JPL (Europa Clipper)',
+},
+{
+id: 'juice', name: 'Juice', short: 'Juice', aka: ['juice', 'jupiter icy moons explorer'], type: 'craft', parent: 'sol',
+sub: 'Sonda rumbo a Júpiter', R: 0.0135, color: '#e8c87a', model: 'juice', validFrom: '2023-04-14',
+orbit: { t: 'cruise', legs: [['2023-04-14', 'tierra'], ['2024-08-20', 'tierra', 'Asistencia gravitatoria doble de la Luna y la Tierra'], ['2025-08-31', 'venus', 'Asistencia gravitatoria de Venus'], ['2026-09-29', 'tierra', 'Asistencia gravitatoria de la Tierra'], ['2029-01-18', 'tierra', 'Última asistencia gravitatoria de la Tierra'], ['2031-07-21', 'jupiter', 'Llegada a Júpiter']],
+after: { parent: 'jupiter', a: 1500000, P: 11.9, i: 2, txt: 'En órbita de Júpiter; a finales de 2034 pasará a orbitar Ganímedes' } },
+craft: { agency: 'ESA', launch: '2023-04-14', launchTxt: '14 de abril de 2023 (Ariane 5, Kurú)', orbitTxt: 'En crucero hacia Júpiter: asistencias gravitatorias de la Luna y la Tierra (2024), Venus (2025) y la Tierra (2026 y 2029); llegada prevista en julio de 2031', periodTxt: 'No aplica durante el crucero', dims: 'Paneles solares de 85 m² y 27 m de envergadura; antena del radar de 16 m', mass: '≈ 6,100 kg al lanzamiento', goal: 'Estudiar Ganímedes, Calisto y Europa; será la primera nave en orbitar una luna distinta de la nuestra', status: 'En crucero hacia Júpiter' },
+info: {
+desc: 'La misión de la Agencia Espacial Europea a las lunas heladas de Júpiter.',
+feats: ['En agosto de 2024 hizo la primera asistencia gravitatoria doble de la historia: primero la Luna y, al día siguiente, la Tierra.', 'Lleva paneles solares enormes porque en Júpiter la luz del Sol es unas 25 veces más débil que en la Tierra.'],
+facts: ['Su nombre es el acrónimo en inglés de «JUpiter ICy moons Explorer».', 'A finales de 2034 entrará en órbita de Ganímedes, la luna más grande del Sistema Solar.'],
+}, src: 'ESA (Juice)',
+},
+{
+id: 'bepicolombo', name: 'BepiColombo', short: 'BepiColombo', aka: ['bepicolombo', 'bepi colombo', 'mio', 'mpo'], type: 'craft', parent: 'sol',
+sub: 'Misión a Mercurio', R: 0.015, color: '#d8dee8', model: 'bepicolombo', validFrom: '2018-10-20',
+orbit: { t: 'cruise', legs: [['2018-10-20', 'tierra'], ['2020-04-10', 'tierra', 'Asistencia gravitatoria de la Tierra'], ['2020-10-15', 'venus', 'Primera asistencia gravitatoria de Venus'], ['2021-08-10', 'venus', 'Segunda asistencia gravitatoria de Venus'], ['2021-10-01', 'mercurio', 'Primer sobrevuelo de Mercurio'], ['2022-06-23', 'mercurio', 'Segundo sobrevuelo de Mercurio'], ['2023-06-19', 'mercurio', 'Tercer sobrevuelo de Mercurio'], ['2024-09-04', 'mercurio', 'Cuarto sobrevuelo de Mercurio'], ['2024-12-01', 'mercurio', 'Quinto sobrevuelo de Mercurio'], ['2025-01-08', 'mercurio', 'Sexto y último sobrevuelo de Mercurio'], ['2026-11-21', 'mercurio', 'Entrada en órbita de Mercurio']],
+after: { parent: 'mercurio', a: 3430, P: 0.0958, i: 90, txt: 'En órbita de Mercurio: los orbitadores MPO y Mio estudian el planeta' } },
+craft: { agency: 'ESA y JAXA', launch: '2018-10-20', launchTxt: '20 de octubre de 2018 (Ariane 5, Kurú)', orbitTxt: 'Llega a Mercurio tras nueve asistencias gravitatorias (una de la Tierra, dos de Venus y seis de Mercurio); entrada en órbita prevista en noviembre de 2026', periodTxt: 'Tras la llegada, ≈ 2.3 h (orbitador MPO)', dims: 'Unos 30 m de envergadura con los paneles desplegados', mass: '≈ 4,100 kg al lanzamiento', goal: 'Estudiar Mercurio con dos orbitadores: MPO (ESA) y Mio (JAXA)', status: 'En la aproximación final a Mercurio' },
+info: {
+desc: 'Una misión conjunta europea y japonesa que lleva dos orbitadores a Mercurio.',
+feats: ['Viaja como una pila de tres módulos: el de transferencia, el orbitador europeo MPO y el japonés Mio.', 'Combina propulsión eléctrica (iónica) con asistencias gravitatorias para frenar contra la atracción del Sol.'],
+facts: ['Su nombre honra a Giuseppe «Bepi» Colombo, que ideó la trayectoria de la sonda Mariner 10 para visitar Mercurio varias veces.', 'Llegar a Mercurio exige más energía que llegar a Plutón: hay que perder mucha velocidad respecto al Sol.'],
+}, src: 'ESA/JAXA (BepiColombo)',
+},
+{
+id: 'lucy', name: 'Lucy', short: 'Lucy', aka: ['lucy', 'mision lucy'], type: 'craft', parent: 'sol',
+sub: 'Sonda a los asteroides troyanos', R: 0.0072, color: '#f0c48a', model: 'lucy', validFrom: '2021-10-16',
+orbit: { t: 'cruise', legs: [['2021-10-16', 'tierra'], ['2022-10-16', 'tierra', 'Primera asistencia gravitatoria de la Tierra'], ['2023-11-01', { r: 2.2 }, 'Sobrevuelo del asteroide Dinkinesh'], ['2024-12-12', 'tierra', 'Segunda asistencia gravitatoria de la Tierra'], ['2027-08-12', { L: 4, of: 'jupiter' }, 'Sobrevuelo del troyano Eurybates'], ['2027-09-15', { L: 4, of: 'jupiter' }, 'Sobrevuelo del troyano Polymele'], ['2028-04-18', { L: 4, of: 'jupiter' }, 'Sobrevuelo del troyano Leucus'], ['2028-11-11', { L: 4, of: 'jupiter' }, 'Sobrevuelo del troyano Orus'], ['2030-12-26', 'tierra', 'Tercera asistencia gravitatoria de la Tierra'], ['2033-03-02', { L: 5, of: 'jupiter' }, 'Sobrevuelo del par troyano Patroclus y Menoetius']],
+endTxt: 'Misión principal completada tras el sobrevuelo de Patroclus y Menoetius' },
+craft: { agency: 'NASA', launch: '2021-10-16', launchTxt: '16 de octubre de 2021 (Atlas V, Cabo Cañaveral)', orbitTxt: 'Órbita alrededor del Sol que la lleva a los asteroides troyanos de Júpiter, con asistencias gravitatorias de la Tierra', periodTxt: '≈ 6 años', dims: 'Dos paneles solares circulares de 7.3 m de diámetro', mass: '≈ 1,550 kg al lanzamiento', goal: 'Visitar por primera vez los asteroides troyanos de Júpiter: Eurybates, Polymele, Leucus y Orus (2027–2028) y el par Patroclus y Menoetius (2033)', status: 'En crucero hacia los troyanos de Júpiter' },
+info: {
+desc: 'La primera misión a los asteroides troyanos de Júpiter, restos de la formación de los planetas.',
+feats: ['Los troyanos comparten la órbita de Júpiter, agrupados 60° por delante y 60° por detrás del planeta.', 'Visitará más asteroides que ninguna otra misión.'],
+facts: ['Su nombre recuerda al fósil Lucy, que ayudó a comprender la evolución humana; los troyanos podrían hacer lo mismo con los planetas.', 'En 2023 sobrevoló el pequeño asteroide Dinkinesh y descubrió que tiene una luna formada por dos lóbulos, Selam.', 'En abril de 2025 sobrevoló el asteroide Donaldjohanson, en el cinturón principal.'],
+}, src: 'NASA/SwRI (Lucy)',
+},
+{
+id: 'mro', name: 'Mars Reconnaissance Orbiter', short: 'MRO', aka: ['mro', 'mars reconnaissance orbiter', 'orbitador de reconocimiento de marte', 'hirise'], type: 'craft', parent: 'marte',
+sub: 'Orbitador de Marte', R: 0.0068, color: '#e0b46c', model: 'mro', validFrom: '2006-03-10',
+orbit: { t: 'leo', a: 3389.5 + 290, P: 0.0784, i: 92.6, node: 40, L0: 10 },
+craft: { agency: 'NASA', launch: '2005-08-12', launchTxt: '12 de agosto de 2005 (Atlas V); llegó a Marte el 10 de marzo de 2006', orbitTxt: 'Órbita polar baja a unos 250–320 km de altitud', periodTxt: '≈ 112 minutos', dims: '6.5 m de alto; 13.6 m con paneles solares', mass: '≈ 2,180 kg al lanzamiento', goal: 'Cartografiar Marte con gran detalle, buscar huellas de agua y retransmitir los datos de los rovers', status: 'En operación' },
+info: {
+desc: 'El orbitador que fotografía Marte con más detalle: su cámara HiRISE distingue objetos del tamaño de una mesa.',
+feats: ['La cámara HiRISE alcanza unos 30 cm por píxel desde la órbita.', 'Retransmite a la Tierra los datos de los rovers Curiosity y Perseverance.'],
+facts: ['Fotografió a Phoenix (2008) y a Curiosity (2012) mientras descendían en paracaídas.', 'Ha enviado a la Tierra más datos que todas las misiones anteriores a Marte juntas.'],
+}, src: 'NASA/JPL (MRO)',
+},
+{
+id: 'maven', name: 'MAVEN', short: 'MAVEN', aka: ['maven', 'mars atmosphere and volatile evolution'], type: 'craft', parent: 'marte',
+sub: 'Orbitador de Marte', R: 0.0057, color: '#e0b46c', model: 'maven', validFrom: '2014-09-22',
+orbit: { t: 'leo', a: 3389.5 + 2325, e: 0.381, w: 60, P: 0.150, i: 75, node: 160, L0: 200 },
+craft: { agency: 'NASA', launch: '2013-11-18', launchTxt: '18 de noviembre de 2013 (Atlas V); llegó a Marte el 21 de septiembre de 2014', orbitTxt: 'Órbita elíptica inclinada 75°, entre unos 150 y 4,500 km de altitud', periodTxt: '≈ 3.5 horas', dims: '11.4 m con paneles solares', mass: '≈ 2,450 kg al lanzamiento', goal: 'Estudiar cómo Marte perdió hacia el espacio buena parte de su atmósfera y su agua', status: 'Sin contacto desde diciembre de 2025; la NASA intentaba recuperarla' },
+info: {
+desc: 'Una sonda dedicada a la atmósfera alta de Marte, para entender cómo el planeta pasó de ser templado y húmedo a frío y seco.',
+feats: ['En cada paso por el punto más bajo de su órbita atraviesa la atmósfera superior para tomar medidas.', 'Mostró que el viento solar arranca gas de la atmósfera marciana, sobre todo durante las tormentas solares.'],
+facts: ['Su nombre abrevia Mars Atmosphere and Volatile EvolutioN.', 'En 2019 rebajó su órbita frenando con la atmósfera para servir mejor de repetidor a los rovers.'],
+}, src: 'NASA (MAVEN)',
+},
+{
+id: 'marsexpress', name: 'Mars Express', short: 'Mars Express', aka: ['mars express', 'mex', 'marsis'], type: 'craft', parent: 'marte',
+sub: 'Orbitador de Marte', R: 0.006, color: '#e0b46c', model: 'marsexpress', validFrom: '2003-12-25',
+orbit: { t: 'leo', a: 3389.5 + 5202, e: 0.571, w: 120, P: 0.280, i: 86.9, node: 280, L0: 50 },
+craft: { agency: 'ESA', launch: '2003-06-02', launchTxt: '2 de junio de 2003 (Soyuz-Fregat); llegó a Marte el 25 de diciembre de 2003', orbitTxt: 'Órbita polar muy elíptica, entre unos 300 y 10,100 km de altitud', periodTxt: '≈ 6.7 horas', dims: 'Cuerpo de 1.5 × 1.8 × 1.4 m; 12 m con paneles solares; antena de radar de 40 m', mass: '≈ 1,120 kg al lanzamiento', goal: 'Estudiar la superficie, el subsuelo y la atmósfera de Marte', status: 'En operación' },
+info: {
+desc: 'La primera misión de la ESA a otro planeta, que lleva más de dos décadas observando Marte.',
+feats: ['Su cámara estéreo HRSC ha cartografiado Marte en relieve y en color.', 'El radar MARSIS sondea el subsuelo y los casquetes polares.'],
+facts: ['Llevaba el módulo de aterrizaje Beagle 2, que se perdió en 2003 y fue localizado en 2015 en imágenes de MRO.', 'Su órbita la acerca de vez en cuando a Fobos, la mayor luna de Marte.'],
+}, src: 'ESA (Mars Express)',
+},
+{
+id: 'tgo', name: 'ExoMars Trace Gas Orbiter', short: 'TGO', aka: ['exomars', 'tgo', 'trace gas orbiter'], type: 'craft', parent: 'marte',
+sub: 'Orbitador de Marte', R: 0.00875, color: '#e0b46c', model: 'tgo', validFrom: '2016-10-19',
+orbit: { t: 'leo', a: 3389.5 + 400, P: 0.0820, i: 74, node: 210, L0: 300 },
+craft: { agency: 'ESA y Roscosmos', launch: '2016-03-14', launchTxt: '14 de marzo de 2016 (Protón-M); llegó a Marte el 19 de octubre de 2016', orbitTxt: 'Órbita casi circular a unos 400 km de altitud, inclinada 74°, desde 2018', periodTxt: '≈ 2 horas', dims: 'Cuerpo de 3.2 × 2 × 2 m; 17.5 m con paneles solares', mass: '≈ 3,750 kg al lanzamiento (4,330 kg con Schiaparelli)', goal: 'Medir gases traza como el metano en la atmósfera de Marte y retransmitir datos de la superficie', status: 'En operación' },
+info: {
+desc: 'Un orbitador que analiza la atmósfera de Marte en busca de gases que podrían tener un origen geológico o biológico.',
+feats: ['Detecta gases presentes en cantidades minúsculas, de partes por mil millones.', 'Su detector de neutrones FREND busca hielo de agua bajo la superficie.'],
+facts: ['Viajó junto con el módulo Schiaparelli, que se estrelló al intentar aterrizar en 2016.', 'Durante más de un año usó la atmósfera marciana para frenar y bajar su órbita.'],
+}, src: 'ESA (ExoMars TGO)',
+},
+{
+id: 'hope', name: 'Sonda Hope (Al-Amal)', short: 'Hope', aka: ['hope', 'al amal', 'amal', 'emirates mars mission', 'emm', 'esperanza'], type: 'craft', parent: 'marte',
+sub: 'Orbitador de Marte', R: 0.004, color: '#e0b46c', model: 'hope', validFrom: '2021-02-09',
+orbit: { t: 'leo', a: 3389.5 + 31500, e: 0.330, w: 200, P: 2.29, i: 25, node: 100, L0: 90 },
+craft: { agency: 'Agencia Espacial de los Emiratos Árabes Unidos y MBRSC', launch: '2020-07-19', launchTxt: '19 de julio de 2020 (H-IIA, desde Japón); llegó a Marte el 9 de febrero de 2021', orbitTxt: 'Órbita elíptica alta, entre unos 20,000 y 43,000 km de altitud, inclinada 25°', periodTxt: '≈ 55 horas', dims: 'Cuerpo hexagonal de 2.37 m de ancho y 2.9 m de alto', mass: '≈ 1,350 kg al lanzamiento', goal: 'Estudiar el clima y el tiempo de Marte a todas horas del día y en todas las estaciones', status: 'En operación' },
+info: {
+desc: 'La primera misión interplanetaria de un país árabe: un satélite meteorológico que observa Marte entero desde muy lejos.',
+feats: ['Su órbita alta le deja ver casi un hemisferio completo de una sola vez.', 'Observa cada región de Marte a distintas horas del día.'],
+facts: ['Llegó a Marte en febrero de 2021, un día antes que Tianwen-1 y nueve antes del aterrizaje de Perseverance.', 'En 2023 se acercó a Deimos y fotografió en detalle su cara oculta.'],
+}, src: 'MBRSC (Emirates Mars Mission)',
+},
+{
+id: 'tianwen1', name: 'Orbitador Tianwen-1', short: 'Tianwen-1', aka: ['tianwen', 'tianwen 1', 'tianwen-1', 'zhurong'], type: 'craft', parent: 'marte',
+sub: 'Orbitador de Marte', R: 0.0075, color: '#e0b46c', model: 'tianwen1', validFrom: '2021-02-10',
+orbit: { t: 'leo', a: 3389.5 + 5482, e: 0.588, w: 250, P: 0.295, i: 87, node: 330, L0: 160 },
+craft: { agency: 'Administración Nacional del Espacio de China (CNSA)', launch: '2020-07-23', launchTxt: '23 de julio de 2020 (Larga Marcha 5); llegó a Marte el 10 de febrero de 2021', orbitTxt: 'Órbita polar elíptica de observación, entre unos 265 y 10,700 km de altitud', periodTxt: '≈ 7 horas', dims: 'Orbitador con dos alas de paneles solares y antena de alta ganancia', mass: '≈ 5,000 kg al lanzamiento, con el módulo de aterrizaje y el rover', goal: 'Estudiar Marte desde la órbita y retransmitir los datos del rover Zhurong', status: 'En operación' },
+info: {
+desc: 'La primera misión de China a Marte: en un solo viaje llevó un orbitador, un módulo de aterrizaje y el rover Zhurong.',
+feats: ['Su cámara de resolución media completó un mapa de todo el planeta.', 'Lleva un radar que estudia el subsuelo marciano.'],
+facts: ['El rover Zhurong aterrizó en Utopia Planitia en mayo de 2021.', 'Tianwen significa "Preguntas al cielo", por un antiguo poema chino.'],
+}, src: 'CNSA',
+},
+{
+id: 'lro', name: 'Lunar Reconnaissance Orbiter', short: 'LRO', aka: ['lro', 'lunar reconnaissance orbiter', 'orbitador de reconocimiento lunar'], type: 'craft', parent: 'luna',
+sub: 'Orbitador lunar', R: 0.0025, color: '#d6dae0', model: 'lro', validFrom: '2009-06-23',
+orbit: { t: 'leo', a: 1737.4 + 105, e: 0.041, w: 270, P: 0.0821, i: 90, node: 0, L0: 0 },
+craft: { agency: 'NASA', launch: '2009-06-18', launchTxt: '18 de junio de 2009 (Atlas V); llegó a la Luna el 23 de junio de 2009', orbitTxt: 'Órbita polar baja y ligeramente elíptica, aproximadamente entre 30 y 180 km de altitud', periodTxt: '≈ 2 horas', dims: 'Cuerpo de unos 2 × 2 × 3 m con un ala solar de tres paneles', mass: '≈ 1,900 kg al lanzamiento', goal: 'Cartografiar la Luna con gran detalle para preparar el regreso de astronautas', status: 'En operación' },
+info: {
+desc: 'El orbitador que más tiempo lleva estudiando la Luna de cerca: fotografía su superficie con un detalle de medio metro.',
+feats: ['Su cámara LROC fotografió los sitios de alunizaje del programa Apolo, con los senderos que dejaron los astronautas.', 'Su radiómetro Diviner midió en cráteres polares en sombra algunas de las temperaturas más frías del Sistema Solar.'],
+facts: ['Se lanzó junto con LCROSS, que impactó en un cráter polar y detectó hielo de agua.', 'Sus mapas sirven para elegir los lugares de alunizaje del programa Artemis.'],
+}, src: 'NASA (LRO)',
+},
+{
+id: 'chandrayaan2', name: 'Orbitador Chandrayaan-2', short: 'Chandrayaan-2', aka: ['chandrayaan', 'chandrayaan 2', 'chandrayaan-2'], type: 'craft', parent: 'luna',
+sub: 'Orbitador lunar', R: 0.0029, color: '#d6dae0', model: 'chandrayaan2', validFrom: '2019-08-20',
+orbit: { t: 'leo', a: 1737.4 + 100, P: 0.0818, i: 90, node: 60, L0: 120 },
+craft: { agency: 'Organización de Investigación Espacial de la India (ISRO)', launch: '2019-07-22', launchTxt: '22 de julio de 2019 (GSLV Mk III); llegó a la Luna el 20 de agosto de 2019', orbitTxt: 'Órbita polar circular a unos 100 km de altitud', periodTxt: '≈ 2 horas', dims: 'Cuerpo de 3.2 × 5.8 × 2.2 m', mass: '≈ 2,380 kg al lanzamiento', goal: 'Cartografiar la superficie y la composición de la Luna y estudiar su tenue exosfera', status: 'En operación' },
+info: {
+desc: 'El orbitador de la segunda misión lunar de la India, que estudia la Luna desde 2019.',
+feats: ['Su cámara de alta resolución distingue detalles de unos 30 cm.', 'Su radar busca hielo de agua en los cráteres polares en sombra.'],
+facts: ['Su módulo Vikram se estrelló al intentar alunizar en 2019; Chandrayaan-3 lo consiguió en 2023.', 'Sirvió de enlace de respaldo para las comunicaciones de Chandrayaan-3.'],
+}, src: 'ISRO',
+},
+{
+id: 'danuri', name: 'Danuri (KPLO)', short: 'Danuri', aka: ['danuri', 'kplo', 'korea pathfinder lunar orbiter'], type: 'craft', parent: 'luna',
+sub: 'Orbitador lunar', R: 0.0028, color: '#d6dae0', model: 'danuri', validFrom: '2022-12-17',
+orbit: { t: 'leo', a: 1737.4 + 100, P: 0.0818, i: 90, node: 140, L0: 250 },
+craft: { agency: 'Instituto Coreano de Investigación Aeroespacial (KARI)', launch: '2022-08-04', launchTxt: '4 de agosto de 2022 (Falcon 9); llegó a la Luna en diciembre de 2022', orbitTxt: 'Órbita polar a unos 100 km de altitud', periodTxt: '≈ 2 horas', dims: 'Cuerpo de 2.14 × 1.82 × 2.29 m', mass: '≈ 678 kg al lanzamiento', goal: 'Probar tecnologías de exploración lunar y cartografiar los recursos de la Luna', status: 'En operación (misión extendida)' },
+info: {
+desc: 'La primera misión de Corea del Sur a la Luna, que llegó por una ruta larga y de bajo consumo que pasa cerca del punto L1 Sol-Tierra.',
+feats: ['Lleva ShadowCam, una cámara de la NASA tan sensible que fotografía el interior de cráteres en sombra permanente.', 'Probó comunicaciones por internet espacial, con protocolos que toleran interrupciones.'],
+facts: ['Su nombre une las palabras coreanas para "Luna" y "disfrutar".', 'En su viaje a la Luna transmitió el video musical "Dynamite" de BTS como prueba de comunicaciones.'],
+}, src: 'KARI',
+},
+{
+id: 'queqiao2', name: 'Queqiao-2', short: 'Queqiao-2', aka: ['queqiao', 'queqiao 2', 'queqiao-2'], type: 'craft', parent: 'luna',
+sub: 'Satélite repetidor lunar', R: 0.005, color: '#d6dae0', model: 'queqiao2', validFrom: '2024-03-24',
+orbit: { t: 'leo', a: 1737.4 + 8100, e: 0.803, w: 270, P: 1.0, i: 55, node: 220, L0: 0 },
+craft: { agency: 'Administración Nacional del Espacio de China (CNSA)', launch: '2024-03-20', launchTxt: '20 de marzo de 2024 (Larga Marcha 8); entró en órbita lunar el 24 de marzo de 2024', orbitTxt: 'Órbita elíptica congelada muy alargada, de unos 200 × 16,000 km de altitud', periodTxt: '≈ 24 horas', dims: 'Antena parabólica de 4.2 m de diámetro', mass: '≈ 1,200 kg', goal: 'Retransmitir las comunicaciones de las misiones en la cara oculta y el polo sur de la Luna', status: 'En operación' },
+info: {
+desc: 'Un satélite de comunicaciones que permite hablar con las naves situadas en la cara oculta de la Luna, que nunca mira hacia la Tierra.',
+feats: ['Su órbita alargada lo mantiene muchas horas seguidas a la vista de la cara oculta y del polo sur.', 'Retransmitió los datos de Chang’e 6, la primera misión que trajo muestras de la cara oculta.'],
+facts: ['Queqiao significa "puente de urracas", por una leyenda china en la que las aves forman un puente en el cielo.', 'Complementa al primer Queqiao, que desde 2018 da servicio a Chang’e 4 desde el punto L2 Tierra-Luna.'],
+}, src: 'CNSA',
+},
 ];
 CRAFTS.forEach(c => {
 c.vis = { style: 'craft' };
@@ -1142,7 +1472,7 @@ return true;
 },
 };
 const ASSET_MANIFEST = {"music": {"webm": "assets/audio/metamorphosis.webm", "mp3": "assets/audio/metamorphosis.mp3"}, "bodyMeshes": {"fobos": {"url": "assets/models/moons/fobos.bin", "k": 1.26255}, "deimos": {"url": "assets/models/moons/deimos.bin", "k": 1.37497}, "haumea": {"url": "assets/models/dwarfs/haumea.bin", "k": 1.44255}}};
-const SOLARIS_BUILD = '2026.10.09-0955-web';
+const SOLARIS_BUILD = '2026.10.10-0125-web';
 console.info('SOLARIS · versión ' + SOLARIS_BUILD);
 const Assets = {
 cache: new Map(), busyN: new Map(),
@@ -1692,7 +2022,9 @@ if (Math.abs(dE) < 1e-12) break;
 return E;
 },
 elemToEcl(a, e, iDeg, nodeDeg, periDeg, E) {
-const xp = a * (Math.cos(E) - e), yp = a * Math.sqrt(1 - e * e) * Math.sin(E);
+return Astro.planeToEcl(a * (Math.cos(E) - e), a * Math.sqrt(1 - e * e) * Math.sin(E), iDeg, nodeDeg, periDeg);
+},
+planeToEcl(xp, yp, iDeg, nodeDeg, periDeg) {
 const O = nodeDeg * DEG, w = periDeg * DEG, I = iDeg * DEG;
 const cO = Math.cos(O), sO = Math.sin(O), cw = Math.cos(w), sw = Math.sin(w), cI = Math.cos(I), sI = Math.sin(I);
 return [
@@ -1711,12 +2043,40 @@ if (orbit.t === 'kep') {
 const n = GAUSS_K_DEG / Math.pow(orbit.a, 1.5);
 return { a: orbit.a, e: orbit.e, i: orbit.i, node: orbit.node, peri: orbit.peri, M: wrap360(n * (jd - orbit.tpJD)) };
 }
+if (orbit.t === 'hyp') {                         // órbita hiperbólica (objetos interestelares): a < 0 y anomalía media sin acotar
+const a = orbit.q / (1 - orbit.e), n = GAUSS_K_DEG / Math.pow(-a, 1.5);
+return { a, e: orbit.e, i: orbit.i, node: orbit.node, peri: orbit.peri, M: n * (jd - orbit.tpJD), hyp: true };
+}
 return null;
+},
+keplerH(M, e) {                                  // ecuación de Kepler hiperbólica: e·sinh H − H = M
+let H = Math.asinh(M / e);
+for (let k = 0; k < 60; k++) {
+const f = e * Math.sinh(H) - H - M, dH = f / (e * Math.cosh(H) - 1); H -= dH;
+if (Math.abs(dH) < 1e-12) break;
+}
+return H;
+},
+hypToEcl(a, e, iDeg, nodeDeg, periDeg, H) {
+const xp = a * (Math.cosh(H) - e), yp = -a * Math.sqrt(e * e - 1) * Math.sinh(H);
+return Astro.planeToEcl(xp, yp, iDeg, nodeDeg, periDeg);
 },
 helioPos(orbit, jd) {
 const k = Astro.elementsAt(orbit, jd);
+if (k.hyp) return Astro.hypToEcl(k.a, k.e, k.i, k.node, k.peri, Astro.keplerH(k.M * DEG, k.e));
 const E = Astro.keplerE(k.M * DEG, k.e);
 return Astro.elemToEcl(k.a, k.e, k.i, k.node, k.peri, E);
+},
+sampleHyp(orbit, n, rMax) {                      // tramo de la hipérbola con r ≤ rMax; la fracción avanza con el tiempo
+const e = orbit.e, a = orbit.q / (1 - e), p = orbit.q * (1 + e);
+const nuMax = Math.acos(clamp((p / rMax - 1) / e, -1, 1));
+const Mof = nu => { const H = 2 * Math.atanh(Math.sqrt((e - 1) / (e + 1)) * Math.tan(nu / 2)); return e * Math.sinh(H) - H; };
+const Mmax = Mof(nuMax), pts = [], fr = [];
+for (let j = 0; j <= n; j++) {
+const nu = -nuMax + 2 * nuMax * j / n, M = Mof(nu), H = 2 * Math.atanh(Math.sqrt((e - 1) / (e + 1)) * Math.tan(nu / 2));
+pts.push(Astro.hypToEcl(a, e, orbit.i, orbit.node, orbit.peri, H)); fr.push((M + Mmax) / (2 * Mmax));
+}
+return { pts, fr, Mmax };
 },
 sampleOrbit(orbit, jd, n) {
 const k = Astro.elementsAt(orbit, jd);
@@ -1768,6 +2128,64 @@ const normal = V.norm(V.cross(nodeDir, ninety));
 return { u: nodeDir, v: ninety, n: normal };
 },
 };
+const Cruise = {
+// Trayectoria aproximada por puntos de paso: la nave está en cada planeta en la fecha real de su asistencia gravitatoria
+// (o en el punto L4/L5 de Júpiter para los troyanos); entre ellos se interpolan radio, longitud y latitud con splines de Hermite.
+target(tg, jd) {
+if (typeof tg === 'string') return Astro.helioPos(BODY[tg].orbit, jd);
+if (tg && tg.L) { const p = Astro.helioPos(BODY[tg.of].orbit, jd), a = (tg.L === 4 ? 60 : -60) * DEG, c = Math.cos(a), s = Math.sin(a); return [p[0] * c - p[1] * s, p[0] * s + p[1] * c, p[2]]; }
+return null;
+},
+prep(o) {
+const K = o.legs.map(([date, tg, txt]) => {
+const jd = Astro.jdFromISO(date), p = this.target(tg, jd), r = p ? V.len(p) : tg.r;
+return { jd, tg, txt, r, lam: p ? Math.atan2(p[1], p[0]) : null, bet: p ? Math.asin(p[2] / r) : 0 };
+});
+let prev = null;
+for (let i = 0; i < K.length; i++) {
+if (K[i].lam == null) continue;
+if (prev != null) {
+const A = K[prev], B = K[i];
+let est = 0;                                   // ángulo esperado según el movimiento medio kepleriano a los radios intermedios
+for (let j = prev; j < i; j++) est += TAU / 365.25 * Math.pow((K[j].r + K[j + 1].r) / 2, -1.5) * (K[j + 1].jd - K[j].jd);
+let dl = B.lam - A.lam; dl -= TAU * Math.round((dl - est) / TAU); if (dl < 0) dl += TAU;   // siempre en sentido directo
+B.lam = A.lam + dl;
+for (let j = prev + 1; j < i; j++) { const u = (K[j].jd - A.jd) / (B.jd - A.jd); K[j].lam = A.lam + dl * u; K[j].bet = A.bet + (B.bet - A.bet) * u; }
+}
+prev = i;
+}
+o.K = K; o.j0 = K[0].jd; o.j1 = K[K.length - 1].jd;
+for (const f of ['r', 'lam', 'bet']) {           // pendientes monótonas (Fritsch–Carlson): sin excursiones artificiales entre puntos de paso
+const n = K.length, h = [], dl = [];
+for (let k = 0; k < n - 1; k++) { h[k] = K[k + 1].jd - K[k].jd; dl[k] = (K[k + 1][f] - K[k][f]) / h[k]; }
+for (let k = 0; k < n; k++) {
+let m;
+if (k === 0) m = dl[0]; else if (k === n - 1) m = dl[n - 2];
+else if (dl[k - 1] * dl[k] <= 0) m = 0;
+else m = 3 * (h[k - 1] + h[k]) / ((2 * h[k] + h[k - 1]) / dl[k - 1] + (h[k] + 2 * h[k - 1]) / dl[k]);
+K[k]['m_' + f] = m;
+}
+}
+},
+pos(o, jd) {
+const K = o.K, n = K.length;
+if (jd >= o.j1) return this.target(K[n - 1].tg, jd) || this.at(K[n - 1]);
+if (jd <= o.j0) return this.target(K[0].tg, jd);
+let i = 0; while (i < n - 2 && jd >= K[i + 1].jd) i++;
+const h = K[i + 1].jd - K[i].jd, u = (jd - K[i].jd) / h, u2 = u * u, u3 = u2 * u;
+const H = f => (2 * u3 - 3 * u2 + 1) * K[i][f] + (u3 - 2 * u2 + u) * h * K[i]['m_' + f] + (-2 * u3 + 3 * u2) * K[i + 1][f] + (u3 - u2) * h * K[i + 1]['m_' + f];
+return this.at({ r: H('r'), lam: H('lam'), bet: H('bet') });
+},
+at(k) { const c = Math.cos(k.bet); return [k.r * c * Math.cos(k.lam), k.r * c * Math.sin(k.lam), k.r * Math.sin(k.bet)]; },
+sample(o, n) {
+const pts = [], fr = [];
+for (let j = 0; j <= n; j++) { const jd = o.j0 + (o.j1 - o.j0) * j / n; pts.push(this.pos(o, jd)); fr.push(j / n); }
+return { pts, fr };
+},
+next(o, jd) { return o.K.find(k => k.jd > jd && k.txt) || null; },
+};
+// distancia en pantalla de una órbita alrededor de un cuerpo: órbitas bajas ampliadas y, lejos, la misma ley que las lunas
+const orbiterDist = (k, a, R) => k === 'real' ? SCALES.real.moon(a) : Math.min(SCALES[k].body(R) * (1 + (a / R - 1) * 2.5), SCALES[k].moon(a, R, SCALES[k].body(R)));
 const SCALES = {
 visual: {
 label: 'Visual', badge: 'Escala visual: tamaños ampliados y distancias comprimidas',
@@ -3467,6 +3885,7 @@ if (o && o.t === 'kep') {
 if (o.tp) o.tpJD = Astro.jdFromISO(o.tp);
 else if (o.fit) this.fitOrbit(o);
 }
+if (o && o.t === 'hyp') o.tpJD = Astro.jdFromISO(o.tp) + (o.tpFrac || 0);
 const v = def.vis;
 if (def.shape || v.irregular || v.feat === 'bilobe') {
 const g = Geo.irregular(def.shape, v.irregular || 0.05, v.seed || 1, v.feat === 'bilobe');
@@ -3478,6 +3897,7 @@ rb.mesh = CraftModels.mesh(def.model); rb.isCraft = true;
 if (def.model === 'jwst' && this.jwstHD) rb.lodMesh = CraftModels.mesh('jwst-lite');
 rb.vFrom = def.validFrom ? Astro.jdFromISO(def.validFrom) : null; rb.vTo = def.validTo ? Astro.jdFromISO(def.validTo) : null;
 if (o && o.t === 'drift') { o.dir = V.norm(Astro.eqToEcl(Astro.radecVec(o.ra, o.dec))); o.t0JD = Astro.jdFromISO(o.t0); }
+if (o && o.t === 'cruise' && !o.K) Cruise.prep(o);
 }
 rb.prog = v.style === 'rock' ? this.P['rock_' + v.feat] : v.style === 'gas' ? this.P['gas_' + v.feat] : this.P[v.style];
 rb.u = {};
@@ -3495,6 +3915,7 @@ this.sun = this.byId.sol;
 this.rb.forEach(rb => {
 const o = rb.def.orbit;
 if (o && (o.t === 'moon' || o.t === 'leo')) rb.oframe = Astro.orbitFrame(rb.parent.frame.P, rb.parent.frame.Q, o.i, o.node);
+if (o && o.t === 'cruise' && o.after) { const P = this.byId[o.after.parent]; rb.oframe = Astro.orbitFrame(P.frame.P, P.frame.Q, o.after.i || 0, o.after.node || 0); }
 });
 this.rb.forEach(rb => {
 if (rb.isSun) return;
@@ -3503,9 +3924,10 @@ else if (rb.def.type === 'moon') rb.occ = [rb.parent].concat(rb.parent.children.
 else rb.occ = rb.children.filter(c => c.def.type === 'moon').sort((a, b) => b.R - a.R).slice(0, 4);
 });
 this.rb.forEach(rb => {
-const o = rb.def.orbit; if (!o || (o.t !== 'jpl' && o.t !== 'kep')) return;
+const o = rb.def.orbit; if (!o || (o.t !== 'jpl' && o.t !== 'kep' && o.t !== 'hyp' && o.t !== 'cruise')) return;
 const n = rb.def.type === 'comet' ? 1024 : (o.e > 0.3 ? 720 : 512);
-const s = Astro.sampleOrbit(o, jd0, n);
+const s = o.t === 'hyp' ? Astro.sampleHyp(o, 720, o.rMax || 40) : o.t === 'cruise' ? Cruise.sample(o, Math.round(clamp(o.j1 - o.j0, 900, 3600))) : Astro.sampleOrbit(o, jd0, n);
+if (o.t === 'hyp') o.Mmax = s.Mmax;
 rb.orbitPts = s.pts.map(p => Astro.eclToScene(p));
 rb.orbitBuf = new Float32Array(rb.orbitPts.length * 3);
 rb.orbitMesh = GLX.mesh({ a_pos: { data: rb.orbitBuf, size: 3 }, a_frac: { data: new Float32Array(s.fr), size: 1 } }, null, GLX.gl.LINE_STRIP, true);
@@ -3646,6 +4068,11 @@ if (o.t === 'jpl' || o.t === 'kep') {
 rb.helio = Astro.helioPos(o, jd);
 rb.posS = sc.mapVec(Astro.eclToScene(rb.helio));
 rb.orbitFrac = Astro.elementsAt(o, jd).M / 360;
+} else if (o.t === 'hyp') {
+const k = Astro.elementsAt(o, jd);
+rb.helio = Astro.helioPos(o, jd);
+rb.posS = sc.mapVec(Astro.eclToScene(rb.helio));
+rb.orbitFrac = (k.M * DEG + o.Mmax) / (2 * o.Mmax);
 }
 }
 for (const rb of this.rb) {
@@ -3661,6 +4088,7 @@ const th = (o.L0 + 360 * d / o.P) * DEG;
 dirS = V.norm(V.add(V.scale(rb.oframe.u, Math.cos(th)), V.scale(rb.oframe.v, Math.sin(th))));
 rKm = o.a; rb.orbitFrac = ((th / TAU) % 1 + 1) % 1;
 }
+if (par.def.type === 'asteroid') rb.rS = Math.min(rb.rS, par.rS * Math.pow(rb.R / par.R, 0.6));   // lunas de asteroides: ambos tocan el tamaño mínimo en pantalla; se conserva su proporción
 rb.moonDist = sc.moon(rKm, par.R, sc.bodyA(par.R), sc.bodyB(par.R));
 rb.moonDistMean = sc.moon(o.a, par.R, sc.bodyA(par.R), sc.bodyB(par.R));
 rb.posS = V.add(par.posS, V.scale(dirS, rb.moonDist));
@@ -3672,13 +4100,21 @@ if (!rb.isCraft) continue;
 const o = rb.def.orbit;
 rb.hidden = !!(rb.vFrom && (jd < rb.vFrom || (rb.vTo && jd > rb.vTo)));
 if (o.t === 'leo') {
-const par = rb.parent, th = (o.L0 + 360 * d / o.P) * DEG;
+const par = rb.parent, Mn = (o.L0 + 360 * d / o.P) * DEG, map = km => sc.blend(orbiterDist(sc.from, km, par.R), orbiterDist(sc.to, km, par.R));
+let nu = Mn, rK = o.a, ang = Mn;
+if (o.e) {                                       // órbita elíptica: periapsis y apoapsis en sus distancias publicadas; en pantalla, una elipse entre ambas
+const E = Astro.keplerE(Mn, o.e);
+nu = 2 * Math.atan2(Math.sqrt(1 + o.e) * Math.sin(E / 2), Math.sqrt(1 - o.e) * Math.cos(E / 2)); rK = o.a * (1 - o.e * Math.cos(E));
+const q = map(o.a * (1 - o.e)), Q = map(o.a * (1 + o.e)), as = (q + Q) / 2, es = (Q - q) / (Q + q);
+rb.ell = { a: as, e: es }; rb.moonDistMean = as;
+rb.moonDist = as * (1 - es * es) / (1 + es * Math.cos(nu));
+ang = 2 * Math.atan2(Math.sqrt(1 - es) * Math.sin(nu / 2), Math.sqrt(1 + es) * Math.cos(nu / 2));
+} else rb.moonDist = rb.moonDistMean = map(o.a);
+const th = nu + (o.w || 0) * DEG;
 const dirS = V.norm(V.add(V.scale(rb.oframe.u, Math.cos(th)), V.scale(rb.oframe.v, Math.sin(th))));
-const map = k => k === 'real' ? SCALES.real.moon(o.a) : SCALES[k].body(par.R) * (1 + (o.a / par.R - 1) * 2.5);
-rb.moonDist = rb.moonDistMean = sc.blend(map(sc.from), map(sc.to));
 rb.posS = V.add(par.posS, V.scale(dirS, rb.moonDist));
-rb.helio = V.add(par.helio, V.scale(Astro.sceneToEcl(dirS), o.a / AU_KM));
-rb.moonDir = dirS; rb.orbitFrac = ((th / TAU) % 1 + 1) % 1;
+rb.helio = V.add(par.helio, V.scale(Astro.sceneToEcl(dirS), rK / AU_KM));
+rb.orbR = rK; rb.moonDir = dirS; rb.orbitFrac = (((o.e ? ang : th) / TAU) % 1 + 1) % 1;
 } else if (o.t === 'lpoint') {
 const E = rb.parent, s = V.norm(E.helio), z = [0, 0, 1], w = V.norm(V.cross(s, z));
 const base = V.scale(s, (o.L === 2 ? 1 : -1) * o.dist);
@@ -3693,6 +4129,16 @@ rb.orbitFrac = ((th / TAU) % 1 + 1) % 1;
 } else if (o.t === 'drift') {
 rb.helio = V.scale(o.dir, o.r0 + o.rate * (jd - o.t0JD) / 365.25);
 rb.posS = sc.mapVec(Astro.eclToScene(rb.helio));
+} else if (o.t === 'cruise') {
+rb.orbitFrac = clamp((jd - o.j0) / (o.j1 - o.j0), 0, 1);
+const A = o.after;
+if (A && jd >= o.j1) {                           // tras la llegada: órbita aproximada alrededor del destino
+const par = this.byId[A.parent], th = ((A.L0 || 0) + 360 * (jd - o.j1) / A.P) * DEG;
+const dirS = V.norm(V.add(V.scale(rb.oframe.u, Math.cos(th)), V.scale(rb.oframe.v, Math.sin(th))));
+rb.moonDist = sc.blend(orbiterDist(sc.from, A.a, par.R), orbiterDist(sc.to, A.a, par.R));
+rb.posS = V.add(par.posS, V.scale(dirS, rb.moonDist));
+rb.helio = V.add(par.helio, V.scale(Astro.sceneToEcl(dirS), A.a / AU_KM));
+} else { rb.helio = Cruise.pos(o, jd); rb.posS = sc.mapVec(Astro.eclToScene(rb.helio)); }
 }
 let Y, X;
 if (o.t === 'leo') { Y = rb.moonDir; X = V.norm(V.cross(rb.oframe.n, Y)); }
@@ -3885,7 +4331,8 @@ let show = false, color = COLORS.orbitPlanet, alpha = 0.3;
 if (type === 'craft') {
 const o = rb.def.orbit;
 if (!L.craft || rb.hidden || o.t === 'drift') continue;
-if (o.t === 'leo') { const px = this.pxPerUnit(Math.max(V.dist(rb.parent.posS, cam), 1e-9)) * rb.moonDistMean; show = (L.moonOrbits && px > 14) || sel; alpha = 0.3 * smoothstep(14, 40, px); }
+if (o.t === 'cruise') show = sel || orbMode;
+else if (o.t === 'leo') { const px = this.pxPerUnit(Math.max(V.dist(rb.parent.posS, cam), 1e-9)) * rb.moonDistMean; show = (L.moonOrbits && px > 14) || sel; alpha = 0.3 * smoothstep(14, 40, px); }
 else show = L.orbits || sel;
 color = COLORS.orbitCraft; alpha = o.t === 'leo' ? alpha : 0.32;
 } else if (type === 'moon') {
@@ -3902,7 +4349,14 @@ if (hov) alpha = Math.max(alpha, 0.6);
 if (sel) { color = COLORS.select; alpha = 0.9; }
 let m, mesh;
 if (type === 'craft' && rb.def.orbit.t === 'lpoint') { const Hh = rb.halo; m = M4.fromBasis(Hh.X, Hh.N, Hh.Z, 1, V.sub(V.add(rb.parent.posS, Hh.c), cam)); mesh = this.meshes.circle; }
-else if (type === 'moon' || (type === 'craft' && rb.def.orbit.t === 'leo')) { const F = rb.oframe; m = M4.fromBasis(F.u, F.n, V.cross(F.u, F.n), rb.moonDistMean, V.sub(rb.parent.posS, cam)); mesh = this.meshes.circle; }
+else if (type === 'moon' || (type === 'craft' && rb.def.orbit.t === 'leo')) {
+const F = rb.oframe, El = type === 'craft' && rb.ell;
+if (El) {                                        // elipse con el planeta en un foco
+const w = (rb.def.orbit.w || 0) * DEG, p = V.add(V.scale(F.u, Math.cos(w)), V.scale(F.v, Math.sin(w))), q = V.add(V.scale(F.u, -Math.sin(w)), V.scale(F.v, Math.cos(w)));
+m = M4.fromBasis(V.scale(p, El.a), F.n, V.scale(q, -El.a * Math.sqrt(1 - El.e * El.e)), 1, V.sub(V.add(rb.parent.posS, V.scale(p, -El.a * El.e)), cam));
+} else m = M4.fromBasis(F.u, F.n, V.cross(F.u, F.n), rb.moonDistMean, V.sub(rb.parent.posS, cam));
+mesh = this.meshes.circle;
+}
 else { m = M4.translate(V.sub([0, 0, 0], cam)); mesh = rb.orbitMesh; }
 GLX.setAll(pO, { u_model: m, u_color: lin(color), u_alpha: alpha * vis1, u_cur: rb.orbitFrac || 0, u_fade: orbMode ? 0.35 : 1 });
 GLX.draw(mesh, pO);
@@ -4152,6 +4606,104 @@ B.cyl([0, 1.2, 0], [0, 1, 0], 1.15, 0.12, 24, C.dark, C.white);
 B.cyl([0, 0.15, 0], [0, 1, 0], 0.5, 1.6, 6, C.gold);
 [-1, 1].forEach(s => B.box([s * 1.0, -0.2, 0], [0.9, 0.04, 0.45], C.panel));
 B.cyl([0, -1.1, 0], [0, 1, 0], 0.04, 1.4, 4, C.silver);
+},
+europaclipper(B) {                               // cuerpo cilíndrico, antena de 3 m y dos alas de 5 paneles (30.5 m)
+B.cyl([0, 0, 0], [0, 1, 0], 0.75, 3.0, 12, C.silver, C.dark);
+B.dish([0, 2.1, 0], [0, 1, 0], 1.5, 0.35, 24, C.white, C.silver);
+B.box([0, 1.6, 0], [0.5, 0.6, 0.5], C.dark);
+[-1, 1].forEach(s => { B.cyl([s * 1.3, 0, 0], [1, 0, 0], 0.05, 1.2, 4, C.silver); for (let k = 0; k < 5; k++) B.box([s * (2.3 + k * 2.6), 0, 0], [2.5, 0.06, 4.1], C.panel); });
+B.cyl([0, -0.3, -2.6], [0, 0, 1], 0.04, 4.0, 4, C.silver);
+},
+juice(B) {                                       // dos alas en cruz de 5 paneles, antena de 2.5 m, mástil del magnetómetro y antena del radar
+B.box([0, 0, 0], [2.6, 3.2, 2.4], C.gold);
+B.dish([0, 2.0, 0], [0, 1, 0], 1.25, 0.3, 24, C.white, C.silver);
+[-1, 1].forEach(s => { const c = s * 8.5; B.box([s * 2.2, 0, 0], [1.8, 0.06, 0.5], C.silver); [[0, 0], [2.6, 0], [-2.6, 0], [0, 2.6], [0, -2.6]].forEach(([dx, dz]) => B.box([c + dx, 0, dz], [2.5, 0.06, 2.5], C.panel)); });
+B.cyl([0, -0.2, 6.6], [0, 0, 1], 0.04, 10.6, 4, C.silver);
+B.cyl([0, 1.4, -1.2], [1, 0, 0], 0.03, 16, 4, C.white);
+},
+bepicolombo(B) {                                 // pila de crucero: módulo de transferencia (alas de 14 m), orbitador MPO y Mio bajo su escudo
+B.box([0, -1.6, 0], [3.0, 1.8, 3.0], C.silver);
+[-1, 1].forEach(s => B.box([s * 8.6, -1.6, 0], [14, 0.06, 2.4], C.panel));
+B.box([0, 0.3, 0], [2.4, 2.0, 2.2], C.white);
+B.box([0, 0.3, 4.3], [2.2, 0.06, 6.2], C.panel);
+B.cyl([0, 1.9, 0], [0, 1, 0], 1.0, 0.9, 8, C.silver, C.dark);
+B.cyl([0, 2.8, 0], [0, 1, 0], 1.5, 1.0, 16, C.kapton, C.white);
+},
+lucy(B) {                                        // dos paneles circulares de 7.3 m, antena de 2 m y plataforma de instrumentos
+B.box([0, 0, 0], [2.0, 2.0, 2.0], C.gold);
+B.dish([0, 1.4, 0], [0, 1, 0], 1.0, 0.25, 20, C.white, C.silver);
+const disk = [...Array(24)].map((_, k) => [Math.cos(TAU * k / 24) * 3.65, Math.sin(TAU * k / 24) * 3.65]);
+[-1, 1].forEach(s => { B.cyl([s * 1.6, 0, 0], [1, 0, 0], 0.05, 1.2, 4, C.silver); B.poly([s * 5.8, 0, 0], [1, 0, 0], [0, 0, -1], disk, C.panel, C.panel, 0.06); });
+B.box([0, -0.7, 1.5], [1.0, 0.6, 1.0], C.dark);
+},
+mro(B) {                                         // antena de 3 m, dos paneles de 5.4 × 2.5 m, cámara HiRISE hacia el planeta y antena del radar SHARAD
+B.box([0, 0, 0], [2.0, 2.4, 2.0], C.gold);
+B.dish([0, 1.9, -1.0], [0, 1, -0.4], 1.5, 0.35, 24, C.white, C.silver);
+[-1, 1].forEach(s => { B.cyl([s * 1.5, 0, 0], [1, 0, 0], 0.05, 1.0, 4, C.silver); B.box([s * 4.7, 0, 0], [5.4, 0.06, 2.5], C.panel); });
+B.cyl([0.5, -1.7, 0.4], [0, 1, 0], 0.5, 1.2, 12, C.silver, C.dark);
+B.cyl([0, -1.3, 0], [0, 0, 1], 0.03, 10, 4, C.white);
+},
+maven(B) {                                       // antena de 2 m, alas solares en forma de gaviota y brazo articulado de instrumentos
+B.box([0, 0, 0], [2.3, 2.3, 2.3], C.gold);
+B.dish([0, 1.5, 0], [0, 1, 0], 1.0, 0.3, 24, C.white, C.silver);
+const c = Math.cos(0.35), sn = Math.sin(0.35);
+[-1, 1].forEach(s => {
+B.box([s * 2.6, 0, 0], [3.0, 0.06, 2.0], C.panel);
+B.box([s * 5.37, 0.46, 0], [2.7, 0.06, 2.0], C.panel, [[c, s * sn, 0], [-s * sn, c, 0], [0, 0, 1]]);
+B.cyl([s * 6.75, 0.95, 0], [1, 0, 0], 0.08, 0.5, 6, C.silver);
+});
+B.cyl([0, -1.6, 1.6], [0, -1, 1], 0.05, 2.6, 4, C.silver);
+B.box([0, -2.5, 2.5], [0.6, 0.5, 0.5], C.dark);
+},
+marsexpress(B) {                                 // cuerpo de 1.5 × 1.8 × 1.4 m, alas de 12 m, antena de 1.6 m y antena del radar MARSIS (acortada)
+B.box([0, 0, 0], [1.5, 1.4, 1.8], C.gold);
+B.dish([0, 0.85, 0.3], [0, 1, 0.2], 0.8, 0.2, 20, C.white, C.silver);
+[-1, 1].forEach(s => { B.cyl([s * 1.0, 0, 0], [1, 0, 0], 0.04, 0.6, 4, C.silver); B.box([s * 3.65, 0, 0], [4.7, 0.05, 1.6], C.panel); });
+B.cyl([0, -0.75, 0], [0, 0, 1], 0.02, 12, 4, C.white);
+},
+tgo(B) {                                         // cuerpo de 3.2 × 2 × 2 m, alas de 17.5 m y antena de 2.2 m
+B.box([0, 0, 0], [3.2, 2.0, 2.0], C.gold);
+B.dish([0, 1.35, -0.2], [0, 1, -0.2], 1.1, 0.3, 20, C.white, C.silver);
+[-1, 1].forEach(s => { B.cyl([s * 2.0, 0, 0], [1, 0, 0], 0.05, 0.8, 4, C.silver); [0, 1].forEach(k => B.box([s * (3.9 + k * 3.3), 0, 0], [3.2, 0.06, 2.3], C.panel)); });
+B.cyl([0.6, -1.2, 0.4], [0, 1, 0], 0.3, 0.5, 10, C.dark);
+},
+hope(B) {                                        // cuerpo hexagonal de 2.37 × 2.9 m, tres paneles solares y antena de 1.85 m
+B.cyl([0, 0, 0], [0, 1, 0], 1.2, 2.9, 6, C.gold, C.silver);
+B.dish([0, 1.75, 0], [0, 1, 0], 0.93, 0.25, 24, C.white, C.silver);
+[0, 1, 2].forEach(k => { const a = k * TAU / 3, d = [Math.cos(a), 0, Math.sin(a)]; B.box(V.scale(d, 2.6), [2.8, 0.06, 1.7], C.panel, [d, [0, 1, 0], [-d[2], 0, d[0]]]); });
+B.cyl([0, -1.6, 0], [0, 1, 0], 0.35, 0.4, 10, C.dark);
+},
+tianwen1(B) {                                    // orbitador con dos alas solares y antena de alta ganancia
+B.cyl([0, 0, 0], [0, 1, 0], 1.4, 2.6, 8, C.gold, C.silver);
+B.dish([0, 1.75, 0.6], [0, 1, 0.3], 1.25, 0.3, 24, C.white, C.silver);
+[-1, 1].forEach(s => { B.cyl([s * 1.8, 0.3, 0], [1, 0, 0], 0.05, 0.8, 4, C.silver); [0, 1].forEach(k => B.box([s * (3.45 + k * 2.6), 0.3, 0], [2.5, 0.06, 2.0], C.panel)); });
+},
+lro(B) {                                         // cuerpo de unos 2 × 2 × 3 m, un ala solar de tres paneles y antena en un mástil
+B.box([0, 0, 0], [1.9, 2.7, 1.9], C.gold);
+B.box([0, -1.15, 0], [1.6, 0.4, 1.6], C.silver);
+B.cyl([1.4, 0.6, 0], [1, 0, 0], 0.05, 1.0, 4, C.silver);
+[0, 1, 2].forEach(k => B.box([3.0, 0.6, (k - 1) * 1.45], [2.2, 0.06, 1.4], C.panel));
+B.cyl([-1.5, 1.15, 0], [-1, 0.5, 0], 0.04, 1.9, 4, C.silver);
+B.dish([-2.4, 1.65, 0], [-0.4, 1, 0], 0.4, 0.12, 16, C.white, C.silver);
+},
+chandrayaan2(B) {                                // orbitador en forma de caja, un ala solar y antena de alta ganancia
+B.box([0, 0, 0], [2.2, 2.4, 2.4], C.gold);
+B.cyl([1.5, 0, 0], [1, 0, 0], 0.05, 0.8, 4, C.silver);
+B.box([3.6, 0, 0], [3.4, 0.06, 2.4], C.panel);
+B.dish([-1.4, 0.6, 0], [-1, 0.3, 0], 0.6, 0.18, 16, C.white, C.silver);
+B.cyl([0, -1.35, 0], [0, 1, 0], 0.35, 0.3, 10, C.dark);
+},
+danuri(B) {                                      // cuerpo de 2.1 × 1.8 × 2.3 m, dos paneles solares, antena y la cámara ShadowCam
+B.box([0, 0, 0], [1.8, 2.3, 2.1], C.gold);
+[-1, 1].forEach(s => { B.cyl([s * 1.2, 0.3, 0], [1, 0, 0], 0.04, 0.6, 4, C.silver); B.box([s * 2.7, 0.3, 0], [2.4, 0.06, 1.6], C.panel); });
+B.dish([0, 1.45, -0.6], [0, 1, -0.4], 0.5, 0.15, 16, C.white, C.silver);
+B.cyl([0, -1.35, 0.4], [0, 1, 0], 0.35, 0.4, 10, C.silver, C.dark);
+},
+queqiao2(B) {                                    // satélite repetidor: antena parabólica de 4.2 m y dos alas solares
+B.box([0, 0, 0], [1.6, 1.6, 1.6], C.gold);
+B.cyl([0, 1.0, 0], [0, 1, 0], 0.08, 0.6, 6, C.silver);
+B.dish([0, 1.9, 0], [0, 1, 0], 2.1, 0.6, 28, C.white, C.silver);
+[-1, 1].forEach(s => { B.cyl([s * 1.1, 0, 0], [1, 0, 0], 0.04, 0.6, 4, C.silver); [0, 1].forEach(k => B.box([s * (2.4 + k * 2.1), 0, 0], [2.0, 0.06, 1.4], C.panel)); });
 },
 };
 const cache = {};
@@ -4526,8 +5078,11 @@ const add = (sec, label, val, kind, note) => out[sec].push({ label, val, kind: k
 const isMoon = d.type === 'moon', par = rb.parent;
 add('phys', 'Edad aproximada', i.age || null);
 const diam = d.shape ? '≈ ' + fmt(2 * d.R, 1) + ' km (medio; forma irregular)' : fmt(2 * d.R, d.R < 50 ? 2 : 0) + ' km';
+if (i.sizeTxt) add('phys', 'Tamaño', i.sizeTxt);
+else {
 add('phys', 'Diámetro medio', d.R < 1 ? fmt(2 * d.R * 1000, 0) + ' m' + (d.shape ? ' (medio)' : '') : diam);
 add('phys', 'Radio medio', d.R < 1 ? fmt(d.R * 1000, 0) + ' m' : fmt(d.R, d.R < 50 ? 2 : 1) + ' km');
+}
 add('phys', 'Masa', d.mass ? fmtSci(d.mass, 'kg') : null);
 let g = i.grav, gk = 'ref';
 if (g == null && d.mass) { g = G_CONST * d.mass / Math.pow(d.R * 1000, 2); gk = 'calc'; }
@@ -4555,8 +5110,15 @@ else { const a = this.orbitA(rb); if (a && P) { v = TAU * a * AU_KM / (P.v * 864
 }
 add('orb', 'Velocidad orbital media', i.vTxt || (v != null ? fmt(v, v < 10 ? 2 : 1) + ' km/s' : null), i.vTxt ? 'ref' : vk);
 if (isMoon) add('orb', 'Distancia media a ' + par.def.name, fmtKm(o.a));
-else if (d.type !== 'star') { const a = this.orbitA(rb); add('orb', 'Distancia media al Sol', a ? fmtKm(a * AU_KM) + ' (' + fmtAU(a) + ')' : null); }
-if (o && (o.t === 'jpl' || o.t === 'kep')) {
+else if (d.type !== 'star' && !(o && o.t === 'hyp')) { const a = this.orbitA(rb); add('orb', 'Distancia media al Sol', a ? fmtKm(a * AU_KM) + ' (' + fmtAU(a) + ')' : null); }
+if (o && o.t === 'hyp') {
+const vInf = Math.sqrt(1.32712440018e11 / (o.q / (o.e - 1) * AU_KM));
+add('orb', 'Tipo de órbita', 'Hiperbólica: no está ligada al Sol y nunca regresará');
+add('orb', 'Paso por el perihelio', fmtAU(o.q) + ' del Sol, el ' + Astro.dateFromJD(o.tpJD).toLocaleDateString(I18N.loc(), { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }));
+add('orb', 'Excentricidad', fmt(o.e, 4) + ' (mayor que 1: trayectoria abierta)');
+add('orb', 'Inclinación orbital', fmt(o.i, 2) + '° respecto a la eclíptica' + (o.i > 90 ? ' (retrógrada)' : ''));
+add('orb', 'Velocidad lejos del Sol', fmt(vInf, 1) + ' km/s (velocidad con la que llegó del espacio interestelar)', 'calc');
+} else if (o && (o.t === 'jpl' || o.t === 'kep')) {
 const k = Astro.elementsAt(o, World.jd);
 add('orb', 'Excentricidad', fmt(k.e, 4));
 add('orb', 'Inclinación orbital', fmt(k.i, 2) + '° respecto a la eclíptica');
@@ -4580,9 +5142,10 @@ return [
 },
 craftNote(rb) {
 return {
-leo: 'Posición: órbita circular aproximada. La ubicación a lo largo de la órbita es ilustrativa porque no se usan datos de seguimiento en tiempo real.',
+leo: (rb.def.orbit.e ? 'Posición: órbita elíptica aproximada entre la altitud mínima y máxima publicadas.' : 'Posición: órbita circular aproximada.') + ' La ubicación a lo largo de la órbita es ilustrativa porque no se usan datos de seguimiento en tiempo real.',
 lpoint: 'Posición: órbita halo aproximada alrededor del punto de Lagrange; la amplitud y la fase son ilustrativas.',
 drift: 'Posición: distancia extrapolada desde datos publicados por NASA/JPL, en una dirección fija aproximada.',
+cruise: 'Posición: trayectoria aproximada. La nave pasa por cada planeta en la fecha real de sus asistencias gravitatorias; entre ellas, la ruta se interpola de forma suave y no procede de efemérides oficiales.',
 kep: 'Posición: órbita kepleriana aproximada; la orientación del plano orbital es una estimación.',
 }[rb.def.orbit.t] + ' El tamaño de la nave en pantalla está muy ampliado.';
 },
@@ -4597,11 +5160,17 @@ const ds = V.len(rb.helio);
 out.push({ label: 'Distancia actual al Sol', km: ds * AU_KM, au: ds });
 if (rb !== E) { const de = V.dist(rb.helio, E.helio); out.push({ label: 'Distancia actual a la Tierra', km: de * AU_KM, au: de }); }
 const o = rb.def.orbit;
-if (o && (o.t === 'jpl' || o.t === 'kep')) {
+if (o && (o.t === 'jpl' || o.t === 'kep' || o.t === 'hyp')) {
 const a = Astro.elementsAt(o, World.jd).a, v = Math.sqrt(1.32712440018e11 * (2 / (ds * AU_KM) - 1 / (a * AU_KM)));
 out.push({ label: 'Velocidad orbital actual', txt: fmt(v, 2) + ' km/s' });
 }
-if (rb.isCraft && rb.def.orbit.t === 'leo') out.push({ label: 'Altitud sobre la Tierra', txt: fmtKm(rb.def.orbit.a - rb.parent.R) });
+if (rb.isCraft && rb.def.orbit.t === 'leo') out.push({ label: (rb.def.orbit.e ? 'Altitud actual sobre ' : 'Altitud sobre ') + ({ tierra: 'la Tierra', luna: 'la Luna' }[rb.parent.id] || rb.parent.def.name), txt: fmtKm((rb.orbR || rb.def.orbit.a) - rb.parent.R) });
+if (rb.isCraft && rb.def.orbit.t === 'cruise') {
+const oc = rb.def.orbit, nx = Cruise.next(oc, World.jd), lt = V.dist(rb.helio, E.helio) * AU_KM / 299792.458 / 60;
+out.push({ label: 'Tiempo de la señal desde la Tierra', txt: lt < 1 ? fmt(lt * 60, 0) + ' s' : lt < 120 ? fmt(lt, 1) + ' min' : fmt(lt / 60, 1) + ' h' });
+if (nx) out.push({ label: 'Próxima etapa', txt: nx.txt + ' (' + Astro.dateFromJD(nx.jd).toLocaleDateString(I18N.loc(), { month: 'long', year: 'numeric', timeZone: 'UTC' }) + ')' });
+else out.push({ label: 'Fase actual', txt: oc.after ? oc.after.txt : oc.endTxt || 'Trayectoria principal completada' });
+}
 if (rb.isCraft && rb.def.orbit.t === 'drift') { const lt = V.dist(rb.helio, E.helio) * AU_KM / 299792.458 / 3600; out.push({ label: 'Tiempo de la señal desde la Tierra', txt: fmt(lt, 1) + ' h' }); }
 if (rb.def.type === 'moon') { const dp = V.dist(rb.helio, rb.parent.helio) * AU_KM; out.push({ label: 'Distancia actual a ' + rb.parent.def.name, txt: fmtKm(dp) }); }
 return out;
@@ -4781,15 +5350,24 @@ return `<p class="lead">8 planetas, 5 planetas enanos reconocidos, cientos de lu
 }
 case 'planetas': return `<div class="list">${by('planet').map(rb => this.bodyRow(rb, distTxt(rb))).join('')}</div>`;
 case 'enanos': return `<h3>Planetas enanos</h3><div class="list">${by('dwarf').map(rb => this.bodyRow(rb, distTxt(rb))).join('')}</div><h3>Objetos transneptunianos</h3><div class="list">${by('tno').map(rb => this.bodyRow(rb, distTxt(rb))).join('')}</div>`;
-case 'asteroides': return `<p class="lead">El cinturón principal está entre Marte y Júpiter. Observa los huecos de Kirkwood, despejados por resonancias con Júpiter, y los troyanos que comparten su órbita.</p><div class="list">${by('asteroid').map(rb => this.bodyRow(rb, distTxt(rb))).join('')}</div>`;
-case 'cometas': return `<p class="lead">Las colas aparecen al acercarse al Sol: la de iones, azulada y recta, y la de polvo, curvada.</p><div class="list">${by('comet').map(rb => this.bodyRow(rb, distTxt(rb))).join('')}</div>
+case 'asteroides': return `<p class="lead">El cinturón principal está entre Marte y Júpiter. Observa los huecos de Kirkwood, despejados por resonancias con Júpiter, y los troyanos que comparten su órbita.</p><div class="list">${by('asteroid').filter(rb => !rb.def.interstellar).map(rb => this.bodyRow(rb, distTxt(rb))).join('')}</div>`;
+case 'cometas': return `<p class="lead">Las colas aparecen al acercarse al Sol: la de iones, azulada y recta, y la de polvo, curvada.</p><div class="list">${by('comet').filter(rb => !rb.def.interstellar).map(rb => this.bodyRow(rb, distTxt(rb))).join('')}</div>
+<h3>Visitantes interestelares</h3><p class="note">Objetos nacidos alrededor de otras estrellas que cruzan el Sistema Solar una sola vez, en trayectorias hiperbólicas.</p><div class="list">${W.rb.filter(rb => rb.def.interstellar).map(rb => this.bodyRow(rb, distTxt(rb))).join('')}</div>
 <label class="check"><input type="checkbox" data-layer="cometOrbits" ${S.layers.cometOrbits ? 'checked' : ''}><span>Mostrar trayectorias de cometas</span></label>`;
 case 'naves': {
-const g = (t, ids, note) => `<h3>${t}</h3><div class="list">${ids.map(id => { const rb = W.byId[id]; return this.bodyRow(rb, rb.hidden ? 'No existía en la fecha simulada' : rb.def.sub); }).join('')}</div>${note ? `<p class="note">${note}</p>` : ''}`;
+const when = rb => {                            // naves ocultas en la fecha simulada: antes del lanzamiento, en camino o ya retiradas
+if (!rb.hidden) return rb.def.sub;
+if (rb.vTo && W.jd > rb.vTo) return 'Ya no estaba en servicio en la fecha simulada';
+return W.jd >= Astro.jdFromISO(rb.def.craft.launch) ? 'En camino en la fecha simulada' : 'Aún no se había lanzado en la fecha simulada';
+};
+const g = (t, ids, note) => `<h3>${t}</h3><div class="list">${ids.map(id => this.bodyRow(W.byId[id], when(W.byId[id]))).join('')}</div>${note ? `<p class="note">${note}</p>` : ''}`;
 return `<p class="lead">Telescopios, estaciones y sondas construidos por la humanidad. Su tamaño en pantalla está muy ampliado para que puedas verlos.</p>
 <label class="check"><input type="checkbox" data-layer="craft" ${S.layers.craft ? 'checked' : ''}><span>Mostrar naves espaciales</span></label>` +
 g('Órbita terrestre', ['iss', 'tiangong', 'hubble'], 'Órbitas circulares aproximadas: la posición exacta a lo largo de la órbita es ilustrativa.') +
 g('Puntos de Lagrange', ['jwst', 'euclid', 'soho'], 'L1 y L2 están a unos 1.5 millones de km de la Tierra, hacia el Sol y en sentido opuesto.') +
+g('En órbita de Marte', ['mro', 'maven', 'marsexpress', 'tgo', 'hope', 'tianwen1']) +
+g('En órbita de la Luna', ['lro', 'chandrayaan2', 'danuri', 'queqiao2'], 'Órbitas aproximadas a partir de las altitudes mínima y máxima publicadas: la posición a lo largo de cada órbita es ilustrativa.') +
+g('Rumbo a otros mundos', ['europaclipper', 'juice', 'bepicolombo', 'lucy'], 'Trayectorias reconstruidas a partir de las fechas publicadas de lanzamiento, sobrevuelos y llegada: la forma exacta entre etapas es aproximada.') +
 g('Espacio profundo', ['parker', 'newhorizons', 'voyager2', 'voyager1'], 'Las sondas de escape se sitúan extrapolando su distancia y dirección desde datos publicados por NASA/JPL.');
 }
 case 'lunas': {
@@ -5531,7 +6109,9 @@ if (stop.kind === 'minor') return pick(['Diámetro medio', 'Duración de un año
 return pick(['Diámetro medio', 'Gravedad superficial', 'Duración de un día', 'Duración de un año (periodo orbital)', 'Número de lunas', 'Temperatura aproximada']);
 },
 minorNote(rb) {
-const o = rb.def.orbit; if (!o || !(o.t === 'jpl' || o.t === 'kep')) return '';
+const o = rb.def.orbit;
+if (o && o.t === 'hyp') return `Su trayectoria es hiperbólica (excentricidad ${fmt(o.e, 2)}): llegó desde fuera del Sistema Solar, lo cruza una sola vez y se aleja para siempre.`;
+if (!o || !(o.t === 'jpl' || o.t === 'kep')) return '';
 const k = Astro.elementsAt(o, World.jd), em = Astro.elementsAt(World.byId.mercurio.def.orbit, World.jd).e;
 const q = k.a * (1 - k.e), Q = k.a * (1 + k.e);
 let s = k.e > 0.5 ? `Su órbita es muy alargada (excentricidad ${fmt(k.e, 3)}); entre los planetas, la más excéntrica es la de Mercurio (${fmt(em, 3)}).`
@@ -6791,7 +7371,7 @@ clearInterval(this.tick); this.tick = setInterval(() => { if (this.isOpen()) thi
 close() { const p = $('#plan'); if (p) p.classList.remove('open'); clearInterval(this.tick); },
 rb(id) { const r = World.byId[id]; return r && !r.hidden ? r : null; },
 shipDef() { return SHIPS.find(s => s.id === this.ship) || SHIPS.find(s => s.id === 'ranger') || SHIPS[0]; },
-orbitalOK(o, d) { return o && d && o !== d && !o.isSun && !d.isSun && !o.isCraft && !d.isCraft && o.parent && o.parent.isSun && d.parent && d.parent.isSun; },
+orbitalOK(o, d) { return o && d && o !== d && !o.isSun && !d.isSun && !o.isCraft && !d.isCraft && o.parent && o.parent.isSun && d.parent && d.parent.isSun && !o.def.interstellar && !d.def.interstellar; },   // un objeto interestelar no tiene órbita cerrada: sin transferencia de Hohmann
 meanAU(rb) { const n = Compare.num(rb, 'au'); return n || V.len(rb.helio); },
 calc() {
 const o = this.rb(this.origin), d = this.rb(this.dest), sh = this.shipDef(); if (!o || !d || o === d) return { o, d, sh };
