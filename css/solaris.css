@@ -351,6 +351,7 @@ kbd { font-family: var(--mono); font-size: 11.5px; border: 1px solid var(--line-
 .guide-end { flex-direction: column; align-items: stretch; }
 }
 .intro-author { display: flex; align-items: center; gap: 9px; margin: 26px 0 0; font-size: 13.5px; color: var(--muted); letter-spacing: .01em; }
+.intro-author + .intro-author { margin-top: 8px; }
 .mx-flag { flex: none; border-radius: 2px; box-shadow: 0 0 0 1px rgba(255, 255, 255, .18), 0 1px 4px rgba(0, 0, 0, .5); }
 .cta-ghost { padding: 14px 22px; border-radius: var(--r-lg); font-size: 17px; color: var(--sun); border: 1px solid rgba(242, 200, 121, .45); background: rgba(5, 8, 16, .35); }
 .cta-ghost:hover:not(:disabled) { background: var(--sun-dim); }
