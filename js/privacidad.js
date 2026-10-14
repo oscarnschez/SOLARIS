@@ -6,8 +6,8 @@
 var KEY = 'solaris.privacidad', VER = 1, MAX_HIST = 12;
 // versiones vigentes de los documentos legales (cámbialas aquí y en cada página cuando se actualice su texto)
 var DOCS = {
-  terminos: { v: '1.1', titulo: 'Términos y condiciones', ruta: 'terminos-y-condiciones/' },
-  privacidad: { v: '1.1', titulo: 'Política de privacidad', ruta: 'politica-de-privacidad/' },
+  terminos: { v: '1.2', titulo: 'Términos y condiciones', ruta: 'terminos-y-condiciones/' },
+  privacidad: { v: '1.2', titulo: 'Política de privacidad', ruta: 'politica-de-privacidad/' },
   cookies: { v: '1.1', titulo: 'Política de cookies', ruta: 'politica-de-cookies/' },
 };
 // raíz del sitio a partir de la ubicación de este script (sirve igual desde el simulador y desde las subpáginas)

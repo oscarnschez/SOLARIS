@@ -1,0 +1,34 @@
+SOLARIS · Simulador educativo del Sistema Solar en 3D
+Copyright (c) 2026 Oscar A. Sánchez · Zapopan, Jalisco, México
+https://oscarnschez.github.io/SOLARIS/
+
+ALCANCE DE LA LICENCIA MIT
+
+La licencia MIT (archivo LICENSE) cubre únicamente el código fuente propio
+de SOLARIS: los archivos HTML, CSS y JavaScript (index.html, css/, js/ y el
+marcado de las páginas legales).
+
+NO están cubiertos por la licencia MIT y conservan todos los derechos:
+
+- El nombre «SOLARIS» y su logotipo (assets/images/logo-solaris*.png,
+  favicon.ico y los iconos de la aplicación).
+- Los textos de SOLARIS, aunque estén dentro de archivos de código:
+  descripciones, fichas, guías, recorridos, mensajes y documentos legales
+  (Términos y condiciones, Política de privacidad y Política de cookies).
+- Todo el contenido de la carpeta assets/. Los recursos de terceros
+  (modelos 3D, texturas, música, tipografías, imágenes y marcas) conservan
+  sus propias licencias; cada uno, con su autor, licencia y enlace original,
+  aparece en la sección «Créditos» del sitio
+  (https://oscarnschez.github.io/SOLARIS/#creditos). Las tipografías Jost y
+  JetBrains Mono se distribuyen bajo la SIL Open Font License 1.1
+  (assets/fonts/OFL-*.txt).
+
+Las fotografías de Wikimedia Commons no forman parte del repositorio: el
+sitio las enlaza y solo las carga si la persona lo permite.
+
+Si publicas una versión modificada del código, no la presentes como la
+versión oficial de SOLARIS ni uses su nombre o su logotipo de forma que lo
+sugiera. SOLARIS no está afiliado a la NASA ni a ninguna agencia, estudio o
+empresa mencionada.
+
+Contacto: oscarasanchez.c@outlook.com
