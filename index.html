@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/solaris.css?v=f35fc606b8">
+<link rel="stylesheet" href="css/solaris.css?v=0abb9e7124">
 </head>
 <body>
 <div id="app" class="booting">
@@ -183,6 +183,11 @@
           <section id="cr-sobre" class="cr-sec cr-in">
             <h2>Sobre SOLARIS</h2>
             <p><b>SOLARIS</b> es un proyecto independiente de carácter educativo y sin fines de lucro, creado en México con el propósito de acercar la astronomía, la exploración espacial y el conocimiento del Sistema Solar a más personas mediante una experiencia visual e interactiva.</p>
+            <h3>Autoría</h3>
+            <dl class="cr-format cr-authors">
+              <div><dt>Autor</dt><dd><svg class="mx-flag" viewBox="0 0 28 16" width="25" height="14" role="img" aria-label="Bandera de México"><rect width="9.34" height="16" fill="#006847"/><rect x="9.33" width="9.34" height="16" fill="#fff"/><rect x="18.66" width="9.34" height="16" fill="#ce1126"/><path d="M11.6 9.9 Q14 11.9 16.4 9.9" fill="none" stroke="#3f7f3a" stroke-width=".7"/><ellipse cx="14" cy="7.6" rx="1.7" ry="2.1" fill="#8a5a24"/><circle cx="14.9" cy="5.7" r=".75" fill="#8a5a24"/></svg><span>Oscar A. Sánchez</span></dd></div>
+              <div><dt>Co-autora</dt><dd><svg class="mx-flag" viewBox="0 0 28 16" width="25" height="14" role="img" aria-label="Bandera de México"><rect width="9.34" height="16" fill="#006847"/><rect x="9.33" width="9.34" height="16" fill="#fff"/><rect x="18.66" width="9.34" height="16" fill="#ce1126"/><path d="M11.6 9.9 Q14 11.9 16.4 9.9" fill="none" stroke="#3f7f3a" stroke-width=".7"/><ellipse cx="14" cy="7.6" rx="1.7" ry="2.1" fill="#8a5a24"/><circle cx="14.9" cy="5.7" r=".75" fill="#8a5a24"/></svg><span>María J. Gascón</span></dd></div>
+            </dl>
             <p>El proyecto ha sido desarrollado con apoyo de herramientas de inteligencia artificial, incluyendo <b>Claude</b> y <b>ChatGPT</b>, así como distintas tecnologías y recursos digitales utilizados durante su desarrollo.</p>
             <p>SOLARIS no representa, pertenece ni está afiliado oficialmente con ninguna agencia espacial, estudio cinematográfico, empresa, universidad, institución científica o titular de propiedad intelectual mencionado dentro del sitio, salvo que expresamente se indique lo contrario.</p>
           </section>
@@ -356,11 +361,11 @@
       <p id="intro-tele" class="intro-tele"></p>
       <div class="intro-actions"><button id="start" class="cta" disabled>Explorar el Sistema Solar</button><button id="start-tours" class="cta-ghost" disabled>Recorridos guiados</button><button id="start-fly" class="cta-ghost" disabled>Pilotar una nave</button><button id="guide-btn" class="intro-mini" aria-haspopup="dialog"><svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M9.6 9.3a2.5 2.5 0 1 1 3.6 2.3c-.8.4-1.2 1-1.2 1.8v.4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="12" cy="16.9" r="1" fill="currentColor"/></svg>Instrucciones</button><button id="intro-settings" class="intro-mini" data-open-settings><svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M12 8.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M19.3 13.4l1.6 1.2-1.7 2.9-1.9-.6a7.4 7.4 0 0 1-1.8 1l-.4 2h-3.3l-.4-2a7.4 7.4 0 0 1-1.8-1l-1.9.6-1.7-2.9 1.6-1.2a7 7 0 0 1 0-2.1L4.4 10l1.7-2.9 1.9.6a7.4 7.4 0 0 1 1.8-1l.4-2h3.3l.4 2a7.4 7.4 0 0 1 1.8 1l1.9-.6L19.3 10l-1.6 1.2a7 7 0 0 1 0 2.2z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>Ajustes</button><button id="credits-btn" class="intro-mini"><svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M7 3.5h7.5L19 8v12.5H7z M14.5 3.5V8H19 M10 12h6 M10 15.5h6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg>Créditos y propiedad intelectual</button></div>
       <p class="intro-author"><svg class="mx-flag" viewBox="0 0 28 16" width="25" height="14" role="img" aria-label="Bandera de México"><rect width="9.34" height="16" fill="#006847"/><rect x="9.33" width="9.34" height="16" fill="#fff"/><rect x="18.66" width="9.34" height="16" fill="#ce1126"/><path d="M11.6 9.9 Q14 11.9 16.4 9.9" fill="none" stroke="#3f7f3a" stroke-width=".7"/><ellipse cx="14" cy="7.6" rx="1.7" ry="2.1" fill="#8a5a24"/><circle cx="14.9" cy="5.7" r=".75" fill="#8a5a24"/></svg><span>Autor: Oscar A. Sánchez</span></p>
-      <p class="intro-author"><svg class="mx-flag" viewBox="0 0 28 16" width="25" height="14" role="img" aria-label="Bandera de México"><rect width="9.34" height="16" fill="#006847"/><rect x="9.33" width="9.34" height="16" fill="#fff"/><rect x="18.66" width="9.34" height="16" fill="#ce1126"/><path d="M11.6 9.9 Q14 11.9 16.4 9.9" fill="none" stroke="#3f7f3a" stroke-width=".7"/><ellipse cx="14" cy="7.6" rx="1.7" ry="2.1" fill="#8a5a24"/><circle cx="14.9" cy="5.7" r=".75" fill="#8a5a24"/></svg><span>Co-autora: María José Gascón</span></p>
+      <p class="intro-author"><svg class="mx-flag" viewBox="0 0 28 16" width="25" height="14" role="img" aria-label="Bandera de México"><rect width="9.34" height="16" fill="#006847"/><rect x="9.33" width="9.34" height="16" fill="#fff"/><rect x="18.66" width="9.34" height="16" fill="#ce1126"/><path d="M11.6 9.9 Q14 11.9 16.4 9.9" fill="none" stroke="#3f7f3a" stroke-width=".7"/><ellipse cx="14" cy="7.6" rx="1.7" ry="2.1" fill="#8a5a24"/><circle cx="14.9" cy="5.7" r=".75" fill="#8a5a24"/></svg><span>Co-autora: María J. Gascón</span></p>
       <div class="loader"><div class="bar"><i id="load-bar"></i></div><span id="load-msg" aria-live="polite">Preparando la escena</span></div>
     </div>
   </section>
 </div>
-<script src="js/solaris.js?v=ffd70de160"></script>
+<script src="js/solaris.js?v=81d14f3a33"></script>
 </body>
 </html>
