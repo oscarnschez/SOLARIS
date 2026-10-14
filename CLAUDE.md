@@ -28,6 +28,10 @@ done
 
 Actualiza la versión **antes** de recalcular el `?v=` del script, porque cambiar la versión cambia el md5 de `js/solaris.js`.
 
+## Licencia
+
+El código fuente propio (HTML, CSS y JavaScript) es MIT (`LICENSE`). El nombre, el logotipo, los textos y todo `assets/` quedan fuera de la licencia; el alcance está en `NOTICE`. No añadas a `assets/` recursos sin licencia compatible y regístralos en Créditos.
+
 ## Privacidad y documentos legales
 
 - SOLARIS no usa cookies, analítica ni servicios de terceros al cargar. Las tipografías se sirven desde `assets/fonts/` (`css/fonts.css`); no vuelvas a enlazar Google Fonts ni otros CDN.
