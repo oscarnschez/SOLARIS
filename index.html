@@ -8,11 +8,11 @@
 <link rel="icon" type="image/png" sizes="32x32" href="assets/images/favicon-32.png">
 <link rel="apple-touch-icon" sizes="180x180" href="assets/images/apple-touch-icon.png">
 <meta name="description" content="Simulador educativo en 3D del Sistema Solar con planetas, lunas, asteroides, cometas y constelaciones.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="preload" href="assets/fonts/jost-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="css/fonts.css?v=450f18c3e4">
 <link rel="preload" href="assets/images/logo-solaris.png" as="image">
-<link rel="stylesheet" href="css/solaris.css?v=4e6fd17678">
+<link rel="stylesheet" href="css/privacidad.css?v=7545cd942b">
+<link rel="stylesheet" href="css/solaris.css?v=300e889665">
 <script>
 /* Pantalla de carga: movimiento reducido antes del primer pintado y salida de emergencia si el simulador no llega a arrancar */
 (function () {
@@ -79,6 +79,8 @@
         <button id="music-btn" class="mm-item music-btn" role="menuitem" data-music aria-haspopup="dialog" aria-expanded="false"><svg class="mi" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path class="mi-note" d="M9 17.5V6.2l10-2.2v11.3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle class="mi-note" cx="6.6" cy="17.6" r="2.4" fill="none" stroke="currentColor" stroke-width="1.7"/><circle class="mi-note" cx="16.6" cy="15.4" r="2.4" fill="none" stroke="currentColor" stroke-width="1.7"/><path class="mi-off" d="M4 4l16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>Música y sonido</span><small class="mm-state"></small></button>
         <button id="help-btn" class="mm-item" role="menuitem"><span>Atajos de teclado</span><kbd aria-hidden="true">?</kbd></button>
         <button id="more-guide" class="mm-item" role="menuitem"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 5.5C6.5 4.5 9.5 4.6 12 6.3c2.5-1.7 5.5-1.8 8-.8v13c-2.5-1-5.5-.9-8 .8-2.5-1.7-5.5-1.8-8-.8z M12 6.3v13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg><span>Instrucciones</span></button>
+        <button id="more-privacy" class="mm-item" role="menuitem" data-privacy-open><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 3.2l7 2.8v5.4c0 4.4-3 8.1-7 9.4-4-1.3-7-5-7-9.4V6z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M9 12.2l2.1 2.1L15.2 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Privacidad y cookies</span></button>
+        <div class="mm-legal"><a href="terminos-y-condiciones/" target="_blank" rel="noopener">Términos</a><a href="politica-de-privacidad/" target="_blank" rel="noopener">Privacidad</a><a href="politica-de-cookies/" target="_blank" rel="noopener">Cookies</a></div>
       </div>
     </div>
   </header>
@@ -201,6 +203,7 @@
         <p>Su objetivo no es comercial, sino educativo: aprender, explorar y compartir conocimiento.</p>
         <p class="about-close-line">SOLARIS nace de la idea de que entender mejor el universo también puede inspirarnos a seguir preguntando, investigando y descubriendo.</p>
       </div>
+      <div class="about-legal"><nav class="legal-links" aria-label="Información legal"><a href="terminos-y-condiciones/" target="_blank" rel="noopener">Términos y condiciones</a><a href="politica-de-privacidad/" target="_blank" rel="noopener">Política de privacidad</a><a href="politica-de-cookies/" target="_blank" rel="noopener">Política de cookies</a><button type="button" class="link" data-privacy-open>Preferencias de privacidad</button></nav></div>
       <div class="about-foot"><button id="about-credits" class="txt-btn">Créditos y propiedad intelectual</button><button id="about-ok" class="cta">Cerrar</button></div>
     </div>
   </div>
@@ -219,7 +222,7 @@
           <p class="cr-tag">Proyecto educativo independiente · México · Sin fines de lucro</p>
         </div>
         <nav class="cr-index cr-in" aria-label="Secciones">
-          <a href="#cr-sobre">Sobre SOLARIS</a><a href="#cr-recursos">Modelos 3D y recursos</a><a href="#cr-musica">Música y audio</a><a href="#cr-interstellar">Interstellar</a><a href="#cr-expanse" data-ship-ref="rocinante">The Expanse</a><a href="#cr-orville" data-ship-ref="orville">The Orville</a><a href="#cr-gargantua">Sistema Gargantúa</a><a href="#cr-marcas">Marcas registradas</a><a href="#cr-ciencia">Información científica</a><a href="#cr-agencias">Agencias y misiones</a><a href="#cr-ia">Inteligencia artificial</a><a href="#cr-finalidad">Finalidad no comercial</a><a href="#cr-solicitudes">Solicitudes</a><a href="#cr-gracias">Agradecimientos</a>
+          <a href="#cr-sobre">Sobre SOLARIS</a><a href="#cr-recursos">Modelos 3D y recursos</a><a href="#cr-musica">Música y audio</a><a href="#cr-interstellar">Interstellar</a><a href="#cr-expanse" data-ship-ref="rocinante">The Expanse</a><a href="#cr-orville" data-ship-ref="orville">The Orville</a><a href="#cr-gargantua">Sistema Gargantúa</a><a href="#cr-marcas">Marcas registradas</a><a href="#cr-ciencia">Información científica</a><a href="#cr-agencias">Agencias y misiones</a><a href="#cr-ia">Inteligencia artificial</a><a href="#cr-finalidad">Finalidad no comercial</a><a href="#cr-solicitudes">Solicitudes</a><a href="#cr-legal">Privacidad y términos</a><a href="#cr-gracias">Agradecimientos</a>
         </nav>
         <div class="cr-panel">
           <section id="cr-sobre" class="cr-sec cr-in">
@@ -263,7 +266,7 @@
               <div><dt>Enlace de origen</dt><dd><a href="https://www.youtube.com/watch?v=G7-1z_8Mn5M" target="_blank" rel="noopener">youtube.com/watch?v=G7-1z_8Mn5M</a></dd></div>
             </dl>
             <p class="cr-note">«Metamorphosis», de Laura Platt, se utiliza bajo la licencia Creative Commons Atribución 4.0 Internacional (CC BY 4.0), que permite su uso siempre que se reconozca la autoría.</p>
-            <p class="cr-note">Los efectos de sonido de la interfaz, de la navegación entre objetos y del modo de vuelo (motores, propulsores, alertas, escáner y logros) son originales de SOLARIS y se generan por síntesis en tiempo real. La voz de la computadora de a bordo usa la síntesis de voz del propio navegador, solo cuando ofrece una voz en español. Las texturas de la cabina y los materiales de los satélites dibujados por SOLARIS también son originales y se generan por procedimiento.</p>
+            <p class="cr-note">Los efectos de sonido de la interfaz, de la navegación entre objetos y del modo de vuelo (motores, propulsores, alertas, escáner y logros) son originales de SOLARIS y se generan por síntesis en tiempo real. La voz de la computadora de a bordo usa la síntesis de voz del propio navegador, solo con voces en español instaladas en el dispositivo (las voces en línea no se utilizan). Las texturas de la cabina y los materiales de los satélites dibujados por SOLARIS también son originales y se generan por procedimiento.</p>
           </section>
           <section id="cr-interstellar" class="cr-sec cr-in">
             <h2>Referencias a Interstellar</h2>
@@ -357,6 +360,12 @@
             <p>Las solicitudes legítimas serán revisadas y, cuando corresponda, se realizarán las modificaciones necesarias.</p>
             <div class="cr-contact"><span>Contacto</span><a href="mailto:oscarasanchez.c@outlook.com">oscarasanchez.c@outlook.com</a></div>
           </section>
+          <section id="cr-legal" class="cr-sec cr-in">
+            <h2>Privacidad, cookies y términos de uso</h2>
+            <p>SOLARIS no usa cookies, no tiene cuentas ni formularios y no incluye analítica, publicidad ni herramientas de rastreo. Lo único que guarda son tus ajustes y tu progreso, en tu propio navegador.</p>
+            <p>Las tipografías, texturas, modelos y música se sirven desde el propio sitio. Las fotografías reales de Wikimedia Commons solo se cargan si las activas.</p>
+            <ul class="cr-list"><li><a href="terminos-y-condiciones/" target="_blank" rel="noopener">Términos y condiciones</a></li><li><a href="politica-de-privacidad/" target="_blank" rel="noopener">Política de privacidad</a></li><li><a href="politica-de-cookies/" target="_blank" rel="noopener">Política de cookies</a></li><li><button type="button" class="link" data-privacy-open>Gestionar privacidad y cookies</button></li></ul>
+          </section>
           <section id="cr-gracias" class="cr-sec cr-in">
             <h2>Agradecimientos</h2>
             <p>SOLARIS reconoce y agradece el trabajo de científicos, astrónomos, ingenieros, artistas 3D, desarrolladores, divulgadores, instituciones y comunidades que hacen posible el acceso público al conocimiento y a recursos relacionados con la exploración espacial.</p>
@@ -368,6 +377,7 @@
         <footer class="cr-foot cr-in">
           <img data-logo="small" alt="SOLARIS" width="111" height="30">
           <p>Proyecto educativo independiente · México<br>Sin fines de lucro</p>
+          <nav class="legal-links" aria-label="Información legal"><a href="terminos-y-condiciones/" target="_blank" rel="noopener">Términos y condiciones</a><a href="politica-de-privacidad/" target="_blank" rel="noopener">Política de privacidad</a><a href="politica-de-cookies/" target="_blank" rel="noopener">Política de cookies</a><button type="button" class="link" data-privacy-open>Preferencias de privacidad</button></nav>
           <button id="cr-back2" class="cta-ghost">← Volver al inicio</button>
         </footer>
       </article>
@@ -404,10 +414,12 @@
       <div class="intro-actions"><button id="start" class="cta" disabled>Explorar el Sistema Solar</button><button id="start-tours" class="cta-ghost" disabled>Recorridos guiados</button><button id="start-fly" class="cta-ghost" disabled>Pilotar una nave</button><button id="guide-btn" class="intro-mini" aria-haspopup="dialog"><svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M9.6 9.3a2.5 2.5 0 1 1 3.6 2.3c-.8.4-1.2 1-1.2 1.8v.4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="12" cy="16.9" r="1" fill="currentColor"/></svg>Instrucciones</button><button id="intro-settings" class="intro-mini" data-open-settings><svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M12 8.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M19.3 13.4l1.6 1.2-1.7 2.9-1.9-.6a7.4 7.4 0 0 1-1.8 1l-.4 2h-3.3l-.4-2a7.4 7.4 0 0 1-1.8-1l-1.9.6-1.7-2.9 1.6-1.2a7 7 0 0 1 0-2.1L4.4 10l1.7-2.9 1.9.6a7.4 7.4 0 0 1 1.8-1l.4-2h3.3l.4 2a7.4 7.4 0 0 1 1.8 1l1.9-.6L19.3 10l-1.6 1.2a7 7 0 0 1 0 2.2z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>Ajustes</button><button id="credits-btn" class="intro-mini"><svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M7 3.5h7.5L19 8v12.5H7z M14.5 3.5V8H19 M10 12h6 M10 15.5h6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg>Créditos y propiedad intelectual</button></div>
       <p class="intro-author"><svg class="mx-flag" viewBox="0 0 28 16" width="25" height="14" role="img" aria-label="Bandera de México"><rect width="9.34" height="16" fill="#006847"/><rect x="9.33" width="9.34" height="16" fill="#fff"/><rect x="18.66" width="9.34" height="16" fill="#ce1126"/><path d="M11.6 9.9 Q14 11.9 16.4 9.9" fill="none" stroke="#3f7f3a" stroke-width=".7"/><ellipse cx="14" cy="7.6" rx="1.7" ry="2.1" fill="#8a5a24"/><circle cx="14.9" cy="5.7" r=".75" fill="#8a5a24"/></svg><span>Autor: Oscar A. Sánchez</span></p>
       <p class="intro-author"><svg class="mx-flag" viewBox="0 0 28 16" width="25" height="14" role="img" aria-label="Bandera de México"><rect width="9.34" height="16" fill="#006847"/><rect x="9.33" width="9.34" height="16" fill="#fff"/><rect x="18.66" width="9.34" height="16" fill="#ce1126"/><path d="M11.6 9.9 Q14 11.9 16.4 9.9" fill="none" stroke="#3f7f3a" stroke-width=".7"/><ellipse cx="14" cy="7.6" rx="1.7" ry="2.1" fill="#8a5a24"/><circle cx="14.9" cy="5.7" r=".75" fill="#8a5a24"/></svg><span>Co-autora: María J. Gascón</span></p>
+      <p class="intro-legal"><span>Sin cookies ni rastreo.</span><a href="terminos-y-condiciones/" target="_blank" rel="noopener">Términos</a><a href="politica-de-privacidad/" target="_blank" rel="noopener">Privacidad</a><a href="politica-de-cookies/" target="_blank" rel="noopener">Cookies</a><button type="button" class="link" data-privacy-open>Preferencias</button></p>
       <div class="loader"><div class="bar"><i id="load-bar"></i></div><span id="load-msg" aria-live="polite">Preparando la escena</span></div>
     </div>
   </section>
 </div>
-<script src="js/solaris.js?v=e9be6cb3c5"></script>
+<script src="js/privacidad.js?v=acbb3580f4"></script>
+<script src="js/solaris.js?v=7ecc43db95"></script>
 </body>
 </html>

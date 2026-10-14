@@ -1339,7 +1339,7 @@ return true;
 },
 };
 const ASSET_MANIFEST = {"music": {"webm": "assets/audio/metamorphosis.webm", "mp3": "assets/audio/metamorphosis.mp3"}, "bodyMeshes": {"fobos": {"url": "assets/models/moons/fobos.bin", "k": 1.26255}, "deimos": {"url": "assets/models/moons/deimos.bin", "k": 1.37497}, "haumea": {"url": "assets/models/dwarfs/haumea.bin", "k": 1.44255}}};
-const SOLARIS_BUILD = '2026.10.14-1020-web';
+const SOLARIS_BUILD = '2026.10.14-2018-web';
 console.info('SOLARIS · versión ' + SOLARIS_BUILD);
 const Assets = {
 cache: new Map(), busyN: new Map(),
@@ -2098,6 +2098,12 @@ init(canvas) {
 const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, depth: false, stencil: false, premultipliedAlpha: false, powerPreference: 'high-performance', preserveDrawingBuffer: false });
 if (!gl) throw new Error('WebGL2 no disponible');
 this.gl = gl; this.canvas = canvas;
+canvas.addEventListener('webglcontextlost', e => {   // el sistema liberó la GPU (habitual en iOS con poca memoria): se avisa y se ofrece recargar
+e.preventDefault(); this.lost = true;
+if (typeof CompareView !== 'undefined' && CompareView.active) { CompareView.exit(); Compare.render(); }
+let b = document.getElementById('gl-lost');
+if (!b) { b = document.createElement('div'); b.id = 'gl-lost'; b.setAttribute('role', 'alert'); b.innerHTML = '<p>Se perdió el contexto gráfico (WebGL), algo habitual cuando el dispositivo libera memoria. Las fichas, el comparador en 2D y los documentos siguen disponibles.</p><button class="cta" type="button">Recargar la vista 3D</button>'; b.querySelector('button').addEventListener('click', () => location.reload()); document.body.appendChild(b); }
+}, false);
 this.hdr = !!gl.getExtension('EXT_color_buffer_float');
 this.maxSamples = gl.getParameter(gl.MAX_SAMPLES) || 0;
 this.fsTri = gl.createVertexArray(); // triángulo de pantalla completa (usa gl_VertexID)
@@ -5092,7 +5098,14 @@ const tex = GLOBE_TEX.has(d.id) ? `<b style="background-image:url(assets/images/
 return `<i class="globe${d.id === 'saturno' ? ' ringed' : ''}${d.type === 'star' ? ' star' : ''}${cls ? ' ' + cls : ''}" style="--s:${size}px;--c:${d.color || '#94a0b6'};${style || ''}" aria-hidden="true"><span>${tex}</span></i>`;
 },
 };
-// Fotografías reales (Wikimedia Commons): se enlazan, no se copian al sitio. [archivo, autoría, licencia, misión y fecha, nota]
+// Enlaces legales: se abren en otra pestaña para no perder la sesión de exploración; «Preferencias» abre el panel de js/privacidad.js
+const LEGAL_LINKS_HTML = '<nav class="legal-links" aria-label="Información legal"><a href="terminos-y-condiciones/" target="_blank" rel="noopener">Términos y condiciones</a><a href="politica-de-privacidad/" target="_blank" rel="noopener">Política de privacidad</a><a href="politica-de-cookies/" target="_blank" rel="noopener">Política de cookies</a><button type="button" class="link" data-privacy-open>Preferencias de privacidad</button></nav>';
+// Permiso para el contenido externo opcional (desactivado por defecto): sin él no se hace ninguna petición a Wikimedia Commons
+const Privacy = {
+ok(p) { return !!(window.SolarisPrivacy && SolarisPrivacy.allows(p)); },
+allow(p, how) { if (window.SolarisPrivacy) SolarisPrivacy.set(p, true, how); },
+};
+// Fotografías reales (Wikimedia Commons): se enlazan, no se copian al sitio, y solo se cargan si la persona lo permite. [archivo, autoría, licencia, misión y fecha, nota]
 const PHOTOS = {
 sol: ["The_Sun_by_the_Atmospheric_Imaging_Assembly_of_NASA's_Solar_Dynamics_Observatory_-_20100819.jpg", 'NASA/SDO (instrumento AIA)', 'Dominio público', 'Solar Dynamics Observatory, 19 de agosto de 2010', 'Luz ultravioleta extrema (30.4 nm) en falso color: así se ven las capas altas de la atmósfera solar.'],
 mercurio: ['Mercury_in_true_color.jpg', 'NASA/JHUAPL/Carnegie Institution of Washington', 'Dominio público', 'Sonda MESSENGER, 6 de octubre de 2008'],
@@ -5127,21 +5140,45 @@ url(id, w) { return 'https://commons.wikimedia.org/wiki/Special:FilePath/' + enc
 page(id) { return 'https://commons.wikimedia.org/wiki/File:' + encodeURIComponent(PHOTOS[id][0]); },
 lic(id) { const l = PHOTOS[id][2]; return LICENSE_URL[l] ? `<a href="${LICENSE_URL[l]}" target="_blank" rel="noopener">${l}</a>` : esc(l); },
 credit(id) { const p = PHOTOS[id]; return `Imagen: ${esc(p[1])} · ${this.lic(id)} · <a href="${this.page(id)}" target="_blank" rel="noopener">Wikimedia Commons</a>`; },
-img(id, w, cls) { const n = BODY[id].name; return `<img class="${cls || ''}" data-photo="${id}" src="${this.url(id, w)}" alt="Fotografía real de ${esc(n)}" loading="lazy" decoding="async">`; },
+ok() { return Privacy.ok('wikimedia'); },
+img(id, w, cls) { const n = BODY[id].name; return `<img class="${cls || ''}" data-photo="${id}" src="${this.url(id, w)}" alt="Fotografía real de ${esc(n)}" loading="lazy" decoding="async" referrerpolicy="no-referrer">`; },
+// marco de la foto real; sin permiso, un aviso con el botón para activarla (no se descarga nada hasta entonces)
+frame(id, w, big) {
+const n = esc(BODY[id].name), at = `data-ph-slot="${id}" data-w="${w}"${big ? ' data-big="1"' : ''}`;
+if (!this.ok()) return `<span class="ph-frame ph-photo ph-off" ${at}><span class="ph-ask"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect x="3.5" y="5.5" width="17" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="9" cy="10.5" r="1.6" fill="currentColor"/><path d="M5 17l4.5-4.2 3 2.7 3-3.3L19.5 17" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg><button type="button" class="ph-allow" data-photo-allow aria-label="Mostrar foto real de ${n}, desde Wikimedia Commons">Mostrar foto real</button></span></span>`;
+const inner = this.img(id, w) + '<i class="ph-fail" aria-hidden="true">Sin conexión con Wikimedia Commons</i>';
+return big ? `<span class="ph-frame ph-photo" ${at}>${inner}</span>` : `<button type="button" class="ph-frame ph-photo" ${at} data-photo-open="${id}" aria-label="Ampliar la fotografía real de ${n}">${inner}</button>`;
+},
+// aviso informativo previo: qué pasa al activar las fotos (va junto al botón, enlazado con aria-describedby)
+whyHTML(id) { return this.ok() ? '' : `<p class="note ph-why" data-ph-why>Las fotografías reales se descargan de Wikimedia Commons, un servicio de la Fundación Wikimedia (Estados Unidos): al mostrarlas, tu navegador se conecta a sus servidores y les envía tu dirección IP. La preferencia se guarda en este navegador y puedes retirarla en <button type="button" class="link" data-privacy-open>Preferencias de privacidad</button>.</p>`; },
 // pareja «modelo girando / foto real»: el modelo es una esfera dibujada con la textura de SOLARIS
 pair(id, size, big) {
 const d = BODY[id], g = GLOBE_TEX.has(id), px = Math.round(size);
 const model = g ? `<figure class="ph-fig"><span class="ph-frame"><canvas class="ph-globe" data-globe="${id}" width="${px}" height="${px}" role="img" aria-label="Modelo de ${esc(d.name)} girando"></canvas></span>
 <figcaption><b>Modelo de SOLARIS</b><small>Girando${(d.rotH || 0) < 0 ? ' en sentido retrógrado' : ''} · rotación acelerada</small></figcaption></figure>` : '';
-return `<div class="ph-pair${g ? '' : ' solo'}" style="--ph:${px}px">${model}<figure class="ph-fig"><${big ? 'span' : `button type="button" data-photo-open="${id}" aria-label="Ampliar la fotografía real de ${esc(d.name)}"`} class="ph-frame ph-photo">${this.img(id, big ? 960 : 500)}<i class="ph-fail" aria-hidden="true">Sin conexión con Wikimedia Commons</i></${big ? 'span' : 'button'}>
+return `<div class="ph-pair${g ? '' : ' solo'}" style="--ph:${px}px">${model}<figure class="ph-fig">${this.frame(id, big ? 960 : 500, big)}
 <figcaption><b>Foto real</b><small>${esc(PHOTOS[id][3])}</small></figcaption></figure></div>`;
 },
 cardHTML(rb) {
 if (!this.has(rb.id)) return '';
 const p = PHOTOS[rb.id], g = GLOBE_TEX.has(rb.id);
-return `<section class="ph-cmp"><h3>Modelo y fotografía real</h3>${this.pair(rb.id, 136)}
+return `<section class="ph-cmp"><h3>Modelo y fotografía real</h3>${this.pair(rb.id, 136)}${this.whyHTML(rb.id)}
 ${p[4] ? `<p class="note">${esc(p[4])}</p>` : ''}${g ? '' : '<p class="note">En SOLARIS este cuerpo se dibuja con un sombreado procedimental: compáralo con la vista 3D, que gira en tiempo real.</p>'}
 <p class="ph-credit">${this.credit(rb.id)}</p></section>`;
+},
+thumb(id, w) { return `<span class="cmp-thumb" data-ph-thumb="${id}" data-w="${w}">${this.ok() ? this.img(id, w) : ''}</span>`; },
+// aplica el permiso actual a todo lo que ya está en pantalla: activa o retira las fotos sin recargar la ficha
+sync() {
+const ok = this.ok();
+document.querySelectorAll('[data-ph-slot]').forEach(el => {
+const focus = el.contains(document.activeElement), tmp = document.createElement('div');
+tmp.innerHTML = this.frame(el.dataset.phSlot, +el.dataset.w || 500, el.dataset.big === '1');
+const nu = tmp.firstElementChild; el.replaceWith(nu);
+if (focus) { const f = nu.matches('button') ? nu : nu.querySelector('button'); if (f) f.focus({ preventScroll: true }); }
+});
+document.querySelectorAll('[data-ph-why]').forEach(el => { el.hidden = ok; });
+document.querySelectorAll('[data-ph-thumb]').forEach(el => { el.innerHTML = ok ? this.img(el.dataset.phThumb, +el.dataset.w || 120) : ''; });
+if (!ok) document.querySelectorAll('img[data-photo]').forEach(im => { const m = im.closest('.fd-media'); if (m) { im.remove(); m.classList.add('fd-dot'); } });
 },
 open(id) {
 let b = $('#ph-box');
@@ -5154,14 +5191,24 @@ addEventListener('keydown', e => { if (e.key === 'Escape' && b.classList.contain
 const d = BODY[id], p = PHOTOS[id], sz = Math.min(380, Math.floor((Math.min(innerWidth, 900) - 90) / (GLOBE_TEX.has(id) ? 2 : 1)));
 this._from = document.activeElement;
 b.innerHTML = `<div class="ph-card"><header><div><span class="tp-kicker">Comparar con la realidad</span><h2 id="ph-title">${esc(d.name)}</h2></div><button class="icon-btn" data-ph-close aria-label="Cerrar">&times;</button></header>
-${this.pair(id, sz, true)}${p[4] ? `<p class="note">${esc(p[4])}</p>` : ''}<p class="ph-credit">${this.credit(id)}</p></div>`;
+${this.pair(id, sz, true)}${this.whyHTML(id)}${p[4] ? `<p class="note">${esc(p[4])}</p>` : ''}<p class="ph-credit">${this.credit(id)}</p></div>`;
 b.classList.add('open'); GlobeCanvas.scan(b);
 setTimeout(() => { const x = b.querySelector('[data-ph-close]'); if (x) x.focus({ preventScroll: true }); }, 30);
 },
 close() { const b = $('#ph-box'); if (!b) return; b.classList.remove('open'); b.innerHTML = ''; if (this._from && this._from.focus) this._from.focus({ preventScroll: true }); },
 };
 document.addEventListener('error', e => { const im = e.target; if (im && im.dataset && im.dataset.photo) { const f = im.closest('.ph-frame') || im.parentNode; if (f) f.classList.add('failed'); } }, true);
-document.addEventListener('click', e => { const o = e.target.closest && e.target.closest('[data-photo-open]'); if (o) Photo.open(o.dataset.photoOpen); });
+document.addEventListener('click', e => {
+const o = e.target.closest && e.target.closest('[data-photo-open]'); if (o) return Photo.open(o.dataset.photoOpen);
+const a = e.target.closest && e.target.closest('[data-photo-allow]'); if (a) Privacy.allow('wikimedia', a.closest('#cmp') ? 'comparador' : a.closest('#ph-box') ? 'visor' : 'ficha');
+});
+addEventListener('solaris:privacy', () => Photo.sync());
+// borrado desde el panel de privacidad: deja de escribir esas claves antes de que la página se recargue
+addEventListener('solaris:privacy-wipe', e => {
+const k = (e.detail && e.detail.keys) || [];
+if (k.includes(SETTINGS_KEY)) { clearTimeout(Settings._saveT); Settings._dirty = false; Settings.save = Settings.flush = () => {}; }
+if (k.includes(FG_KEY)) FlightGame.save = () => {};
+});
 // Esfera girando en un canvas 2D: proyección ortográfica de la miniatura equirectangular con iluminación, atmósfera y anillos
 const GlobeCanvas = {
 tex: {}, live: new Set(), raf: 0, t0: 0,
@@ -6328,6 +6375,9 @@ const groups = [
 ['El Sol, planetas y lunas', Object.keys(PLANET_TEX).map(id => { const a = fromCredit(BODY[id].name, BODY[id].credit); if (GLOBE_TEX.has(id)) a.note = (a.note ? a.note + '; ' : '') + 'también se muestra reducida como miniatura en las fichas y los recorridos'; return a; })],
 ['Fotografías reales (fichas y comparador)', Object.keys(PHOTOS).map(id => ({ use: 'Foto real de ' + BODY[id].name, name: PHOTOS[id][0].replace(/_/g, ' ').replace(/\.\w+$/, ''), author: PHOTOS[id][1], source: 'Wikimedia Commons', license: PHOTOS[id][2], licenseUrl: LICENSE_URL[PHOTOS[id][2]], url: Photo.page(id), note: PHOTOS[id][3] + '; la imagen se enlaza desde Wikimedia Commons, no se copia al sitio' }))],
 ['Naves del modo de vuelo', SHIPS.filter(sh => MODEL_CREDITS[sh.id]).map(sh => fromCredit('Nave ' + sh.name, MODEL_CREDITS[sh.id]))],
+['Tipografías (alojadas en el propio sitio)', [
+{ use: 'Textos e interfaz', name: 'Jost', author: 'The Jost Project Authors (indestructible type*)', source: 'github.com', license: 'SIL Open Font License 1.1', licenseUrl: 'assets/fonts/OFL-Jost.txt', url: 'https://github.com/indestructible-type/Jost', note: 'Archivos WOFF2 de Fontsource servidos desde SOLARIS: no hay conexión con servicios de fuentes de terceros' },
+{ use: 'Cifras, unidades e instrumentos', name: 'JetBrains Mono', author: 'The JetBrains Mono Project Authors', source: 'github.com', license: 'SIL Open Font License 1.1', licenseUrl: 'assets/fonts/OFL-JetBrainsMono.txt', url: 'https://github.com/JetBrains/JetBrainsMono', note: 'Archivos WOFF2 de Fontsource servidos desde SOLARIS' }]],
 ['Recursos utilizados en versiones anteriores', PREV_CREDITS.map(p => fromCredit(BODY[p.id].name + ' (versión anterior)', p.credit))],
 ['Música', [{ use: 'Tema musical principal de SOLARIS', name: MUSIC_INFO.title, author: MUSIC_INFO.artist, source: 'YouTube', license: MUSIC_INFO.license, licenseUrl: MUSIC_INFO.licenseUrl, url: MUSIC_INFO.url }]],
 ['Referencias culturales', SHIPS.filter(sh => sh.brand && sh.brand.credit).map(sh => ({ use: 'Ficha de la nave ' + sh.name, name: sh.brand.credit.name, author: sh.brand.credit.author, source: 'Imagen aportada por el creador del proyecto',
@@ -6725,6 +6775,8 @@ const SETTINGS_SCHEMA = [
 { type: 'action', id: 'reset-all', label: 'Restaurar valores predeterminados', desc: 'Devuelve todos los ajustes a su configuración inicial.', danger: true },
 { type: 'note', label: 'Versión de SOLARIS: ' + SOLARIS_BUILD },
 { type: 'link', id: 'open-credits', label: 'Fuentes, créditos y licencias', desc: 'Datos de NASA, JPL y MPC; modelos 3D y música con sus atribuciones.' },
+{ type: 'link', id: 'open-privacy', label: 'Privacidad y cookies', desc: 'SOLARIS no usa cookies ni rastreo. Revisa lo que se guarda en este navegador, bórralo o decide si cargar fotografías de Wikimedia Commons.' },
+{ type: 'legal' },
 ] },
 { id: 'audio', title: 'Audio', items: [
 { type: 'range', path: 'audio.master', label: 'Volumen general', desc: 'Controla todo el audio de SOLARIS.' },
@@ -6811,6 +6863,7 @@ $('#set-body').innerHTML = `<h2 id="set-cat-title">${t(cat.title)}</h2>` + cat.i
 const id = 'set-' + cat.id + '-' + i, v = this.itemValue(it), desc = it.desc ? `<p class="set-desc">${t(it.desc)}</p>` : '';
 if (it.type === 'head') return `<h3 class="set-head">${t(it.label)}</h3>`;
 if (it.type === 'note') return `<p class="set-note">${t(it.label)}</p>`;
+if (it.type === 'legal') return `<div class="set-legal">${LEGAL_LINKS_HTML}</div>`;
 if (it.type === 'keys') return this.keysHTML();
 if (it.type === 'action' || it.type === 'link') return `<div class="set-row"><div class="set-lbl"><b>${t(it.label)}</b>${desc}</div><button class="${it.danger ? 'set-btn danger' : 'set-btn'}" data-act="${it.id}">${t(it.type === 'link' ? 'Abrir' : 'Restaurar')}</button></div>`;
 if (it.type === 'toggle') return `<label class="set-row set-tog" for="${id}"><div class="set-lbl"><b>${t(it.label)}</b>${desc}</div><input type="checkbox" id="${id}" data-i="${i}" ${v ? 'checked' : ''}><span class="sw" aria-hidden="true"></span></label>`;
@@ -6852,6 +6905,7 @@ const act = e.target.closest('[data-act]'); if (!act) return;
 if (act.dataset.act === 'reset-all') resetAll();
 if (act.dataset.act === 'reset-keys') { Settings.resetControls(); this.renderSettings(); this.toast(t('Controles restaurados')); }
 if (act.dataset.act === 'open-credits') { this.closeSettings(); this.openCredits(); }
+if (act.dataset.act === 'open-privacy' && window.SolarisPrivacy) SolarisPrivacy.open();
 });
 m.addEventListener('change', e => { const el = e.target; if (!el.matches('input[type="checkbox"][data-i]')) return; const it = this.curItems()[+el.dataset.i]; if (it.set) it.set(el.checked); else Settings.set(it.path, el.checked); if (it.path === 'graphics.auto') this.renderSettings(); });
 m.addEventListener('input', e => { const el = e.target; if (!el.matches('input[type="range"][data-i]')) return; const it = this.curItems()[+el.dataset.i], v = +el.value; Settings.set(it.path, v); el.nextElementSibling.textContent = (it.fmt || PCT)(v); });
@@ -7170,13 +7224,13 @@ else if (v === 'view') { this.view = a.dataset.v; this.render(); }
 else if (v === 'add') { this.add(id); $('#cmp-q').value = ''; }
 });
 p.addEventListener('input', e => { if (e.target.id === 'cmp-q') this.renderHits(); });
-addEventListener('keydown', e => { if (e.key === 'Escape' && this.isOpen()) { e.stopImmediatePropagation(); this.close(); } }, true);
+addEventListener('keydown', e => { if (e.key === 'Escape' && this.isOpen() && !$('#ph-box.open')) { e.stopImmediatePropagation(); if (CompareView.active && CompareView.sel) CompareView.select(null); else this.close(); } }, true);
 }
 UI.openSection(null);
 p.classList.add('open'); this.render(); this.paintTray();
 setTimeout(() => { const q = $('#cmp-q'); if (q && this.list.length < 2) q.focus(); }, 60);
 },
-close() { const p = $('#cmp'); if (p) p.classList.remove('open'); this.paintTray(); },
+close() { const p = $('#cmp'); if (p) p.classList.remove('open'); CompareView.exit(); this.paintTray(); },
 ROWS: [
 ['Tipo', null], ['Diámetro', /^Diámetro medio/, 'diam'], ['Radio', /^Radio medio/], ['Masa', /^Masa$/, 'mass'],
 ['Gravedad superficial', /^Gravedad superficial/, 'grav'], ['Temperatura', /^Temperatura aproximada/], ['Duración del día', /^Duración de un día/],
@@ -7206,15 +7260,19 @@ render() {
 const p = $('#cmp'); if (!p) return;
 const rbs = this.list.map(id => World.byId[id]).filter(Boolean); rbs.forEach(rb => { rb._cmpF = null; });
 const tabs = [['tabla', 'Datos'], ['tamano', 'Comparar tamaño'], ['gravedad', 'Gravedad'], ['fotos', 'Fotos reales']];
-p.innerHTML = `
+const studio = rbs.length >= 2 && this.view === 'tamano' && CompareView.supported();
+p.classList.toggle('cmp-3d', studio);
+p.innerHTML = `<div class="cmp-top">
 <header class="tp-head"><div><span class="tp-kicker">Herramienta</span><h2 id="cmp-title">Comparar cuerpos celestes</h2></div><button class="icon-btn" data-c="close" aria-label="Cerrar">&times;</button></header>
-<div class="cmp-cards">${rbs.map(rb => `<div class="cmp-card">${Photo.has(rb.id) ? `<span class="cmp-thumb">${Photo.img(rb.id, 120)}</span>` : ''}<i class="dot" style="--c:${rb.def.color}"></i><b>${esc(rb.def.name)}</b><small>${esc(TYPE_LABEL[rb.def.type])}${rb.def.type === 'moon' && rb.parent ? ' de ' + esc(rb.parent.def.name) : ''}</small>
+<div class="cmp-cards">${rbs.map(rb => `<div class="cmp-card">${Photo.has(rb.id) ? Photo.thumb(rb.id, 120) : ''}<i class="dot" style="--c:${rb.def.color}"></i><b>${esc(rb.def.name)}</b><small>${esc(TYPE_LABEL[rb.def.type])}${rb.def.type === 'moon' && rb.parent ? ' de ' + esc(rb.parent.def.name) : ''}</small>
 <span class="cmp-card-act"><button class="txt-btn" data-c="locate" data-id="${rb.id}">Localizar</button><button class="txt-btn" data-c="remove" data-id="${rb.id}" aria-label="Quitar ${esc(rb.def.name)}">Quitar</button></span></div>`).join('')}
 ${rbs.length < this.MAX ? `<div class="cmp-card cmp-add"><input id="cmp-q" type="search" placeholder="Añadir un objeto…" autocomplete="off" aria-label="Buscar un objeto para comparar"><ul id="cmp-hits" role="listbox"></ul></div>` : ''}</div>
 ${rbs.length < 2 ? `<p class="note cmp-empty">Elige al menos dos objetos para compararlos. Puedes añadirlos aquí o con «+ Comparar» en la ficha de cada objeto.</p>` : `
-<div class="seg tp-tabs" role="tablist">${tabs.map(([v, t]) => `<button role="tab" aria-selected="${this.view === v}" class="${this.view === v ? 'on' : ''}" data-c="view" data-v="${v}">${t}</button>`).join('')}</div>
-<div class="tp-body">${this.view === 'tamano' ? this.sizeHTML(rbs) : this.view === 'gravedad' ? this.gravHTML(rbs) : this.view === 'fotos' ? this.photosHTML(rbs) : this.tableHTML(rbs)}</div>`}`;
+<div class="seg tp-tabs" role="tablist">${tabs.map(([v, t]) => `<button role="tab" aria-selected="${this.view === v}" class="${this.view === v ? 'on' : ''}" data-c="view" data-v="${v}">${t}</button>`).join('')}</div>`}</div>
+${rbs.length < 2 ? '' : `<div class="tp-body">${this.view === 'tamano' ? (studio ? this.studioHTML(rbs) : this.sizeHTML(rbs, true)) : this.view === 'gravedad' ? this.gravHTML(rbs) : this.view === 'fotos' ? this.photosHTML(rbs) : this.tableHTML(rbs)}</div>`}
+<div class="cmp-legal">${LEGAL_LINKS_HTML}</div>`;
 this.renderHits(); GlobeCanvas.scan(p);
+if (studio && p.classList.contains('open')) CompareView.enter($('#cmp-stage'), rbs); else CompareView.exit();
 },
 renderHits() {
 const q = $('#cmp-q'), ul = $('#cmp-hits'); if (!q || !ul) return;
@@ -7236,7 +7294,12 @@ return `<tr><th scope="row">${label}${B && B.log ? '<small class="cmp-log" data-
 return `<div class="cmp-scroll"><table class="cmp-table"><thead><tr><th></th>${rbs.map(rb => `<th scope="col">${esc(rb.def.short || rb.def.name)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>
 <p class="note">Datos de referencia de las fichas de SOLARIS (NASA y JPL). «calc.» indica valores calculados a partir de la masa y el radio.${rbs.some(rb => rb.def.type === 'moon') ? ' En las lunas, el periodo y la velocidad orbital se refieren a su órbita alrededor del planeta.' : ''}</p>`;
 },
-sizeHTML(rbs) {
+studioHTML(rbs) {                                // comparador 3D: los modelos de SOLARIS se dibujan en el hueco del escenario
+const D = rbs.map(rb => 2 * rb.def.R), big = rbs[D.indexOf(Math.max(...D))], small = rbs[D.indexOf(Math.min(...D))], ratio = Math.max(...D) / Math.min(...D);
+return CompareView.html() + `<div class="cmp-foot"><p class="cmp-ratio">El diámetro de <b>${esc(big.def.name)}</b> es <b>${fmt(ratio, ratio < 10 ? 1 : 0)} veces</b> el de <b>${esc(small.def.name)}</b>.</p>
+<p class="note">Medida empleada: <b>diámetro medio volumétrico</b> (NASA). Con «Escala real», los tamaños son proporcionales entre sí; la distancia entre los cuerpos no es real. Cada cuerpo gira sobre su propio eje con su periodo de rotación sideral y su sentido; no se muestra su movimiento alrededor del Sol (traslación).</p></div>`;
+},
+sizeHTML(rbs, fallback) {
 const D = rbs.map(rb => 2 * rb.def.R), W = 760, H = 310, pad = 18, gap = 18, SLOT = 112;   // espacio mínimo por etiqueta
 const sum = D.reduce((a, c) => a + c, 0), s = Math.min(Math.max(1e-9, W - pad * 2 - gap * (rbs.length - 1) - SLOT * rbs.length * 0.5) / sum, (H - 84) / Math.max(...D));
 let x = pad; const base = H - 58;
@@ -7252,13 +7315,14 @@ const vbW = Math.max(W, x - gap + pad);
 const big = rbs[D.indexOf(Math.max(...D))], small = rbs[D.indexOf(Math.min(...D))], ratio = Math.max(...D) / Math.min(...D);
 return `<svg class="cmp-size" viewBox="0 0 ${vbW} ${H}" role="img" aria-label="Comparación de tamaños a escala relativa">${circ}<line x1="${pad}" y1="${base}" x2="${vbW - pad}" y2="${base}" class="sz-base"/></svg>
 <p class="cmp-ratio">El diámetro de <b>${esc(big.def.name)}</b> es <b>${fmt(ratio, ratio < 10 ? 1 : 0)} veces</b> el de <b>${esc(small.def.name)}</b>.</p>
-<p class="note">Escala relativa basada en diámetro real. No usa la escala visual ampliada del Sistema Solar.</p>`;
+<p class="note">Escala relativa basada en diámetro real. No usa la escala visual ampliada del Sistema Solar.</p>${fallback ? '<p class="note">Vista simplificada en 2D: este dispositivo o navegador no ofrece WebGL 2 o el contexto gráfico se perdió, así que no se pueden mostrar los modelos 3D.</p>' : ''}`;
 },
 photosHTML(rbs) {
 const n = rbs.length, sz = innerWidth < 760 ? 118 : n > 3 ? 112 : n > 2 ? 138 : 168;
 return `<div class="cmp-photos" style="--n:${n}">${rbs.map(rb => `<div class="cp-col"><h4><i class="dot" style="--c:${rb.def.color}"></i>${esc(rb.def.name)}</h4>
 ${Photo.has(rb.id) ? Photo.pair(rb.id, sz) + `<p class="ph-credit">${Photo.credit(rb.id)}</p>` : `<p class="note">Aún no hay una fotografía real de ${esc(rb.def.name)} en SOLARIS${['asteroid', 'comet', 'tno'].includes(rb.def.type) ? ': muchos de estos objetos solo se conocen como puntos de luz o por imágenes de sobrevuelos parciales' : ''}.</p>`}</div>`).join('')}</div>
-<p class="note">Las fotografías no están a la misma escala: cada una muestra el objeto completo. Pulsa una foto para verla en grande junto al modelo girando. Las imágenes se cargan desde Wikimedia Commons.</p>`;
+${Photo.ok() ? '' : `<p class="note ph-why" data-ph-why>Las fotografías reales se descargan de Wikimedia Commons, un servicio de la Fundación Wikimedia (Estados Unidos): al mostrarlas, tu navegador se conecta a sus servidores y les envía tu dirección IP. La preferencia se guarda en este navegador y puedes retirarla en <button type="button" class="link" data-privacy-open>Preferencias de privacidad</button>.</p>`}
+<p class="note">Las fotografías no están a la misma escala: cada una muestra el objeto completo. Pulsa una foto para verla en grande junto al modelo girando. Las imágenes se cargan desde Wikimedia Commons solo si lo permites.</p>`;
 },
 gravHTML(rbs) {
 const G = rbs.map(rb => this.grav(rb)), B = this.bars(G);
@@ -7271,6 +7335,338 @@ return `<div class="cg-row"><b><i class="dot" style="--c:${rb.def.color}"></i>${
 <small>Una báscula que marca 70 kg en la Tierra marcaría ≈ ${fmt(kg, kg < 1 ? 2 : 1)} kg${rb.def.type === 'planet' && ['jupiter', 'saturno', 'urano', 'neptuno'].includes(rb.id) ? ' (en la parte alta de la atmósfera: no tiene superficie sólida)' : ''}.</small></div>`;
 }).join('')}</div>${B && B.log ? '<p class="note">Las barras usan escala logarítmica por la gran diferencia entre valores.</p>' : ''}
 <p class="note">Factor respecto a la gravedad terrestre (9.81 m/s²). La masa no cambia: lo que varía es el peso.</p>`;
+},
+};
+// Rotación de los cuerpos para el comparador 3D. Fuente principal: NASA/NSSDCA Planetary Fact Sheets.
+// P: periodo de rotación sideral en horas (negativo = retrógrado); obl: inclinación del eje respecto al plano de su órbita, en grados (NASA)
+const NSSDC = 'https://nssdc.gsfc.nasa.gov/planetary/factsheet/';
+const ROT_DATA = {
+sol: { P: 609.12, obl: 7.25, ref: 'la eclíptica', fs: 'sunfact', note: 'Periodo adoptado a 16° de latitud: el Sol no es sólido y gira más rápido en el ecuador (≈ 25 días) que cerca de los polos (≈ 35 días).' },
+mercurio: { P: 1407.6, obl: 0.034, fs: 'mercuryfact', note: 'Gira tres veces sobre su eje por cada dos vueltas al Sol (resonancia 3:2).' },
+venus: { P: -5832.6, obl: 177.36, fs: 'venusfact', note: 'Rotación retrógrada y la más lenta de los planetas: su día sideral dura más que su año (224.7 días).' },
+tierra: { P: 23.9345, obl: 23.44, fs: 'earthfact', note: 'El día sideral (23 h 56 min) es unos 4 minutos más corto que el día solar de 24 h.' },
+luna: { P: 655.728, obl: 6.68, ref: 'su órbita alrededor de la Tierra', fs: 'moonfact', note: 'Rotación síncrona: tarda lo mismo en girar sobre sí misma que en dar una vuelta a la Tierra, por eso siempre nos muestra la misma cara.' },
+marte: { P: 24.6229, obl: 25.19, fs: 'marsfact' },
+jupiter: { P: 9.925, obl: 3.13, fs: 'jupiterfact', note: 'Periodo del Sistema III (1965.0), ligado al campo magnético. Las nubes ecuatoriales giran unos minutos más deprisa.' },
+saturno: { P: 10.656, obl: 26.73, fs: 'saturnfact', note: 'Periodo de referencia de NASA (Sistema III, radioemisiones). Estudios de 2019 basados en ondas en sus anillos proponen ≈ 10.56 h: el valor exacto sigue en estudio.' },
+urano: { P: -17.24, obl: 97.77, fs: 'uranusfact', note: 'Gira casi tumbado: su eje está prácticamente en el plano de su órbita.' },
+neptuno: { P: 16.11, obl: 28.32, fs: 'neptunefact', note: 'Periodo del interior derivado de las radioemisiones medidas por la Voyager 2.' },
+pluton: { P: -153.2928, obl: 119.51, fs: 'plutofact', note: 'Rotación retrógrada; Plutón y Caronte giran sincronizados y siempre se muestran la misma cara.' },
+};
+const CompareView = {
+active: false, stage: null, rect: null, items: [], tSim: 0, playing: true, speed: 'media', custom: 7200, scale: 'real', info: false, sel: null,
+SPEEDS: [['real', 'Tiempo real', 1], ['baja', '10 min por segundo', 600], ['media', '2 horas por segundo', 7200], ['alta', '1 día por segundo', 86400], ['custom', 'Personalizada', null]],
+view: new Float64Array(16), proj: new Float64Array(16), cam: [0, 0, 1], camT: null, o: {},
+// datos de rotación de un cuerpo: curados (NASA) o los de su ficha de SOLARIS
+rot(rb) {
+const d = rb.def, R = ROT_DATA[rb.id];
+if (R) {
+const obl = R.obl, retro = R.P < 0;
+return { P: R.P, obl, tilt: obl > 90 ? 180 - obl : obl, sign: retro ? -1 : 1, retro, ref: R.ref || 'su órbita', note: R.note || '', src: 'NASA/NSSDCA · ' + ({ sunfact: 'Sun', moonfact: 'Moon', earthfact: 'Earth', mercuryfact: 'Mercury', venusfact: 'Venus', marsfact: 'Mars', jupiterfact: 'Jupiter', saturnfact: 'Saturn', uranusfact: 'Uranus', neptunefact: 'Neptune', plutofact: 'Pluto' }[R.fs]) + ' Fact Sheet', url: NSSDC + R.fs + '.html', kind: 'nasa' };
+}
+const o = d.orbit;
+if (d.locked && o && o.P) return { P: o.P * 24, obl: null, tilt: 0, sign: 1, retro: false, ref: 'su órbita', note: 'Rotación síncrona: su periodo de rotación sideral coincide con su periodo orbital alrededor de ' + (rb.parent ? rb.parent.def.name : 'su planeta') + '.', src: d.src, kind: 'sync' };
+if (d.rotH) return { P: d.rotH, obl: null, tilt: 0, sign: d.rotH < 0 ? -1 : 1, retro: d.rotH < 0, ref: '', note: '', src: d.src, kind: 'ficha' };
+return { P: null, obl: null, tilt: 0, sign: 1, retro: false, ref: '', note: 'Sin un periodo de rotación medido con fiabilidad: el modelo se muestra sin girar.', src: d.src, kind: 'none' };
+},
+speedK() { const s = this.SPEEDS.find(x => x[0] === this.speed); return s && s[2] != null ? s[2] : this.custom; },
+supported() { return !!(GLX.gl && !GLX.lost && World.P && World.meshes && World.meshes.hi); },
+enter(stage, rbs) {
+this.stage = stage; this.active = true; this._ctlPainted = false; this._labH = this._svgH = null;
+const ids = rbs.map(rb => rb.id);
+if (this.sel && !ids.includes(this.sel)) this.sel = null;
+this.items = rbs.map(rb => ({ rb, rot: this.rot(rb), w0: (rb.def.W0 || 0) + 90 }));
+this.items.forEach(it => { if (PLANET_TEX[it.rb.id]) World.requestTex(it.rb.id, true); if (it.rb.isSun) World.requestTex('sol', true); });
+if (this._first == null) { this._first = true; if (UI.reducedMotion) this.playing = false; }
+$('#app').classList.add('cmp-studio');
+this.bind(); this.layout(); this.measure(); this.paint();
+},
+exit() {
+if (!this.active) return;
+this.active = false; this.stage = null; this.dragS = null;
+$('#app').classList.remove('cmp-studio');
+},
+measure() { if (!this.stage) return; const r = this.stage.getBoundingClientRect(), c = this.stage.querySelector('.cs-ctrl'); this.rect = { x: r.left, y: r.top, w: r.width, h: r.height }; if (c) this.ctlH = c.offsetHeight + 14; },
+// disposición en fila: escala real (radios proporcionales) o adaptada (ilustrativa)
+layout() {
+const its = this.items; if (!its.length) return;
+const Rmax = Math.max(...its.map(it => it.rb.def.R));
+its.forEach(it => {
+const R = it.rb.def.R;
+it.r = this.scale === 'real' ? R / Rmax : Math.pow(R / Rmax, 0.42);
+const ring = it.rb.def.vis.rings, F = this.frameOf(it);
+it.ringK = ring ? ring.out : 1; it.halfW = it.halfH = it.r;
+if (ring) for (let a = 0; a < TAU; a += TAU / 48) { const p = V.add(V.scale(F.Q, Math.cos(a)), V.scale(F.PxQ, Math.sin(a))); it.halfW = Math.max(it.halfW, Math.abs(p[0]) * ring.out * it.r); it.halfH = Math.max(it.halfH, Math.abs(p[1]) * ring.out * it.r); }
+});
+const W = this.rect ? this.rect.w : 800, slotPx = innerWidth < 600 ? 96 : 116, gap = 0.18 * Math.max(...its.map(it => it.r));
+let total = its.reduce((s, it) => s + it.halfW * 2, 0) + gap * (its.length - 1);
+for (let k = 0; k < 6; k++) { const minW = slotPx * total / Math.max(W - 40, 100); total = its.reduce((s, it) => s + Math.max(it.halfW * 2, minW), 0) + gap * (its.length - 1); }
+const minW = slotPx * total / Math.max(W - 40, 100);
+let x = -total / 2;
+its.forEach(it => { const w = Math.max(it.halfW * 2, minW); it.pos = [x + w / 2, it.halfH, 0]; x += w + gap; });
+this.total = total; this.maxH = Math.max(...its.map(it => it.halfH * 2));
+this.over = this.over || { zoom: 1, px: 0, py: 0 };
+},
+fov: 18 * DEG,
+// cámara: vista general (encuadra la fila) o inspección de un cuerpo (órbita alrededor de él)
+camGoal() {
+const R = this.rect, asp = R.w / Math.max(R.h, 1), tv = Math.tan(this.fov / 2), th = tv * asp, it = this.sel && this.items.find(i => i.rb.id === this.sel);
+if (it) {
+const I = this.insp, info = this.stage.querySelector('.cs-info'), narrow = R.w < 600, ih = info && !info.hidden ? (narrow ? info.offsetHeight : info.offsetWidth) : 0;
+const fitH = narrow ? Math.max(R.h - ih - (this.ctlH || 96), 120) / R.h : 1, d = it.r * Math.max(it.ringK, 1) * 1.3 / Math.min(tv * fitH, th) * I.zoom;
+const ce = Math.cos(I.el), dir = [ce * Math.sin(I.az), Math.sin(I.el), ce * Math.cos(I.az)], upp = 2 * d * tv / R.h;
+const right = V.norm(V.cross([0, 1, 0], dir)), up = V.cross(dir, right);
+const off = narrow ? V.scale(up, -(ih - (this.ctlH || 96)) / 2 * upp) : V.scale(right, ih / 2 * upp);   // el cuerpo queda en el hueco libre que dejan la ficha y los controles
+const tgt = V.add(it.pos, off);
+return { tgt, pos: V.add(tgt, V.scale(dir, d)) };
+}
+const labelPx = 60, topPx = this.ctlH || 96, usable = Math.max(R.h - labelPx - topPx, 60) / R.h;   // sitio para los controles arriba y los nombres abajo
+const dW = (this.total / 2 * 1.06) / th, dH = (this.maxH / 2 * 1.04) / (tv * usable);
+const O = this.over, d = Math.max(dW, dH) / O.zoom;
+const cy = this.maxH / 2 + ((topPx - labelPx) / R.h) * tv * d;
+const tgt = [O.px, cy + O.py, 0];
+return { tgt, pos: V.add(tgt, [0, 0, d]) };
+},
+frame(dt, t) {
+if (!this.stage || !this.stage.isConnected) { this.exit(); return; }
+if (this.playing) this.tSim += dt * this.speedK();
+this.measure();
+const G = this.camGoal(), k = this.camT == null || UI.reducedMotion ? 1 : 1 - Math.exp(-dt * 7);
+if (this.camT == null) this.camT = { tgt: G.tgt, pos: G.pos };
+this.camT.tgt = V.lerp(this.camT.tgt, G.tgt, k); this.camT.pos = V.lerp(this.camT.pos, G.pos, k);
+this.render(t);
+this.paint();
+},
+frameOf(it) {                                       // polo norte inclinado hacia la derecha y 35° hacia el observador: la vertical es la normal a la órbita
+if (it.fr) return it.fr;
+const tl = it.rot.tilt * DEG, ph = 35 * DEG, P = [Math.sin(tl) * Math.cos(ph), Math.cos(tl), Math.sin(tl) * Math.sin(ph)];
+const Q = V.norm(V.cross(P, [0, 0, 1]));
+return (it.fr = { P, Q, PxQ: V.cross(P, Q) });
+},
+basis(it) {
+const w = it.w0 + (it.rot.P ? it.rot.sign * 360 * (this.tSim / 3600) / Math.abs(it.rot.P) : 0);   // misma escala de tiempo para todos; cada uno con su periodo y sentido
+return Astro.basisFromFrame(this.frameOf(it), ((w % 360) + 360) % 360);
+},
+render(t) {
+const gl = GLX.gl, P = World.P, R = this.rect, dpr = GLX.dpr;
+const cam = this.camT.pos, f = V.norm(V.sub(this.camT.tgt, cam));
+M4.viewRot(f, [0, 1, 0], this.view);
+const vx = Math.round(R.x * dpr), vy = Math.round(GLX.H - (R.y + R.h) * dpr), vw = Math.max(2, Math.round(R.w * dpr)), vh = Math.max(2, Math.round(R.h * dpr));
+M4.perspInf(this.fov, vw / vh, 1e-4, this.proj);
+const light = V.norm([-0.62, 0.32, 0.72]), sunRel = V.scale(light, 1e6);
+const glob = { u_view: this.view, u_proj: this.proj, u_depthK: 1e6, u_depthInv: 1 / Math.log2(1 + 1e10 * 1e6), u_time: t, u_sun: sunRel, u_outScale: GLX.hdr ? 1 : 0.25 };
+const useP = pr => { GLX.use(pr); GLX.setAll(pr, glob); return pr; };
+GLX.beginScene();
+// fondo: el mismo campo de estrellas de SOLARIS en toda la pantalla
+if (S.layers.stars !== false) {
+GLX.state({ depthTest: false, depthWrite: false, cull: 'none', blend: 'add' });
+const pr = useP(P.stars); GLX.setAll(pr, { u_proj: this.wide || (this.wide = M4.perspInf(50 * DEG, 1, 1e-4)), u_dpr: dpr, u_bright: 0.35 });
+this.wide[0] = this.wide[5] * GLX.H / GLX.W;
+GLX.bindMesh(World.stars, pr); gl.drawArrays(gl.POINTS, 0, Math.round((World.starN || World.stars.count) * Gfx.particles()));
+}
+gl.viewport(vx, vy, vw, vh); gl.enable(gl.SCISSOR_TEST); gl.scissor(vx, vy, vw, vh);
+gl.clearColor(0.004, 0.007, 0.016, 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+if (S.layers.stars !== false) { GLX.state({ depthTest: false, depthWrite: false, cull: 'none', blend: 'add' }); const pr = useP(P.stars); GLX.setAll(pr, { u_dpr: dpr, u_bright: 0.25 }); GLX.bindMesh(World.stars, pr); gl.drawArrays(gl.POINTS, 0, Math.round((World.starN || World.stars.count) * Gfx.particles() * 0.6)); }
+const occ = this._occ || (this._occ = new Float32Array(16)), amb = Math.max(S.ambient, 0.035) + 0.03;
+GLX.state({ depthTest: true, depthWrite: true, cull: 'back', blend: 'none' });
+for (const it of this.items) {
+const rb = it.rb, B = it.B = this.basis(it), rel = it.rel = V.sub(it.pos, cam), m = it.m || (it.m = new Float64Array(16));
+M4.fromBasis(B[0], B[1], B[2], it.r, rel, m);
+const pr = useP(rb.isSun ? (World.sunTex ? P.sunTex : P.sun) : rb.prog);
+if (rb.isSun && World.sunTex) GLX.set(pr, 'u_map', World.sunTex);
+const px = it.r / Math.max(V.len(rel), 1e-9) * (vh / dpr) * 0.5 / Math.tan(this.fov / 2);
+it.px = px;
+const mesh = rb.mesh || (px > 160 ? World.meshes.hi : px > 30 ? World.meshes.mid : World.meshes.low);
+GLX.setAll(pr, rb.u);
+GLX.setAll(pr, { u_model: m, u_occ: occ, u_occN: 0, u_sunR: 0.004, u_ambient: amb, u_hover: 0, u_radius: it.r, u_detail: px > 90 ? 1 : 0, u_center: rel, u_sunI: 1.1 });
+if (rb.id === 'saturno') GLX.setAll(pr, { u_ringN: B[1], u_ringOn: Gfx.ringShadow() ? 1 : 0 });
+if (rb.u.u_nmap) GLX.set(pr, 'u_rot', [B[0][0], B[0][1], B[0][2], B[1][0], B[1][1], B[1][2], B[2][0], B[2][1], B[2][2]]);
+GLX.draw(mesh, pr);
+}
+if (!World.earthTex) {
+const e = this.items.find(it => it.rb.id === 'tierra');
+if (e) { GLX.state({ depthTest: true, depthWrite: false, cull: 'back', blend: 'premul' }); const pr = useP(P.clouds); GLX.setAll(pr, { u_model: M4.fromBasis(e.B[0], e.B[1], e.B[2], e.r * 1.008, e.rel), u_cloudT: this.tSim / 3600 * 0.004, u_occ: occ, u_occN: 0, u_sunR: 0.004, u_ambient: amb * 0.5 }); GLX.draw(World.meshes.mid, pr); }
+}
+GLX.state({ depthTest: true, depthWrite: false, cull: 'none', blend: 'premul' });
+for (const it of this.items) {
+const Rg = it.rb.def.vis.rings; if (!Rg || !World.meshes.rings[it.rb.id]) continue;
+const tex = Rg.type === 'saturn' && World.ringTex, pr = useP(P['ring_' + Rg.type + (tex ? 'Tex' : '')]);
+if (tex) GLX.setAll(pr, { u_ringTex: World.ringTex, u_rr2: it.rb.u.u_rr2 });
+GLX.setAll(pr, { u_model: it.m, u_center: it.rel, u_radius: it.r, u_ringN: it.B[1], u_ambient: amb * 0.5, u_alpha: Rg.alpha, u_rr: [Rg.in, Rg.out] });
+GLX.draw(World.meshes.rings[it.rb.id], pr);
+}
+if (Settings.state.graphics.atmospheres) {
+GLX.state({ depthTest: true, depthWrite: false, cull: 'front', blend: 'add' });
+for (const it of this.items) {
+const A = it.rb.def.vis.atm; if (!A || it.px < 2) continue;
+const H = it.r * A.h, pr = useP(P.atm);
+GLX.setAll(pr, { u_model: M4.fromBasis([1, 0, 0], [0, 1, 0], [0, 0, 1], it.r + H, it.rel), u_center: it.rel, u_R: it.r, u_H: H, u_atm: [...A.color, 1.0], u_k: A.k });
+GLX.draw(World.meshes.mid, pr);
+}
+}
+const sun = this.items.find(it => it.rb.isSun);
+if (sun && Settings.state.graphics.sunGlow) {
+GLX.state({ depthTest: true, depthWrite: false, cull: 'none', blend: 'add' });
+const pr = useP(P.corona); GLX.setAll(pr, { u_center: sun.rel, u_size: sun.r * 1.9, u_scaleR: 1.9, u_int: 0.55 }); GLX.draw(World.meshes.quad, pr);
+}
+gl.disable(gl.SCISSOR_TEST);
+gl.viewport(0, 0, GLX.W, GLX.H);
+GLX.endScene({ progs: World.post.progs, bloom: Settings.state.graphics.bloom ? (sun ? 0.35 : 0.12) : 0, threshold: GLX.hdr ? 1.1 : 0.27, exposure: 1.05, vignette: 0.2 });
+},
+// proyección de un punto del estudio a coordenadas del escenario (px)
+project(p) {
+const R = this.rect, v = this.view, P = this.proj, c = this.camT.pos, x = p[0] - c[0], y = p[1] - c[1], z = p[2] - c[2];
+const vx = v[0] * x + v[4] * y + v[8] * z, vy = v[1] * x + v[5] * y + v[9] * z, w = -(v[2] * x + v[6] * y + v[10] * z);
+if (w <= 1e-9) return null;
+return [(P[0] * vx / w * 0.5 + 0.5) * R.w, (1 - (P[5] * vy / w * 0.5 + 0.5)) * R.h, w];
+},
+pick(cx, cy) {
+const R = this.rect, P = this.proj, v = this.view, nx = (cx / R.w) * 2 - 1, ny = 1 - (cy / R.h) * 2;
+const dv = [nx / P[0], ny / P[5], -1], d = V.norm([v[0] * dv[0] + v[1] * dv[1] + v[2] * dv[2], v[4] * dv[0] + v[5] * dv[1] + v[6] * dv[2], v[8] * dv[0] + v[9] * dv[1] + v[10] * dv[2]]);
+let best = null, bt = Infinity;
+for (const it of this.items) {
+const oc = V.sub(this.camT.pos, it.pos), b = V.dot(oc, d), rr = Math.max(it.r, (this.camT.pos[2] - it.pos[2]) * 0.012), c = V.dot(oc, oc) - rr * rr, h = b * b - c;
+if (h < 0) continue; const tt = -b - Math.sqrt(h); if (tt > 0 && tt < bt) { bt = tt; best = it; }
+}
+return best;
+},
+select(id) {
+this.sel = id || null; this.insp = { az: 0, el: 0.12, zoom: 1 };
+if (!id) this.over = { zoom: 1, px: 0, py: 0 };
+SFX.play(id ? 'select' : 'back');
+this.paintInfo(); this.paintCtl();
+},
+bind() {
+const st = this.stage; if (!st || st._cvBound) return; st._cvBound = true;
+const ptrs = new Map();
+st.addEventListener('pointerdown', e => {
+if (e.target.closest('button, select, input, a, .cs-info')) return;
+st.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+this.dragS = { x: e.clientX, y: e.clientY, moved: 0, pinch: ptrs.size === 2 ? this.pinchDist(ptrs) : 0 };
+});
+st.addEventListener('pointermove', e => {
+if (!this.dragS || !ptrs.has(e.pointerId)) return;
+const p = ptrs.get(e.pointerId), dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY;
+this.dragS.moved += Math.abs(dx) + Math.abs(dy);
+if (ptrs.size >= 2) { const d = this.pinchDist(ptrs); if (this.dragS.pinch) this.zoomBy(this.dragS.pinch / d); this.dragS.pinch = d; return; }
+if (this.sel) { const I = this.insp; I.az -= dx * 0.008; I.el = clamp(I.el + dy * 0.008, -1.45, 1.45); }   // inspección: mueve la cámara, no el planeta
+else if (this.over.zoom > 1.001) { const s = this.unitsPerPx(); this.over.px -= dx * s; this.over.py += dy * s; this.clampPan(); }
+});
+const up = e => {
+if (!ptrs.has(e.pointerId)) return; ptrs.delete(e.pointerId);
+if (this.dragS && this.dragS.moved < 6 && !ptrs.size) { const r = st.getBoundingClientRect(), it = this.pick(e.clientX - r.left, e.clientY - r.top); if (it) this.select(it.rb.id); }
+if (!ptrs.size) this.dragS = null;
+};
+st.addEventListener('pointerup', up); st.addEventListener('pointercancel', up);
+st.addEventListener('wheel', e => { if (e.target.closest('.cs-info, .cs-ctrl')) return; e.preventDefault(); this.zoomBy(Math.exp(e.deltaY * 0.0015), e); }, { passive: false });
+st.addEventListener('keydown', e => {
+const k = e.key;
+if (k === 'Escape' && this.sel) { e.stopPropagation(); this.select(null); }
+else if ((k === '+' || k === '=') && !e.target.closest('input, select')) this.zoomBy(0.8);
+else if (k === '-' && !e.target.closest('input, select')) this.zoomBy(1.25);
+});
+st.addEventListener('click', e => {
+const b = e.target.closest('[data-cv]'); if (!b) return;
+const a = b.dataset.cv;
+if (a === 'play') { this.playing = !this.playing; this.paintCtl(); }
+else if (a === 'reset') { this.tSim = 0; this.paintCtl(); }
+else if (a === 'info') { this.info = !this.info; this.paintCtl(); }
+else if (a === 'scale') { this.scale = b.dataset.v; this.layout(); this.camT = null; this.over = { zoom: 1, px: 0, py: 0 }; this.paintCtl(); }
+else if (a === 'back') this.select(null);
+else if (a === 'sel') this.select(b.dataset.id);
+else if (a === 'view') { this.over = { zoom: 1, px: 0, py: 0 }; if (this.sel) this.insp = { az: 0, el: 0.12, zoom: 1 }; }
+});
+st.addEventListener('change', e => {
+if (e.target.id === 'cv-speed') { this.speed = e.target.value; this.paintCtl(); }
+if (e.target.id === 'cv-custom') { this.custom = Math.round(Math.pow(10, +e.target.value)); this.paintCtl(); }
+});
+st.addEventListener('input', e => { if (e.target.id === 'cv-custom') { this.custom = Math.round(Math.pow(10, +e.target.value)); const o = st.querySelector('#cv-custom-out'); if (o) o.textContent = this.rateTxt(this.custom); } });
+if (!this._docBound) {
+this._docBound = true;
+addEventListener('resize', () => { if (this.active) { this.measure(); this.layout(); this.camT = null; } });
+document.addEventListener('scroll', () => { if (this.active) this.measure(); }, true);
+}
+},
+pinchDist(ptrs) { const [a, b] = [...ptrs.values()]; return Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)); },
+unitsPerPx() { const d = V.dist(this.camT.pos, this.camT.tgt); return 2 * d * Math.tan(this.fov / 2) / Math.max(this.rect.h, 1); },
+clampPan() { const O = this.over, lim = this.total / 2; O.px = clamp(O.px, -lim, lim); O.py = clamp(O.py, -this.maxH, this.maxH); },
+zoomBy(k, e) {
+if (this.sel) { this.insp.zoom = clamp(this.insp.zoom * k, 0.28, 6); return; }
+const O = this.over, z0 = O.zoom; O.zoom = clamp(O.zoom / k, 1, 4000);
+if (e && this.rect && O.zoom !== z0) {                 // acercar hacia el puntero: el punto bajo el cursor se queda quieto
+const s = this.unitsPerPx(), cx = e.clientX - this.rect.x - this.rect.w / 2, cy = e.clientY - this.rect.y - this.rect.h / 2, f = 1 - z0 / O.zoom;
+O.px += cx * s * f; O.py -= cy * s * f;
+}
+if (O.zoom <= 1.0001) { O.px = 0; O.py = 0; }
+this.clampPan();
+},
+rateTxt(k) { return k < 60 ? fmt(k, 0) + ' s' : k < 3600 ? fmt(k / 60, k < 600 ? 1 : 0) + ' min' : k < 86400 ? fmt(k / 3600, k < 36000 ? 1 : 0) + ' h' : fmt(k / 86400, k < 864000 ? 1 : 0) + ' días'; },
+simTxt(s) { const h = s / 3600; return h < 1 ? fmt(s / 60, 0) + ' min' : h < 48 ? fmt(h, 1) + ' h' : h < 24 * 730 ? fmt(h / 24, 1) + ' días' : fmt(h / 24 / 365.25, 2) + ' años'; },
+periodTxt(P) { const a = Math.abs(P); return a < 48 ? fmt(a, a < 10 ? 3 : 2) + ' h' + (a >= 1 ? ' (' + Math.floor(a) + ' h ' + Math.round((a % 1) * 60) + ' min)' : '') : fmt(a, 1) + ' h (' + fmt(a / 24, a / 24 < 100 ? 2 : 1) + ' días)'; },
+// HTML del escenario (el WebGL se dibuja debajo, en el hueco transparente)
+html() {
+return `<div class="cs-stage" id="cmp-stage" tabindex="0" aria-label="Comparación 3D de tamaños. Toca o haz clic en un cuerpo para seleccionarlo; arrastra para inspeccionarlo y usa la rueda o el pellizco para acercar.">
+<svg class="cs-axes" aria-hidden="true"></svg><div class="cs-labels" aria-hidden="true"></div>
+<div class="cs-ctrl" role="toolbar" aria-label="Controles de la simulación"></div>
+<div class="cs-info" role="region" aria-live="polite" hidden></div>
+</div>`;
+},
+paint() {
+if (!this.stage || !this.camT) return;
+if (!this._ctlPainted) this.paintCtl();
+const L = this.stage.querySelector('.cs-labels'), ax = this.stage.querySelector('.cs-axes'), R = this.rect;
+let html = '', svg = '', lastX = [-1e9, -1e9];
+for (const it of this.items) {
+const b = this.project([it.pos[0], it.pos[1] - it.halfH, 0]), c = this.project(it.pos);
+if (!b || !c) continue;
+const lane = c[0] - lastX[0] < 96 ? (c[0] - lastX[1] < 96 ? 0 : 1) : 0; lastX[lane] = c[0];   // nombres de cuerpos muy juntos: en dos alturas para que no se pisen
+const tiny = it.px < 1.5, d = it.rb.def;
+if (b[0] < -80 || b[0] > R.w + 80 || (this.sel && this.sel !== it.rb.id)) continue;
+html += `<button class="cs-lab${this.sel === it.rb.id ? ' on' : ''}" data-cv="sel" data-id="${it.rb.id}" style="transform:translate(${(c[0]).toFixed(1)}px, ${(Math.min(b[1] + 8, R.h - 60 - lane * 40) + lane * 40).toFixed(1)}px)"><b>${esc(d.short || d.name)}</b><small>${fmt(2 * d.R, d.R < 50 ? 1 : 0)} km${tiny ? ' · casi invisible a esta escala' : ''}</small>${this.info && it.rot.P ? `<small class="cs-rot">${it.rot.retro ? '↻' : '↺'} ${this.periodTxt(it.rot.P).replace(/ \(.*/, '')}${it.rot.obl != null ? ' · ' + fmt(it.rot.obl, it.rot.obl < 1 ? 3 : 1) + '°' : ''}</small>` : ''}</button>`;
+if (tiny) svg += `<circle cx="${c[0].toFixed(1)}" cy="${c[1].toFixed(1)}" r="6" class="cs-tiny"/>`;
+if (this.info && it.px > 6) {
+const B = it.B || this.basis(it), k = 1.45 * it.r, a = this.project(V.add(it.pos, V.scale(B[1], k))), z = this.project(V.sub(it.pos, V.scale(B[1], k))), n1 = this.project(V.add(it.pos, [0, k, 0])), n2 = this.project(V.sub(it.pos, [0, k, 0]));
+if (a && z && n1 && n2) svg += `<line x1="${n2[0].toFixed(1)}" y1="${n2[1].toFixed(1)}" x2="${n1[0].toFixed(1)}" y2="${n1[1].toFixed(1)}" class="cs-norm"/><line x1="${z[0].toFixed(1)}" y1="${z[1].toFixed(1)}" x2="${a[0].toFixed(1)}" y2="${a[1].toFixed(1)}" class="cs-axis"/><circle cx="${a[0].toFixed(1)}" cy="${a[1].toFixed(1)}" r="3" class="cs-pole"/>`;
+}
+}
+if (html !== this._labH) { L.innerHTML = html; this._labH = html; }
+if (svg !== this._svgH) { ax.innerHTML = svg; this._svgH = svg; }
+const ck = this.stage.querySelector('.cs-clock'), ct = `1 s = ${this.rateTxt(this.speedK())} · ${this.simTxt(this.tSim)}${this.playing ? '' : ' · en pausa'}`;
+if (ck && ct !== this._ckT) { ck.textContent = ct; this._ckT = ct; }
+},
+paintCtl() {
+const c = this.stage && this.stage.querySelector('.cs-ctrl'); if (!c) return;
+this._ctlPainted = true;
+const opt = this.SPEEDS.map(([k, t, v]) => `<option value="${k}"${k === this.speed ? ' selected' : ''}>${t}</option>`).join('');
+c.innerHTML = `<div class="cs-row">
+<button class="cs-btn" data-cv="play" aria-pressed="${this.playing}" aria-label="${this.playing ? 'Pausar' : 'Reproducir'} la rotación">${this.playing ? '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" fill="currentColor"/></svg>' : '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M8 5l11 7-11 7z" fill="currentColor"/></svg>'}<span>${this.playing ? 'Pausar' : 'Reproducir'}</span></button>
+<button class="cs-btn" data-cv="reset" aria-label="Reiniciar la orientación de todos los cuerpos"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 12a7 7 0 1 0 2.1-5M5 4v4h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Reiniciar</span></button>
+<label class="cs-speed"><span>Velocidad</span><select id="cv-speed" aria-label="Velocidad de simulación">${opt}</select></label>
+${this.speed === 'custom' ? `<label class="cs-speed cs-custom">1 s =<input id="cv-custom" type="range" min="0" max="6.4" step="0.05" value="${Math.log10(this.custom).toFixed(2)}" aria-label="Velocidad personalizada"><output id="cv-custom-out">${this.rateTxt(this.custom)}</output></label>` : ''}
+<button class="cs-btn${this.info ? ' on' : ''}" data-cv="info" aria-pressed="${this.info}" aria-label="Mostrar información de rotación"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 11v6M12 7.5v.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>Información de rotación</span></button>
+</div>
+<div class="cs-row cs-row2">
+<span class="seg cs-scale" role="radiogroup" aria-label="Escala"><button role="radio" aria-checked="${this.scale === 'real'}" class="${this.scale === 'real' ? 'on' : ''}" data-cv="scale" data-v="real">Escala real</button><button role="radio" aria-checked="${this.scale === 'visual'}" class="${this.scale === 'visual' ? 'on' : ''}" data-cv="scale" data-v="visual">Visual adaptada</button></span>
+<p class="cs-clock" aria-live="off"></p>
+${this.sel ? '<button class="cs-btn cs-back" data-cv="back" aria-label="Volver a la comparación">← <span>Volver a la comparación</span><em>Volver</em></button>' : '<button class="cs-btn cs-back" data-cv="view">Encuadrar</button>'}</div>
+${this.scale === 'visual' ? '<p class="cs-warn">Escala visual adaptada: representación ilustrativa. Los tamaños NO son proporcionales; se comprimen para que los cuerpos pequeños se aprecien.</p>' : ''}
+${UI.reducedMotion && !this.playing ? '<p class="cs-warn">Rotación en pausa por tu preferencia de movimiento reducido. Pulsa «Reproducir» para verla.</p>' : ''}`;
+this.paintInfo();
+},
+paintInfo() {
+const box = this.stage && this.stage.querySelector('.cs-info'); if (!box) return;
+const it = this.sel && this.items.find(i => i.rb.id === this.sel);
+if (!it) { box.hidden = true; box.innerHTML = ''; return; }
+const d = it.rb.def, r = it.rot, row = (k, v) => `<div><dt>${k}</dt><dd>${v}</dd></div>`;
+box.hidden = false;
+box.innerHTML = `<h3>${esc(d.name)}</h3><dl>
+${row('Diámetro medio', fmt(2 * d.R, d.R < 50 ? 2 : 0) + ' km <small>(volumétrico)</small>')}
+${row('Rotación sideral', r.P ? this.periodTxt(r.P) : 'No disponible')}
+${row('Sentido', r.P ? (r.retro ? 'Retrógrado (al revés que la mayoría de los planetas)' : 'Progrado') : '—')}
+${row('Inclinación axial', r.obl != null ? fmt(r.obl, r.obl < 1 ? 3 : 2) + '° respecto a ' + esc(r.ref) + (r.obl > 90 ? `<small>Equivale a ${fmt(180 - r.obl, 2)}° con giro retrógrado: así se muestra el modelo, con su polo norte arriba.</small>` : '') : 'Sin dato verificado en SOLARIS <small>(el eje se muestra vertical)</small>')}
+</dl><details class="cs-more"${innerWidth >= 600 ? ' open' : ''}><summary>Notas y fuente</summary>${r.note ? `<p class="note">${esc(r.note)}</p>` : ''}
+<p class="cs-src">Fuente: ${r.url ? `<a href="${r.url}" target="_blank" rel="noopener">${esc(r.src)}</a>` : esc(r.src || 'ficha de SOLARIS')}${r.kind === 'ficha' ? ' (dato de la ficha de SOLARIS)' : ''}</p>
+<p class="cs-hint">Arrastra para inspeccionarlo desde cualquier ángulo: mueves la cámara, no su rotación real. Usa la rueda o pellizca para acercarte.</p></details>`;
 },
 };
 document.addEventListener('click', e => {
@@ -8295,7 +8691,7 @@ const sf = $('#start-fly'); sf.disabled = false; sf.addEventListener('click', ()
 const explore = Settings.state.general.startup === 'explore' && location.hash !== '#creditos';
 const go = () => { if (explore) this.begin(); else st.focus({ preventScroll: true }); };
 Splash.finish(explore, go).catch(e => { console.error(e); Splash.reveal(true, go); });   // la carga se retira cuando todo está listo
-window.Solaris = { World, Cam, UI, Time, S, select: id => UI.select(World.byId[id], { fly: true }), App, Flight, Music, SFX, Settings, Keys, Gfx, GLX, I18N, BODY, PackedModels, Assets, Compare, TL, Sci, ScaleState, Planner, Systems, Dilation, Missions, MillerFX, FlightGame, FlightAudio, Cockpit, HUD, Voice, Photo, GlobeCanvas, V };
+window.Solaris = { World, Cam, UI, Time, S, select: id => UI.select(World.byId[id], { fly: true }), App, Flight, Music, SFX, Settings, Keys, Gfx, GLX, I18N, BODY, PackedModels, Assets, Compare, TL, Sci, ScaleState, Planner, Systems, Dilation, Missions, MillerFX, FlightGame, FlightAudio, Cockpit, HUD, Voice, Photo, GlobeCanvas, V, CompareView };
 requestAnimationFrame(t => this.loop(t));
 },
 home() {
@@ -8365,7 +8761,9 @@ this.tickT = (this.tickT || 0) + dt;
 if (this.tickT > 0.25 && World.texState) { this.tickT = 0; World.texTick(); PackedModels.tick(); }
 this.last = t;
 this.adapt(dt);
+if (GLX.lost) { if (UI.started) UI.frame(dt); return; }   // sin contexto gráfico no se dibuja nada hasta recargar
 if (Flight.on) { Flight.frame(dt, t / 1000); return; }
+if (CompareView.active) { Time.step(dt); CompareView.frame(dt, t / 1000); World.frame++; if (UI.started) UI.frame(dt); return; }   // la escena general queda oculta tras el comparador: no se dibuja
 Time.step(dt);
 World.update(Time.jd, dt, Time.speed);
 this.scaleCam();
@@ -8602,12 +9000,13 @@ ping() { if (!this.ctx) return; this.osc(660, 0.35, { f2: 990, glide: 0.5, vol: 
 thud() { if (!this.ctx) return; this.noise(0.9, { brown: true, type: 'lowpass', f: 160, vol: 0.8, peak: 0.01, out: this.master }); this.event('clang'); },
 stop() { this.active = false; if (this.master) this.setMute(!this.on); Voice.stop(); },
 };
-// voz de la computadora de a bordo (síntesis de voz del navegador, solo si hay una voz en español)
+// voz de la computadora de a bordo (síntesis de voz del navegador, solo si hay una voz en español instalada en el dispositivo:
+// las voces en línea enviarían el texto a un servicio externo, así que no se usan)
 const Voice = {
 on: true, last: {}, voice: undefined,
 pick() {
 const S = window.speechSynthesis; if (!S) return null;
-const vs = S.getVoices(); if (!vs.length) return null;
+const vs = S.getVoices().filter(v => v.localService === true); if (!vs.length) return null;
 this.voice = vs.find(v => /es[-_](MX|US|419)/i.test(v.lang)) || vs.find(v => /^es/i.test(v.lang)) || null;
 return this.voice;
 },
@@ -9247,7 +9646,7 @@ const d = T.def, F = T.isCraft ? null : Info.fields(T), all = F ? [...F.phys, ..
 const pick = re => { const f = all.find(x => re.test(x.label) && x.val != null); return f ? `<div><dt>${esc(f.label.replace(/ \(.*\)$/, ''))}</dt><dd>${esc(String(f.val))}</dd></div>` : ''; };
 const rows = T.isCraft ? [/^Agencia/, /^Lanzamiento/, /^Objetivo/].map(pick).join('') : [/^Diámetro medio|^Tamaño/, /^Gravedad superficial/, /^Temperatura aproximada/, /^Duración de un día/].map(pick).join('');
 const fact = (d.info.facts && d.info.facts[0]) || (d.info.feats && d.info.feats[0]) || d.info.desc;
-const media = Photo.has(T.id) ? `<span class="fd-media">${Photo.img(T.id, 330)}</span>` : GLOBE_TEX.has(T.id) ? `<span class="fd-media"><canvas data-globe="${T.id}" width="96" height="96"></canvas></span>` : `<span class="fd-media fd-dot" style="--c:${d.color || '#94a0b6'}"></span>`;
+const media = Photo.has(T.id) && Photo.ok() ? `<span class="fd-media">${Photo.img(T.id, 330)}</span>` : GLOBE_TEX.has(T.id) ? `<span class="fd-media"><canvas data-globe="${T.id}" width="96" height="96"></canvas></span>` : `<span class="fd-media fd-dot" style="--c:${d.color || '#94a0b6'}"></span>`;
 el.innerHTML = `${media}<div class="fd-body"><span class="fd-kick">${first ? 'Nuevo descubrimiento · +' + fmt(pts, 0) + ' puntos' : 'Escaneo actualizado'}</span>
 <h3>${esc(d.name)}</h3><p class="fd-sub">${esc(d.type === 'moon' && T.parent ? 'Luna de ' + T.parent.def.name : T.isCraft ? d.sub || 'Nave espacial' : TYPE_LABEL[d.type])}</p>
 ${rows ? `<dl>${rows}</dl>` : ''}<p class="fd-fact">${esc(fact)}</p>
@@ -9614,7 +10013,7 @@ this.msg(this.assisted ? 'Modo asistido: estabilización, freno asistido y sin g
 this.refreshBar();
 },
 toggleSound() { FlightAudio.setMute(FlightAudio.on); this.refreshBar(); },
-toggleVoice() { Voice.on = !Voice.on; FlightGame.data.voice = Voice.on; FlightGame.save(); if (!Voice.on) Voice.stop(); else Voice.say('Voz de a bordo activada.', 'v', 500); this.msg(Voice.on ? (window.speechSynthesis && Voice.pick() ? 'Voz de la computadora de a bordo activada.' : 'Este navegador no tiene una voz en español: la computadora de a bordo seguirá en silencio.') : 'Voz de la computadora de a bordo desactivada.', 'quiet'); this.refreshBar(); },
+toggleVoice() { Voice.on = !Voice.on; FlightGame.data.voice = Voice.on; FlightGame.save(); if (!Voice.on) Voice.stop(); else Voice.say('Voz de a bordo activada.', 'v', 500); this.msg(Voice.on ? (window.speechSynthesis && Voice.pick() ? 'Voz de la computadora de a bordo activada.' : 'Este dispositivo no tiene instalada una voz en español: la computadora de a bordo seguirá en silencio.') : 'Voz de la computadora de a bordo desactivada.', 'quiet'); this.refreshBar(); },
 toggle(k) {
 const T = this.target;
 const needT = ['aim', 'match', 'hold', 'intercept'];
@@ -10102,6 +10501,7 @@ el.innerHTML = `
 <div class="fp-grid" id="fp-keys"></div>
 <p class="note">En modo asistido no hay gravedad y la nave corrige su deriva. En modo simulación la nave conserva su inercia y la gravedad del Sol, los planetas y las lunas grandes curva tu trayectoria.</p>
 <div class="fp-actions"><button class="cta" id="fl-resume">Continuar vuelo</button><button class="txt-btn" data-log="desc">Bitácora y logros</button><button class="txt-btn" data-log="retos">Retos</button><button class="txt-btn" id="fl-tut">Escuela de vuelo</button><button class="txt-btn" id="fl-tohangar">Cambiar de nave</button><button class="txt-btn" id="fl-exit">Salir del modo de vuelo</button></div>
+<div class="fp-legal">${LEGAL_LINKS_HTML}</div>
 </div></div>
 <div id="hangar" role="dialog" aria-labelledby="hg-title">
 <div class="hg-panel">
