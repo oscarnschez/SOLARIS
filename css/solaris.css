@@ -1172,3 +1172,74 @@ html.hc #more-menu { background: rgba(2, 4, 10, .96); }
 @media (max-width: 760px) { #more-menu #help-btn { display: none; } }
 #app:has(#more-menu:not([hidden])) #toast { opacity: 0; }
 @media (max-width: 760px) { #app:has(#info.open) #mx-hud { opacity: 0; } }   /* en móvil la ficha (hoja inferior) ya muestra los mismos contadores y el HUD la tapaba */
+/* ===== Pantalla de carga: el Sol de SOLARIS se enciende y su órbita marca el progreso real ===== */
+@property --sp-r { syntax: '<percentage>'; inherits: true; initial-value: -14%; }
+#splash { position: fixed; inset: 0; z-index: 2000; display: grid; place-items: center; align-content: center; gap: clamp(10px, 2.4vh, 22px); overflow: hidden; color: var(--text); --cx: 50%; --cy: 46%; transition: --sp-r 1.5s cubic-bezier(.2, .62, .18, 1); }
+.sp-bg, .sp-wave { position: absolute; inset: 0; pointer-events: none; }
+.sp-bg { background:
+  radial-gradient(1px 1px at 12% 18%, rgba(255, 255, 255, .8), transparent 70%), radial-gradient(1px 1px at 63% 7%, rgba(220, 232, 255, .7), transparent 70%),
+  radial-gradient(1.4px 1.4px at 38% 71%, rgba(255, 255, 255, .75), transparent 70%), radial-gradient(1px 1px at 86% 54%, rgba(255, 236, 210, .65), transparent 70%),
+  radial-gradient(1px 1px at 24% 91%, rgba(210, 225, 255, .6), transparent 70%), radial-gradient(1.2px 1.2px at 77% 83%, rgba(255, 255, 255, .55), transparent 70%),
+  radial-gradient(1px 1px at 47% 33%, rgba(255, 255, 255, .5), transparent 70%), radial-gradient(1.6px 1.6px at 92% 12%, rgba(255, 246, 228, .7), transparent 70%),
+  radial-gradient(1px 1px at 5% 60%, rgba(220, 232, 255, .55), transparent 70%), radial-gradient(1.3px 1.3px at 57% 49%, rgba(255, 255, 255, .45), transparent 70%),
+  radial-gradient(70% 60% at 50% 46%, rgba(242, 170, 80, .09), transparent 70%), radial-gradient(130% 100% at 50% 110%, rgba(30, 50, 110, .22), transparent 60%), var(--space);
+  background-size: 233px 197px, 233px 197px, 233px 197px, 233px 197px, 233px 197px, 311px 283px, 311px 283px, 311px 283px, 311px 283px, 311px 283px, 100% 100%, 100% 100%, 100% 100%;
+  -webkit-mask-image: radial-gradient(circle at var(--cx) var(--cy), transparent var(--sp-r), #000 calc(var(--sp-r) + 9%)); mask-image: radial-gradient(circle at var(--cx) var(--cy), transparent var(--sp-r), #000 calc(var(--sp-r) + 9%)); }
+.sp-wave { opacity: 0; background: radial-gradient(circle at var(--cx) var(--cy), transparent calc(var(--sp-r) - 1%), rgba(255, 214, 150, .38) calc(var(--sp-r) + 3.5%), rgba(255, 170, 80, .12) calc(var(--sp-r) + 6%), transparent calc(var(--sp-r) + 10%)); mix-blend-mode: screen; }
+.sp-stage { position: relative; width: min(86vw, 58vh, 460px); aspect-ratio: 1; }
+.sp-glow { position: absolute; inset: -22%; border-radius: 50%; background: radial-gradient(circle, rgba(255, 222, 160, .34) 0, rgba(255, 176, 70, .15) 19%, rgba(255, 150, 50, .05) 34%, transparent 52%); animation: sp-glow-in 1.6s ease-out .2s backwards, sp-breathe 5s ease-in-out 1.8s infinite alternate; transition: opacity .6s, transform .6s; }
+.sp-rays { position: absolute; left: 14%; top: 14%; width: 72%; aspect-ratio: 1; border-radius: 50%; opacity: .55; background: repeating-conic-gradient(from 0deg, rgba(255, 206, 130, .16) 0deg 3deg, transparent 3deg 14deg); -webkit-mask-image: radial-gradient(circle, transparent 44%, #000 50%, transparent 72%); mask-image: radial-gradient(circle, transparent 44%, #000 50%, transparent 72%); animation: sp-fade-in 1.4s ease-out 1s backwards, sp-spin 90s linear infinite; transition: opacity .5s; }
+.sp-sunwrap { position: absolute; left: 33%; top: 33%; width: 34%; aspect-ratio: 1; transform-origin: 50% 50%; will-change: transform; }
+.sp-sun { position: absolute; inset: 0; border-radius: 50%; background: url(../assets/images/logo-solaris.png) no-repeat 16.598% 54.5% / 392.857% 107.143%; animation: sp-ignite 1.7s cubic-bezier(.16, 1, .3, 1) .25s backwards; transition: filter .45s ease, opacity .3s ease; }
+.sp-core { position: absolute; left: 50%; top: 50%; width: 30%; aspect-ratio: 1; margin: -15% 0 0 -15%; border-radius: 50%; background: radial-gradient(circle, #fff 0, rgba(255, 244, 220, .95) 22%, rgba(255, 200, 120, .45) 45%, transparent 70%); opacity: 0; animation: sp-flash 1.5s cubic-bezier(.2, .7, .2, 1) .05s; pointer-events: none; }
+.sp-orbits { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; transition: opacity .5s ease-in, transform .55s cubic-bezier(.6, 0, .9, .4); }
+.sp-orb, .sp-track, .sp-prog { fill: none; vector-effect: non-scaling-stroke; }
+.sp-orb { stroke: rgba(160, 190, 235, .26); stroke-width: 1; stroke-dasharray: 1; stroke-dashoffset: 1; animation: sp-draw 1.6s cubic-bezier(.4, 0, .2, 1) forwards; }
+.sp-orb.o1 { animation-delay: .9s; } .sp-orb.o2 { animation-delay: 1.15s; }
+.sp-track { stroke: rgba(160, 190, 235, .16); stroke-width: 1; stroke-dasharray: 1; stroke-dashoffset: 1; animation: sp-draw 1.6s cubic-bezier(.4, 0, .2, 1) 1.4s forwards; }
+.sp-prog { stroke: var(--sun); stroke-width: 2; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; filter: drop-shadow(0 0 3px rgba(242, 200, 121, .8)); animation: sp-creep 14s cubic-bezier(.1, .7, .2, 1) 1.6s forwards; }
+#splash.js .sp-prog { animation: none; }
+.sp-pl { opacity: 0; animation: sp-fade-in 1s ease-out 1.6s forwards; }
+.sp-pl.p1 { fill: #9fd0ff; filter: drop-shadow(0 0 3px rgba(143, 195, 255, .8)); }
+.sp-pl.p2 { fill: #ffb08a; filter: drop-shadow(0 0 3px rgba(255, 150, 110, .7)); animation-delay: 1.85s; }
+.sp-head { fill: #fff6df; opacity: 0; filter: drop-shadow(0 0 4px rgba(255, 220, 150, .95)); transition: opacity .6s; }
+#splash.js .sp-head { opacity: 1; }
+.sp-meta { position: relative; margin-top: calc(min(86vw, 58vh, 460px) * -.14); text-align: center; transition: opacity .35s, transform .5s; }
+.sp-name { margin: 0 0 8px; font-size: clamp(13px, 1.3vw, 15px); font-weight: 300; letter-spacing: .62em; padding-left: .62em; color: rgba(231, 235, 243, .82); animation: sp-rise 1.2s cubic-bezier(.16, 1, .3, 1) 1.2s backwards; }
+.sp-status { display: flex; justify-content: center; gap: 10px; min-height: 18px; margin: 0; font: 400 11.5px/1.5 var(--mono); letter-spacing: .03em; color: var(--muted); animation: sp-rise 1.2s cubic-bezier(.16, 1, .3, 1) 1.45s backwards; }
+.sp-status b { font-weight: 500; color: var(--sun); min-width: 4.2ch; text-align: right; }
+.sp-status b:empty { display: none; }
+@keyframes sp-ignite { 0% { opacity: 0; transform: scale(.18); filter: brightness(3.2) saturate(.4); } 35% { opacity: 1; } 100% { transform: none; filter: none; } }
+@keyframes sp-flash { 0% { opacity: 0; transform: scale(.05); } 18% { opacity: 1; transform: scale(.6); } 100% { opacity: 0; transform: scale(5.5); } }
+@keyframes sp-glow-in { from { opacity: 0; transform: scale(.4); } }
+@keyframes sp-breathe { from { transform: scale(.96); opacity: .85; } to { transform: scale(1.05); opacity: 1; } }
+@keyframes sp-spin { to { transform: rotate(360deg); } }
+@keyframes sp-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sp-draw { to { stroke-dashoffset: 0; } }
+@keyframes sp-creep { to { stroke-dashoffset: .8; } }
+@keyframes sp-rise { from { opacity: 0; transform: translateY(10px); } }
+/* Salida: las órbitas caen hacia el Sol, el Sol vuela a la O del logotipo y su luz abre la pantalla inicial */
+#splash.sp-out .sp-orbits { opacity: 0; transform: scale(.5); }
+#splash.sp-out .sp-meta { opacity: 0; transform: translateY(8px); }
+#splash.sp-out .sp-sun { filter: brightness(1.45) saturate(1.1); }
+#splash.sp-out .sp-glow { animation: none; transform: scale(1.2); }
+#splash.sp-fly .sp-sunwrap { transform: var(--fly); transition: transform .95s cubic-bezier(.66, 0, .22, 1); }
+#splash.sp-fly .sp-sun { filter: none; transition-duration: .95s; }
+#splash.sp-fly .sp-glow, #splash.sp-fly .sp-rays { opacity: 0; transform: scale(.6); }
+#splash.sp-burst .sp-sunwrap { transform: scale(2.4); opacity: 0; transition: transform 1.1s cubic-bezier(.3, 0, .2, 1), opacity .9s ease .2s; }
+#splash.sp-burst .sp-glow { opacity: 0; transform: scale(2); }
+#splash.sp-open { --sp-r: 112%; pointer-events: none; }
+#splash.sp-open .sp-bg { opacity: 0; transition: opacity .6s ease .95s; }
+#splash.sp-open .sp-wave { opacity: 1; transition: opacity .2s; }
+#splash.sp-open.sp-wave-off .sp-wave { opacity: 0; transition: opacity .7s; }
+#splash.sp-landed .sp-sun { opacity: 0; transition: opacity .28s ease .3s; }
+#splash.sp-fade, #splash.sp-failsafe { opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .6s, visibility .6s; }
+/* Mientras la carga cubre la pantalla, el logotipo de la portada espera para animarse al revelarse */
+#app.splash-hold .lg-l, #app.splash-hold .lg-flare, #app.splash-hold .lg-corona { animation-play-state: paused; }
+#app.sp-landed .lg-l.lg-sun { animation: none; }
+#app.sp-landed .lg-flare { animation-delay: .05s; }
+#app.sp-landed .intro-sub, #app.sp-landed .intro-tele, #app.sp-landed .intro-actions, #app.sp-landed .intro-author, #app.sp-landed .intro-about, #app.sp-landed .intro-music { animation: sp-rise 1s cubic-bezier(.16, 1, .3, 1) backwards; }
+#app.sp-landed .intro-sub { animation-delay: .55s; } #app.sp-landed .intro-tele { animation-delay: .62s; } #app.sp-landed .intro-actions { animation-delay: .7s; } #app.sp-landed .intro-author { animation-delay: .85s; } #app.sp-landed .intro-author + .intro-author { animation-delay: .95s; }
+#app.sp-landed .intro-about, #app.sp-landed .intro-music { animation-delay: 1s; }
+html.anim-reduced .sp-pl, html.anim-reduced .sp-rays, html.anim-reduced .sp-core { display: none; }
+@media (prefers-reduced-motion: reduce) { .sp-pl, .sp-rays, .sp-core { display: none; } }

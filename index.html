@@ -10,10 +10,51 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/solaris.css?v=0abb9e7124">
+<link rel="preload" href="assets/images/logo-solaris.png" as="image">
+<link rel="stylesheet" href="css/solaris.css?v=7b48e817db">
+<script>
+/* Pantalla de carga: movimiento reducido antes del primer pintado y salida de emergencia si el simulador no llega a arrancar */
+(function () {
+  var d = document.documentElement;
+  try { var s = JSON.parse(localStorage.getItem('solaris.settings') || 'null'); if (s && ((s.accessibility && s.accessibility.reducedMotion) || (s.interface && s.interface.anim === 'reduced'))) d.classList.add('anim-reduced'); } catch (e) {}
+  setTimeout(function () {
+    if (window.SOLARIS_SPLASH) return;
+    var sp = document.getElementById('splash'), a = document.getElementById('app');
+    if (a) a.classList.remove('splash-hold');
+    if (sp) sp.classList.add('sp-failsafe');
+  }, 30000);
+})();
+</script>
 </head>
 <body>
-<div id="app" class="booting">
+<div id="splash" role="status" aria-label="Cargando SOLARIS">
+  <div class="sp-bg" aria-hidden="true"></div>
+  <div class="sp-wave" aria-hidden="true"></div>
+  <div class="sp-stage" aria-hidden="true">
+    <div class="sp-glow"></div>
+    <div class="sp-rays"></div>
+    <div class="sp-sunwrap"><div class="sp-sun"></div><i class="sp-core"></i></div>
+    <svg class="sp-orbits" viewBox="-200 -200 400 400">
+      <defs><mask id="sp-occ" maskUnits="userSpaceOnUse" x="-220" y="-220" width="440" height="440"><rect x="-220" y="-220" width="440" height="440" fill="#fff"/><path d="M-64 0A64 64 0 0 1 64 0Z" fill="#000"/></mask></defs>
+      <g class="sp-sys" transform="rotate(-9)">
+        <g mask="url(#sp-occ)">
+          <ellipse class="sp-orb o1" rx="96" ry="27" pathLength="1"/>
+          <ellipse class="sp-orb o2" rx="136" ry="38" pathLength="1"/>
+          <ellipse class="sp-track" rx="178" ry="50" pathLength="1"/>
+          <path class="sp-prog" d="M0 50A178 50 0 0 0 0 -50A178 50 0 0 0 0 50" pathLength="1"/>
+          <circle class="sp-pl p1" r="3"><animateMotion dur="3.8s" repeatCount="indefinite" path="M96 0A96 27 0 1 0 -96 0A96 27 0 1 0 96 0"/></circle>
+          <circle class="sp-pl p2" r="4.2"><animateMotion dur="7.4s" begin="-2.6s" repeatCount="indefinite" path="M136 0A136 38 0 1 0 -136 0A136 38 0 1 0 136 0"/></circle>
+          <circle class="sp-head" r="4.4" cx="0" cy="50"/>
+        </g>
+      </g>
+    </svg>
+  </div>
+  <div class="sp-meta">
+    <p class="sp-name" aria-hidden="true">SOLARIS</p>
+    <p class="sp-status"><span id="sp-msg">Encendiendo el Sol</span><b id="sp-pct" aria-hidden="true"></b></p>
+  </div>
+</div>
+<div id="app" class="booting splash-hold">
   <canvas id="gl" tabindex="0" aria-label="Vista 3D del Sistema Solar. Arrastra para girar y usa la rueda para acercarte."></canvas>
   <div id="labels" aria-hidden="true"></div>
   <div id="reticle" class="reticle" aria-hidden="true"></div>
@@ -366,6 +407,6 @@
     </div>
   </section>
 </div>
-<script src="js/solaris.js?v=81d14f3a33"></script>
+<script src="js/solaris.js?v=dc3e027709"></script>
 </body>
 </html>
