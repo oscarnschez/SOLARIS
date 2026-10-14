@@ -1472,7 +1472,7 @@ return true;
 },
 };
 const ASSET_MANIFEST = {"music": {"webm": "assets/audio/metamorphosis.webm", "mp3": "assets/audio/metamorphosis.mp3"}, "bodyMeshes": {"fobos": {"url": "assets/models/moons/fobos.bin", "k": 1.26255}, "deimos": {"url": "assets/models/moons/deimos.bin", "k": 1.37497}, "haumea": {"url": "assets/models/dwarfs/haumea.bin", "k": 1.44255}}};
-const SOLARIS_BUILD = '2026.10.14-0725-web';
+const SOLARIS_BUILD = '2026.10.14-0754-web';
 console.info('SOLARIS · versión ' + SOLARIS_BUILD);
 const Assets = {
 cache: new Map(), busyN: new Map(),
@@ -8062,6 +8062,85 @@ return r;
 };
 const _msPause = Missions.pause.bind(Missions);
 Missions.pause = function (v) { _msPause(v); if (MillerFX.active && Missions.run) MillerFX.pause(Missions.run.paused); };
+const Splash = {                                   // pantalla de carga: el Sol de SOLARIS se enciende y su órbita marca el progreso real
+el: null, p: 0, shown: 0, raf: 0, keyBlock: null,
+reduced() { return document.documentElement.classList.contains('anim-reduced') || !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches); },
+init() {
+const el = $('#splash');
+if (!el || el.classList.contains('sp-failsafe')) { if (el) el.remove(); $('#app').classList.remove('splash-hold'); return; }
+window.SOLARIS_SPLASH = true;                    // el arranque de emergencia de index.html ya no hace falta
+this.el = el; this.path = el.querySelector('.sp-prog'); this.head = el.querySelector('.sp-head');
+this.len = this.path.getTotalLength(); this.msgEl = $('#sp-msg'); this.pctEl = $('#sp-pct');
+this.shown = clamp(1 - (parseFloat(getComputedStyle(this.path).strokeDashoffset) || 1), 0, 0.3);   // continúa desde el avance previo al script
+el.classList.add('js');
+if (this.reduced()) { const sv = el.querySelector('svg'); if (sv.pauseAnimations) sv.pauseAnimations(); }
+addEventListener('keydown', this.keyBlock = e => { e.stopImmediatePropagation(); if (e.key === 'Enter' || e.key === ' ' || e.key === 'Tab') e.preventDefault(); }, true);   // los atajos no actúan detrás de la carga
+this.set(0.2, 'Preparando el simulador');
+let last = performance.now();
+const tick = now => {                            // avance suave e independiente de la tasa de cuadros
+const dt = Math.min((now - last) / 1000, 0.25); last = now;
+this.shown += (this.p - this.shown) * (1 - Math.exp(-dt * 5)); if (this.p - this.shown < 0.002) this.shown = this.p;
+this.draw(); this.raf = requestAnimationFrame(tick);
+};
+this.raf = requestAnimationFrame(tick);
+},
+set(p, msg) { if (!this.el) return; this.p = Math.max(this.p, Math.min(p, 1)); if (msg) this.msgEl.textContent = msg; },
+draw() {
+const p = this.shown, pt = this.path.getPointAtLength(p * this.len);
+this.path.style.strokeDashoffset = 1 - p;
+this.head.setAttribute('cx', pt.x.toFixed(2)); this.head.setAttribute('cy', pt.y.toFixed(2));
+const t = Math.round(p * 100) + ' %'; if (this.pctEl.textContent !== t) this.pctEl.textContent = t;
+},
+async finish(explore, then) {                     // espera tipografías, logotipo, texturas del Sol y la Tierra y los primeros cuadros
+if (!this.el) { then(); return; }
+const wait = ms => new Promise(r => setTimeout(r, ms));
+const frames = n => new Promise(r => { const f = () => (--n <= 0 ? r() : requestAnimationFrame(f)); requestAnimationFrame(f); });
+this.set(0.74, 'Cargando tipografías e imágenes');
+const logo = $('.intro-logo img');
+await Promise.race([Promise.all([document.fonts && document.fonts.ready, logo && logo.decode && logo.decode().catch(() => {})]), wait(6000)]);
+const t0 = performance.now();
+World.requestTex('sol', false); World.requestTex('tierra', false);   // descarga en paralelo con el primer cuadro
+for (const [i, id, msg] of [[0, 'sol', 'Cargando la superficie del Sol'], [1, 'tierra', 'Cargando la superficie de la Tierra']]) {
+this.set(0.78 + 0.08 * i, msg);
+while (performance.now() - t0 < 15000 && PLANET_TEX[id]) { const st = World.texState[id]; if (st === 'ok' || st === 'fail') break; await wait(120); }
+}
+this.set(0.95, 'Primer vistazo al Sistema Solar');
+await frames(3);
+if (performance.now() < 2600) await wait(2600 - performance.now());   // la ignición del Sol se ve completa aunque la carga sea instantánea
+this.set(1, 'Listo');
+for (let k = 0; k < 30 && this.shown < 1; k++) await wait(50);   // la órbita de progreso se completa antes de salir
+await wait(this.reduced() ? 0 : 450);
+this.reveal(explore, then);
+},
+fail() { if (this.el) this.reveal(true, () => {}); },
+reveal(explore, then) {
+const el = this.el, app = $('#app'); if (!el) return;
+const done = () => { cancelAnimationFrame(this.raf); el.remove(); this.el = null; };
+const release = () => { removeEventListener('keydown', this.keyBlock, true); app.classList.remove('splash-hold'); then(); };
+const wrap = $('.intro-logo .lg-wrap'), r = wrap && wrap.getBoundingClientRect();
+const toLogo = !explore && !app.classList.contains('in-credits') && !$('#credits').classList.contains('open') && !app.classList.contains('failed') && r && r.width > 40 && r.top < innerHeight && r.bottom > 0;
+if (this.reduced()) { release(); el.classList.add('sp-fade'); setTimeout(done, 700); return; }
+const s = el.querySelector('.sp-sunwrap').getBoundingClientRect(), sx = s.left + s.width / 2, sy = s.top + s.height / 2;
+let cx = sx, cy = sy;
+if (toLogo) {                                    // el Sol de la carga aterriza exactamente sobre la O del logotipo (mismos píxeles de la imagen)
+cx = r.left + r.width * 0.251; cy = r.top + r.height * 0.503;
+el.style.setProperty('--fly', `translate(${(cx - sx).toFixed(1)}px, ${(cy - sy).toFixed(1)}px) scale(${(r.width * 280 / 1100 / s.width).toFixed(4)})`);
+}
+el.style.setProperty('--cx', cx.toFixed(1) + 'px'); el.style.setProperty('--cy', cy.toFixed(1) + 'px');
+el.classList.add('sp-out');                      // las órbitas caen hacia el Sol, que acumula brillo
+if (toLogo) {
+setTimeout(() => el.classList.add('sp-fly'), 380);
+setTimeout(() => { app.classList.add('sp-landed'); el.classList.add('sp-landed', 'sp-open'); release(); }, 1340);   // aterriza: su luz abre la portada
+setTimeout(() => el.classList.add('sp-wave-off'), 2050);
+setTimeout(done, 3200);
+} else {                                         // inicio directo, créditos o error: el Sol estalla en luz desde el centro
+setTimeout(() => { el.classList.add('sp-burst'); release(); }, 320);
+setTimeout(() => el.classList.add('sp-open'), 620);
+setTimeout(() => el.classList.add('sp-wave-off'), 1350);
+setTimeout(done, 2600);
+}
+},
+};
 const App = {
 last: 0, scaleRatio: null, ready: false,
 qualityParams() {
@@ -8077,10 +8156,11 @@ if (rebuild) { GLX.W = 0; this.resize(); }
 resize() { GLX.resize(innerWidth, innerHeight, this.dpr); },
 async start() {
 const cv = $('#gl');
+Splash.init();
 try { GLX.init(cv); }
 catch (e) {
 $('#load-msg').textContent = 'Este simulador necesita WebGL2. Actualiza el navegador o activa la aceleración por hardware en su configuración.';
-$('#app').classList.add('failed'); return;
+$('#app').classList.add('failed'); Splash.fail(); return;
 }
 document.querySelectorAll('img[data-logo]').forEach(i => { i.src = document.querySelector(i.dataset.logo === 'big' ? '.intro-logo img' : '.about-logo').src; });
 SettingsApply.boot();
@@ -8090,23 +8170,24 @@ addEventListener('resize', () => this.resize());
 Time.startState();
 const steps = 9; let n = 0;
 try {
-await World.build(msg => { n++; $('#load-msg').textContent = msg; $('#load-bar').style.transform = `scaleX(${n / steps})`; });
+await World.build(msg => { n++; $('#load-msg').textContent = msg; $('#load-bar').style.transform = `scaleX(${n / steps})`; Splash.set(0.2 + 0.52 * n / steps, msg); });
 } catch (e) {
 console.error(e);
 $('#load-msg').textContent = 'No se pudo preparar la escena 3D (' + e.message + '). Prueba con otro navegador o reduce la calidad.';
-$('#app').classList.add('failed'); return;
+$('#app').classList.add('failed'); Splash.fail(); return;
 }
 UI.init(); Input.init(cv);
 Cam.dist = Cam.dDist = ScaleState.get('overview') * 0.78; Cam.el = 0.34; Cam.az = 0.4; Cam.auto = UI.reducedMotion ? 0 : 0.03;
 $('#load-msg').textContent = 'Listo';
 $('#app').classList.add('ready');
 UI.introTele();
-const st = $('#start'); st.disabled = false; st.focus({ preventScroll: true });
+const st = $('#start'); st.disabled = false;
 st.addEventListener('click', () => this.begin());
 const sg = $('#start-tours'); sg.disabled = false; sg.addEventListener('click', () => UI.toggleTours(true));
 const sf = $('#start-fly'); sf.disabled = false; sf.addEventListener('click', () => { this.begin(); Flight.openHangar(); });
 this.ready = true;
-if (Settings.state.general.startup === 'explore' && location.hash !== '#creditos') this.begin();
+const explore = Settings.state.general.startup === 'explore' && location.hash !== '#creditos';
+Splash.finish(explore, () => { if (explore) this.begin(); else st.focus({ preventScroll: true }); });   // la carga se retira cuando todo está listo
 window.Solaris = { World, Cam, UI, Time, S, select: id => UI.select(World.byId[id], { fly: true }), App, Flight, Music, SFX, Settings, Keys, Gfx, GLX, I18N, BODY, PackedModels, Assets, Compare, TL, Sci, ScaleState, Planner, Flight, Systems, Dilation, Missions, Cam: Cam, MillerFX, Music };
 requestAnimationFrame(t => this.loop(t));
 },
