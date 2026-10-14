@@ -8,7 +8,6 @@ const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
 const lerp = (a, b, t) => a + (b - a) * t;
 const smoothstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 const easeInOut = t => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
-const easeOut = t => 1 - Math.pow(1 - t, 3);
 const wrap360 = a => ((a % 360) + 360) % 360;
 const wrapPi = a => { a = (a + Math.PI) % TAU; if (a < 0) a += TAU; return a - Math.PI; };
 const V = {
@@ -28,13 +27,6 @@ return [v[0] * c + x[0] * s + k[0] * d * (1 - c), v[1] * c + x[1] * s + k[1] * d
 };
 const M4 = {
 ident() { const m = new Float64Array(16); m[0] = m[5] = m[10] = m[15] = 1; return m; },
-mul(a, b, out) {
-out = out || new Float64Array(16);
-for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) {
-out[c * 4 + r] = a[r] * b[c * 4] + a[4 + r] * b[c * 4 + 1] + a[8 + r] * b[c * 4 + 2] + a[12 + r] * b[c * 4 + 3];
-}
-return out;
-},
 perspInf(fovy, aspect, near, out) {
 const m = out || new Float64Array(16); m.fill(0);
 const f = 1 / Math.tan(fovy / 2);
@@ -65,11 +57,6 @@ const m = out || new Float64Array(16); m.fill(0);
 m[0] = m[5] = m[10] = (s == null ? 1 : s); m[15] = 1; m[12] = t[0]; m[13] = t[1]; m[14] = t[2];
 return m;
 },
-xform(m, p) { // punto
-const x = p[0], y = p[1], z = p[2];
-const w = m[3] * x + m[7] * y + m[11] * z + m[15];
-return [m[0] * x + m[4] * y + m[8] * z + m[12], m[1] * x + m[5] * y + m[9] * z + m[13], m[2] * x + m[6] * y + m[10] * z + m[14], w];
-},
 };
 function makeRng(seed) {
 let a = seed >>> 0;
@@ -83,109 +70,10 @@ return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 function gauss(rng) { let u = 0, v = 0; while (u === 0) u = rng(); while (v === 0) v = rng(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(TAU * v); }
 function hexToRgb(h) { const n = parseInt(h.slice(1), 16); return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255]; }
 function srgbToLin(c) { return c.map(x => (x <= 0.04045 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4))); }
-const LOCALES = {
-es: { name: 'Español', locale: 'es-MX', ui: {}, patterns: [], data: null },
-};
-const I18N = {
-lang: 'es', cache: new Map(), missing: new Set(), busy: false,
-L() { return LOCALES[this.lang] || LOCALES.es; },
-loc() { return this.L().locale || 'es-MX'; },
-t(s, ...a) {
-let r = s;
-if (this.lang !== 'es') { const u = this.L().ui[s]; if (u != null) r = u; else { const p = this.pattern(s); if (p != null) r = p; } }
-return a.length ? r.replace(/\{(\d)\}/g, (m, i) => a[i] != null ? a[i] : '') : r;
-},
-pattern(s) {
-for (const [re, rep] of this.L().patterns || []) { re.lastIndex = 0; if (re.test(s)) { re.lastIndex = 0; return s.replace(re, typeof rep === 'function' ? (...m) => rep(...m) : rep); } }
-return null;
-},
-tr(text) {
-if (this.lang === 'es' || !text) return text;
-const c = this.cache.get(text); if (c !== undefined) return c;
-const m = /^(\s*)([\s\S]*?)(\s*)$/.exec(text), core = m[2];
-let out = text;
-if (core && /[A-Za-zÁÉÍÓÚáéíóúñÑ]/.test(core)) {
-const u = this.L().ui[core];
-if (u != null) out = m[1] + u + m[3];
-else { const p = this.pattern(core); if (p != null && p !== core) out = m[1] + p + m[3]; else if (this.track) this.missing.add(core); }
-}
-if (this.cache.size > 6000) this.cache.clear();
-this.cache.set(text, out);
-return out;
-},
-ATTRS: ['aria-label', 'placeholder', 'data-tip', 'title', 'alt'],
-skip(el) { return el && el.closest && el.closest('[data-no-i18n], script, style, #labels'); },
-textNode(n) {
-if (this.skip(n.parentElement)) return;
-if (n.__o !== undefined && n.data === n.__o) return;          // ya traducido por nosotros
-const src = n.data; n.__es = src;
-const out = this.tr(src);
-n.__o = out; if (out !== src) n.data = out;
-},
-attr(el, a) {
-const v = el.getAttribute(a); if (v == null) return;
-el.__ao = el.__ao || {}; el.__ae = el.__ae || {};
-if (el.__ao[a] !== undefined && v === el.__ao[a]) return;
-el.__ae[a] = v; const out = this.tr(v); el.__ao[a] = out;
-if (out !== v) el.setAttribute(a, out);
-},
-tree(root) {
-if (!root) return;
-if (root.nodeType === 3) return this.textNode(root);
-if (root.nodeType !== 1 || this.skip(root)) return;
-const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT); let n;
-while ((n = w.nextNode())) this.textNode(n);
-const els = [root, ...root.querySelectorAll('*')];
-for (const el of els) for (const a of this.ATTRS) if (el.hasAttribute && el.hasAttribute(a)) this.attr(el, a);
-},
-restore(root) {
-const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT); let n;
-while ((n = w.nextNode())) if (n.__es !== undefined) { if (n.data !== n.__es && n.data === n.__o) n.data = n.__es; n.__o = undefined; n.__es = undefined; }
-root.querySelectorAll('*').forEach(el => { if (el.__ae) { for (const a in el.__ae) if (el.getAttribute(a) === el.__ao[a]) el.setAttribute(a, el.__ae[a]); el.__ae = el.__ao = null; } });
-},
-observe() {
-if (this.obs) return;
-this.obs = new MutationObserver(list => {
-if (this.lang === 'es' || this.busy) return;
-this.busy = true;
-for (const m of list) {
-if (m.type === 'childList') m.addedNodes.forEach(n => this.tree(n));
-else if (m.type === 'characterData') this.textNode(m.target);
-else if (m.type === 'attributes' && !this.skip(m.target)) this.attr(m.target, m.attributeName);
-}
-this.busy = false;
-});
-this.obs.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: this.ATTRS });
-},
-swapData(lang) {
-const D = (LOCALES[lang] && LOCALES[lang].data) || {};
-const keep = (o, keys) => { if (!o.__es) { o.__es = {}; keys.forEach(k => { if (k in o) o.__es[k] = JSON.parse(JSON.stringify(o[k])); }); } };
-const put = (o, tr, keys) => { keys.forEach(k => { if (o.__es && k in o.__es) o[k] = JSON.parse(JSON.stringify(o.__es[k])); }); if (tr) for (const k in tr) { if (k === 'info' || k === 'craft') Object.assign(o[k], tr[k]); else o[k] = tr[k]; } };
-for (const id in BODY) { const b = BODY[id]; keep(b, ['name', 'short', 'sub', 'info', 'craft']); put(b, D.bodies && D.bodies[id], ['name', 'short', 'sub', 'info', 'craft']);
-b.aka = Array.from(new Set([...(b.aka || []), b.__es.name, ...(D.bodies && D.bodies[id] && D.bodies[id].name ? [D.bodies[id].name] : [])])); }
-const swapMap = (obj, tr) => { if (!obj) return; if (!obj.__es) Object.defineProperty(obj, '__es', { value: Object.assign({}, obj), enumerable: false }); Object.assign(obj, obj.__es, tr || {}); };
-swapMap(TYPE_LABEL, D.typeLabel);
-if (typeof DETENT_NAMES !== 'undefined') swapMap(DETENT_NAMES, D.detents);
-const swapPairs = (arr, tr) => { if (!arr) return; arr.forEach(p => { if (p.__es === undefined) Object.defineProperty(p, '__es', { value: p[1], enumerable: false }); p[1] = (tr && tr[p[0]]) || p.__es; }); };
-if (typeof CAMS !== 'undefined') swapPairs(CAMS, D.cams);
-if (typeof STARTS !== 'undefined') swapPairs(STARTS, D.starts);
-for (const k in SCALES) { const sc = SCALES[k]; keep(sc, ['label']); put(sc, D.scales && D.scales[k] ? { label: D.scales[k] } : null, ['label']); }
-if (typeof SHIPS !== 'undefined') SHIPS.forEach(s => { keep(s, ['name', 'type', 'desc', 'prop']); put(s, D.ships && D.ships[s.id], ['name', 'type', 'desc', 'prop']); });
-if (typeof TOURS !== 'undefined') TOURS.forEach(T => { keep(T, ['name', 'title', 'desc']); put(T, D.tours && D.tours[T.id], ['name', 'title', 'desc']);
-T.stops.forEach(st => { keep(st, ['group', 'txt']); const tr = {}, X = D.tourText || {}; if (st.__es.group && X[st.__es.group]) tr.group = X[st.__es.group]; if (st.__es.txt && X[st.__es.txt]) tr.txt = X[st.__es.txt]; put(st, tr, ['group', 'txt']); }); });
-CONSTELLATIONS.forEach(c => { keep(c, ['name']); put(c, D.const && D.const[c.id] ? { name: D.const[c.id] } : null, ['name']); });
-},
-set(lang, initial) {
-if (!LOCALES[lang]) lang = 'es';
-if (lang === this.lang && !initial) return;
-if (!TYPE_LABEL.__es) Object.defineProperty(TYPE_LABEL, '__es', { value: Object.assign({}, TYPE_LABEL), enumerable: false });
-const prev = this.lang; this.lang = lang; this.cache.clear();
-document.documentElement.lang = lang;
-this.swapData(lang);
-if (lang === 'es') { if (prev !== 'es') this.restore(document.body); }
-else { this.observe(); this.busy = true; this.tree(document.body); this.busy = false; }
-if (!initial) document.dispatchEvent(new CustomEvent('solaris:lang', { detail: lang }));
-},
+const I18N = {                                     // textos en español; t() rellena los marcadores {0}, {1}…
+lang: 'es',
+loc() { return 'es-MX'; },
+t(s, ...a) { return a.length ? s.replace(/\{(\d)\}/g, (m, i) => a[i] != null ? a[i] : '') : s; },
 };
 const t = (s, ...a) => I18N.t(s, ...a);
 const SRC_PLANET = 'NASA NSSDCA Planetary Fact Sheet · NASA Science';
@@ -1075,7 +963,6 @@ const TOUR = [
 { id: 'pluton', txt: 'Plutón y su corazón de hielo de nitrógeno.' },
 { id: 'halley', txt: 'El cometa Halley regresará al Sistema Solar interior hacia 2061.' },
 ];
-const SRC_CRAFT = 'NASA, ESA, JAXA, CSA, CMSA (páginas oficiales de cada misión)';
 const CRAFTS = [
 {
 id: 'jwst', name: 'Telescopio espacial James Webb', short: 'James Webb', aka: ['jwst', 'webb', 'james webb', 'telescopio webb'], type: 'craft', parent: 'tierra',
@@ -1373,10 +1260,6 @@ BODY.titan.info.feats.push('Su superficie se representa a partir de observacione
 const MODEL_PACKS = {"voyager": {"mats": [{"name": "material_1", "col": [1, 1, 1], "spec": 0.251, "tex": 0}, {"name": "material_2", "col": [1.0, 0.827, 0.318], "spec": 0.608, "tex": -1}, {"name": "material_3", "col": [1, 1, 1], "spec": 0.251, "tex": 1}, {"name": "material_4", "col": [1, 1, 1], "spec": 0.251, "tex": 2}], "credit": {"title": "Voyager 1", "author": "Sidharth1", "url": "https://sketchfab.com/3d-models/voyager-1-f626e0b2d37b46dab4c9433306720c4b"}, "pack": "assets/models/satellites/voyager.bin", "tex": ["assets/textures/spacecraft/voyager-0.avif", "assets/textures/spacecraft/voyager-1.avif", "assets/textures/spacecraft/voyager-2.avif"], "texAlt": [null, null, null]}, "hubble": {"mats": [{"name": "Material9", "col": [1, 1, 1], "spec": 0.42, "tex": 0}, {"name": "Material", "col": [1, 1, 1], "spec": 0.42, "tex": 1}, {"name": "Material10", "col": [1, 1, 1], "spec": 0.42, "tex": 2}, {"name": "Material3", "col": [1, 1, 1], "spec": 0.42, "tex": 3}, {"name": "Material11", "col": [1, 1, 1], "spec": 0.42, "tex": 4}, {"name": "Material12", "col": [1, 1, 1], "spec": 0.42, "tex": 5}, {"name": "Material4", "col": [1, 1, 1], "spec": 0.42, "tex": 6}, {"name": "Material6", "col": [1, 1, 1], "spec": 0.42, "tex": 6}, {"name": "Material8", "col": [0.542, 0.542, 0.542], "spec": 0.42, "tex": -1}, {"name": "Material7", "col": [1, 1, 1], "spec": 0.225, "tex": 7}, {"name": "scblack", "col": [1, 1, 1], "spec": 0.42, "tex": 8}, {"name": "Material2", "col": [1, 1, 1], "spec": 0.42, "tex": 9}, {"name": "al_irradite", "col": [1, 1, 1], "spec": 0.42, "tex": 10}, {"name": "logos", "col": [1, 1, 1], "spec": 0.42, "tex": 11}, {"name": "GLOBAL03", "col": [0.3, 0.3, 0.3], "spec": 0.42, "tex": -1}, {"name": "scblack1", "col": [1, 1, 1], "spec": 0.42, "tex": 8}, {"name": "GLOBAL04", "col": [1, 1, 1], "spec": 0.42, "tex": 9}], "credit": {"title": "Hubble", "author": "uperesito", "url": "https://sketchfab.com/3d-models/hubble-1b82249a0c3540daa66092a8d73442e9"}, "pack": "assets/models/satellites/hubble.bin", "tex": ["assets/textures/spacecraft/hubble-0.jpg", "assets/textures/spacecraft/hubble-1.avif", "assets/textures/spacecraft/hubble-2.jpg", "assets/textures/spacecraft/hubble-3.jpg", "assets/textures/spacecraft/hubble-4.avif", "assets/textures/spacecraft/hubble-5.avif", "assets/textures/spacecraft/hubble-6.avif", "assets/textures/spacecraft/hubble-7.jpg", "assets/textures/spacecraft/hubble-8.jpg", "assets/textures/spacecraft/hubble-9.jpg", "assets/textures/spacecraft/hubble-10.jpg", "assets/textures/spacecraft/hubble-11.jpg"], "texAlt": [null, null, null, null, null, null, null, null, null, null, null, null]}, "iss": {"mats": [{"name": "material_0", "col": [0.85, 0.85, 0.85], "spec": 0.12, "tex": -1}, {"name": "ISS_03_dull", "col": [1, 1, 1], "spec": 0.12, "tex": 0}, {"name": "ISS_AO_06", "col": [1, 1, 1], "spec": 0.398, "tex": 1}, {"name": "ISS_01_dull", "col": [1, 1, 1], "spec": 0.366, "tex": 2}, {"name": "ISS_02_dull", "col": [1, 1, 1], "spec": 0.347, "tex": 3}, {"name": "shiny_panel", "col": [1, 1, 1], "spec": 0.443, "tex": 3}, {"name": "olive *", "col": [0.432, 0.425, 0.389], "spec": 0.645, "tex": -1}, {"name": "ISS_AO_02", "col": [1, 1, 1], "spec": 0.533, "tex": 4}, {"name": "ISS_AO_04", "col": [1, 1, 1], "spec": 0.398, "tex": 5}, {"name": "ISS_AO_01", "col": [1, 1, 1], "spec": 0.398, "tex": 6}, {"name": "ISS_AO_03", "col": [1, 1, 1], "spec": 0.398, "tex": 7}, {"name": "ISS_01_shiny_n", "col": [1, 1, 1], "spec": 0.398, "tex": 2}, {"name": "ISS_01_dark *", "col": [1, 1, 1], "spec": 0.251, "tex": 2}, {"name": "foil_silver", "col": [0.85, 0.85, 0.85], "spec": 0.645, "tex": -1}, {"name": "ISS_AO_05", "col": [1, 1, 1], "spec": 0.398, "tex": 8}, {"name": "ISS_04_dull", "col": [1, 1, 1], "spec": 0.251, "tex": 9}, {"name": "ISS_02_dark *", "col": [1, 1, 1], "spec": 0.251, "tex": 3}, {"name": "ISS_AO_07", "col": [1, 1, 1], "spec": 0.398, "tex": 10}, {"name": "ISS_AO_08", "col": [1, 1, 1], "spec": 0.398, "tex": 11}, {"name": "ISS_03_shiny_n", "col": [1, 1, 1], "spec": 0.398, "tex": 0}, {"name": "ecostress", "col": [1, 1, 1], "spec": 0.186, "tex": 12}, {"name": "plastic black", "col": [0.026, 0.026, 0.026], "spec": 0.251, "tex": -1}, {"name": "ISS_03_dull.002", "col": [1, 1, 1], "spec": 0.186, "tex": 13}, {"name": "ecostress metal", "col": [1, 1, 1], "spec": 0.259, "tex": 12}, {"name": "ecostress_dexter", "col": [1, 1, 1], "spec": 0.251, "tex": 2}, {"name": "white", "col": [0.497, 0.497, 0.497], "spec": 0.159, "tex": -1}, {"name": "base_metal", "col": [0.475, 0.473, 0.439], "spec": 0.12, "tex": -1}, {"name": "ISS_03_dull.001", "col": [1, 1, 1], "spec": 0.365, "tex": 14}], "credit": {"title": "EEI (archivo proporcionado por el usuario)", "author": null, "url": null}, "pack": "assets/models/satellites/iss.bin", "tex": ["assets/textures/spacecraft/iss-0.avif", "assets/textures/spacecraft/iss-1.avif", "assets/textures/spacecraft/iss-2.avif", "assets/textures/spacecraft/iss-3.avif", "assets/textures/spacecraft/iss-4.avif", "assets/textures/spacecraft/iss-5.avif", "assets/textures/spacecraft/iss-6.avif", "assets/textures/spacecraft/iss-7.avif", "assets/textures/spacecraft/iss-8.avif", "assets/textures/spacecraft/iss-9.avif", "assets/textures/spacecraft/iss-10.avif", "assets/textures/spacecraft/iss-11.avif", "assets/textures/spacecraft/iss-12.jpg", "assets/textures/spacecraft/iss-13.avif", "assets/textures/spacecraft/iss-14.avif"], "texAlt": [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null]}, "tiangong": {"mats": [{"name": "offwhite", "col": [0.965, 0.961, 0.933], "spec": 0.35, "tex": -1}, {"name": "gray", "col": [0.471, 0.49, 0.51], "spec": 0.237, "tex": -1}, {"name": "blue2", "col": [0.098, 0.149, 0.282], "spec": 0.9, "tex": -1}, {"name": "gold", "col": [0.588, 0.471, 0.275], "spec": 0.7, "tex": -1}, {"name": "dark", "col": [0.118, 0.133, 0.149], "spec": 0.237, "tex": -1}, {"name": "black", "col": [0.059, 0.059, 0.071], "spec": 0.237, "tex": -1}, {"name": "red", "col": [0.745, 0.118, 0.118], "spec": 0.237, "tex": -1}], "credit": null, "pack": "assets/models/satellites/tiangong.bin", "tex": [], "texAlt": []}, "colibri": {"mats": [{"name": "Material.001", "col": [0.711, 0.711, 0.711], "spec": 0.593, "tex": 0}], "nozzles": [[-2.24, -0.79, -11.2, 0.44], [2.24, -0.79, -11.2, 0.44]], "credit": {"title": "space craft", "author": "CyberDriger83", "url": "https://sketchfab.com/3d-models/space-craft-f7026b90bf9b44c99c15f7afc87bcdd3"}, "pack": "assets/models/ships/colibri.bin", "tex": ["assets/textures/spacecraft/colibri-0.avif"], "texAlt": [null]}, "ranger": {"mats": [{"name": "material", "col": [0.973, 0.973, 0.973], "spec": 0.15, "tex": 0}, {"name": ".002", "col": [1, 1, 1], "spec": 0.429, "tex": 1}, {"name": ".003", "col": [1, 1, 1], "spec": 0.15, "tex": 2}, {"name": ".006", "col": [1, 1, 1], "spec": 0.15, "tex": 3}, {"name": ".007", "col": [1, 1, 1], "spec": 0.15, "tex": 4}, {"name": ".008", "col": [1, 1, 1], "spec": 0.15, "tex": 5}, {"name": ".010", "col": [0.05, 0.07, 0.09], "spec": 1.2, "tex": -1}], "nozzles": [[-0.95, 0.29, -12.2, 0.62], [-0.02, -1.24, -12.2, 0.62], [1.03, 0.21, -12.2, 0.62]], "credit": {"title": "Interstellar Ranger One", "author": "Max Vizell", "url": "https://sketchfab.com/3d-models/interstellar-ranger-one-77c63df2062d4fd9863cc64711450c6f"}, "pack": "assets/models/ships/ranger.bin", "tex": ["assets/textures/spacecraft/ranger-0.jpg", "assets/textures/spacecraft/ranger-1.avif", "assets/textures/spacecraft/ranger-2.avif", "assets/textures/spacecraft/ranger-3.avif", "assets/textures/spacecraft/ranger-4.avif", "assets/textures/spacecraft/ranger-5.avif"], "texAlt": [null, null, null, null, null, null]}, "atlas": {"mats": [{"name": "Engine", "col": [1, 1, 1], "spec": 0.15, "tex": 0, "etex": 1, "estr": 0.8}, {"name": "Head", "col": [1, 1, 1], "spec": 0.15, "tex": 2, "etex": 3, "estr": 0.8}, {"name": "Middle", "col": [1, 1, 1], "spec": 0.15, "tex": 4, "etex": 3, "estr": 0.8}, {"name": "Back", "col": [1, 1, 1], "spec": 0.15, "tex": 5}, {"name": "Weapon", "col": [1, 1, 1], "spec": 0.15, "tex": 6}], "nozzles": [[-10.95, -0.03, -18.7, 1.17], [-6.04, 0.62, -18.7, 1.17], [6.04, 0.62, -18.7, 1.17], [10.98, -0.07, -18.7, 1.17]], "credit": {"title": "COBR-A", "author": "Alastoir De Faruh", "url": "https://sketchfab.com/3d-models/cobr-a-14588b866bb5461c853947e4b55da750"}, "pack": "assets/models/ships/atlas.bin", "tex": ["assets/textures/spacecraft/atlas-0.avif", "assets/textures/spacecraft/atlas-1.jpg", "assets/textures/spacecraft/atlas-2.avif", "assets/textures/spacecraft/atlas-3.jpg", "assets/textures/spacecraft/atlas-4.avif", "assets/textures/spacecraft/atlas-5.avif", "assets/textures/spacecraft/atlas-6.avif"], "texAlt": [null, null, null, null, null, null, null]}, "odisea": {"mats": [{"name": "Stuff", "col": [1, 1, 1], "spec": 0.15, "tex": 0, "etex": 1, "estr": 2.27}, {"name": "Main", "col": [1, 1, 1], "spec": 0.15, "tex": 2, "etex": 3, "estr": 2.5}], "nozzles": [[-3.49, 0.26, -70.2, 2.8], [-0.06, 0.35, -70.2, 2.8], [3.51, 0.24, -70.2, 2.8]], "credit": {"title": "SpaceShip AV-007", "author": "Muffin_one", "url": "https://sketchfab.com/3d-models/spaceship-av-007-1cd9c6349e714d5ead082177dc9e1250"}, "pack": "assets/models/ships/odisea.bin", "tex": ["assets/textures/spacecraft/odisea-0.avif", "assets/textures/spacecraft/odisea-1.jpg", "assets/textures/spacecraft/odisea-2.avif", "assets/textures/spacecraft/odisea-3.jpg"], "texAlt": [null, null, null, null]}, "parker": {"mats": [{"name": "foil_silver", "col": [0.654, 0.654, 0.654], "spec": 0.74, "tex": -1}, {"name": "base_metal", "col": [0.531, 0.529, 0.508], "spec": 0.675, "tex": -1}, {"name": "black_matte", "col": [0.304, 0.304, 0.304], "spec": 0.393, "tex": -1}, {"name": "material", "col": [0.728, 0.728, 0.728], "spec": 0.12, "tex": -1}, {"name": "foil_antenna", "col": [0.654, 0.654, 0.654], "spec": 0.762, "tex": -1}, {"name": "material_0", "col": [0.005, 0.005, 0.005], "spec": 0.138, "tex": -1}], "tex": [], "texAlt": [], "credit": {"title": "Parker Solar Probe", "author": "salvey", "url": "https://sketchfab.com/3d-models/parker-solar-probe-665bf4ab9de8400e9486bcb337f98e2c", "license": "CC BY 4.0", "licenseUrl": "http://creativecommons.org/licenses/by/4.0/", "note": "adaptado: orientación (escudo térmico hacia el Sol), escala, simplificación y formato"}, "pack": "assets/models/satellites/parker.bin"}, "newhorizons": {"mats": [{"name": "lamina_metalica", "col": [1, 1, 1], "spec": 0.95, "tex": 0}, {"name": "pintura_blanca", "col": [1, 1, 1], "spec": 0.3, "tex": 0}, {"name": "superficie_oscura", "col": [1, 1, 1], "spec": 0.15, "tex": 0}], "tex": ["assets/textures/spacecraft/newhorizons-0.webp"], "texAlt": [null], "credit": {"title": "New Horizons", "author": null, "url": null, "license": null, "licenseUrl": null, "note": "modelo adquirido por el creador del proyecto; información de atribución pendiente. Adaptado: orientación (antena hacia la Tierra), escala real, simplificación, color compuesto a partir de los mapas difuso y especular, y formato"}, "pack": "assets/models/satellites/newhorizons.bin"}, "rocinante": {"mats": [{"name": "00_erged", "col": [1, 1, 1], "spec": 0.15, "tex": 0}], "tex": ["assets/textures/spacecraft/rocinante-0.webp"], "texAlt": [null], "nozzles": [[-2.45, 2.14, -23.2, 1.26], [-1.99, -3.03, -23.2, 1.26], [1.99, -3.03, -23.2, 1.26], [2.45, 2.14, -23.2, 1.26]], "credit": {"title": "Rosinante", "author": "mohamedhussien", "url": "https://sketchfab.com/3d-models/rosinante-9fb2988e9ede4721bff2145a3d07b7fd", "license": "CC BY 4.0", "licenseUrl": "http://creativecommons.org/licenses/by/4.0/", "note": "adaptado: orientación (proa hacia +Z), escala a 46 m, simplificación y formato"}, "pack": "assets/models/ships/rocinante.bin"}, "orville": {"mats": [{"name": "Material", "col": [1, 1, 1], "spec": 0.15, "tex": 0, "etex": 1, "estr": 0.8}], "tex": ["assets/textures/spacecraft/orville-0.webp", "assets/textures/spacecraft/orville-1.webp"], "texAlt": [null, null], "nozzles": [[-9.45, 5.89, -150.2, 6.0], [1.19, 4.21, -150.2, 6.0], [11.75, 5.71, -150.2, 6.0]], "credit": {"title": "USS Orville", "author": "HaughtyGrayAlien", "url": "https://sketchfab.com/3d-models/uss-orville-60170fd125b348349cedeab68f3cca32", "license": "CC BY 4.0", "licenseUrl": "http://creativecommons.org/licenses/by/4.0/", "note": "adaptado: orientación (proa hacia +Z), escala a 300 m y formato"}, "pack": "assets/models/ships/orville.bin"}};
 ['colibri', 'ranger', 'atlas', 'odisea'].forEach(id => { const c = MODEL_PACKS[id] && MODEL_PACKS[id].credit; if (c) MODEL_CREDITS[id] = { title: c.title, author: c.author, url: c.url, license: 'CC BY 4.0', licenseUrl: 'https://creativecommons.org/licenses/by/4.0/', note: 'adaptado: orientación, escala, texturas y formato' }; });
 const PackedModels = {
-async gunzip(b64) {
-const bin = Uint8Array.from(atob(b64), ch => ch.charCodeAt(0));
-return new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
-},
 decode(buf) {
 const dv = new DataView(buf);
 if (String.fromCharCode(dv.getUint8(0), dv.getUint8(1), dv.getUint8(2), dv.getUint8(3)) !== 'SLR2') return null;
@@ -1399,7 +1282,7 @@ return s * Math.pow(2, e - 15) * (1 + f / 1024);
 async loadPack(name) {
 const M = MODEL_PACKS[name];
 if (!M || typeof DecompressionStream === 'undefined') return false;
-const D = this.decode(await this.gunzip(M.pack)); if (!D) return false;
+const D = this.decode(await Assets.gunzip(M.pack)); if (!D) return false;
 const { nv, ni, step, groups, q, nm, uh, dl } = D;
 const vmat = new Uint8Array(nv);
 const idx = new Uint32Array(ni); let a = 0; for (let i = 0; i < ni; i++) { a += dl[i]; idx[i] = a; }
@@ -1425,25 +1308,9 @@ mesh.groups = groups.map(g => { const mt = M.mats[g.mat] || {}; return { first: 
 CraftModels.setMesh(name, mesh);
 return true;
 },
-async loadAll() {
-for (const name of Object.keys(MODEL_PACKS)) {
-try {
-if (!(await this.loadPack(name))) continue;
-const mesh = CraftModels.mesh(name);
-World.rb.filter(rb => rb.isCraft && rb.def.model === name).forEach(rb => {
-rb.lodMesh = CraftModels.mesh(name + '-lite'); rb.mesh = mesh; rb.R = rb.def.R = mesh.R / 1000;
-});
-World.hd[name] = true;
-if (MODEL_PACKS[name].nozzles) { SHIP_NOZZLES[name] = MODEL_PACKS[name].nozzles; if (Flight.state === 'hangar') Flight.renderHangar(); }
-if (UI.sel && UI.sel.def.model === name) UI.renderInfo(UI.sel);
-} catch (e) { console.warn('Modelo detallado no disponible: ' + name, e); }
-await new Promise(r => setTimeout(r, 30));
-}
-},
 async loadJWST() {
-if (!JWST_PACK || JWST_PACK.length < 20 || typeof DecompressionStream === 'undefined') return false;
-const bin = await Assets.bytes(JWST_PACK);
-const buf = await new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+if (typeof DecompressionStream === 'undefined') return false;
+const buf = await Assets.gunzip(JWST_PACK);
 const dv = new DataView(buf);
 if (String.fromCharCode(dv.getUint8(0), dv.getUint8(1), dv.getUint8(2), dv.getUint8(3)) !== 'SLRM') return false;
 const nv = dv.getUint32(4, true), ni = dv.getUint32(8, true), step = dv.getFloat32(12, true);
@@ -1472,17 +1339,13 @@ return true;
 },
 };
 const ASSET_MANIFEST = {"music": {"webm": "assets/audio/metamorphosis.webm", "mp3": "assets/audio/metamorphosis.mp3"}, "bodyMeshes": {"fobos": {"url": "assets/models/moons/fobos.bin", "k": 1.26255}, "deimos": {"url": "assets/models/moons/deimos.bin", "k": 1.37497}, "haumea": {"url": "assets/models/dwarfs/haumea.bin", "k": 1.44255}}};
-const SOLARIS_BUILD = '2026.10.14-0831-web';
+const SOLARIS_BUILD = '2026.10.14-0904-web';
 console.info('SOLARIS · versión ' + SOLARIS_BUILD);
 const Assets = {
 cache: new Map(), busyN: new Map(),
-isURL: s => typeof s === 'string' && /^(\.\/)?assets\//.test(s),
 async bytes(s) {
-if (this.isURL(s)) {
 const r = await fetch(s); if (!r.ok) throw new Error(s + ' → ' + r.status);
 return new Uint8Array(await r.arrayBuffer());
-}
-return Uint8Array.from(atob(s), ch => ch.charCodeAt(0));
 },
 async gunzip(s) {
 const bin = await this.bytes(s);
@@ -1490,11 +1353,11 @@ return new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream
 },
 async image(primary, alt) {
 if (!primary) return alt || null;
-const avif = /^data:image\/avif|\.avif$/.test(primary);
+const avif = /\.avif$/.test(primary);
 if (!avif || await GLX.avifOK()) return primary;
 return alt || null;
 },
-once(key, fn) { if (!this.cache.has(key)) this.cache.set(key, fn().catch(e => { console.warn('Recurso no disponible: ' + key, e); this.cache.delete(key + ':ok'); return false; })); return this.cache.get(key); },
+once(key, fn) { if (!this.cache.has(key)) this.cache.set(key, fn().catch(e => { console.warn('Recurso no disponible: ' + key, e); return false; })); return this.cache.get(key); },
 busy(key, label) {
 this.busyN.set(key, label); this.paintBusy();
 },
@@ -1509,7 +1372,7 @@ if (labels.length) el.querySelector('span').textContent = labels[labels.length -
 Object.assign(Assets, {
 visual(rb) {
 const id = rb.id, m = rb.def.model, st = s => s === 'ok' ? 'loaded' : s === 'fail' ? 'failed' : s === 'loading' ? 'loading' : 'available';
-if (rb.isCraft && m && (MODEL_PACKS[m] || (m === 'jwst' && JWST_PACK && JWST_PACK.length > 20)))
+if (rb.isCraft && m && (MODEL_PACKS[m] || m === 'jwst'))
 return { type: 'mesh', status: st(PackedModels.state[m]), source: m };
 if (ASSET_MANIFEST.bodyMeshes && ASSET_MANIFEST.bodyMeshes[id])
 return { type: 'mesh', status: st(PackedModels.bodyState[id]), source: ASSET_MANIFEST.bodyMeshes[id].url };
@@ -1526,13 +1389,11 @@ for (const id in PLANET_TEX) {
 const c = PLANET_TEX[id].credit; if (!c || !BODY[id]) continue;
 if (PLANET_TEX[id].prevCredit) PREV_CREDITS.push({ id, credit: PLANET_TEX[id].prevCredit });
 if (PLANET_TEX[id].rings && BODY[id] && !BODY[id].vis.rings) BODY[id].vis.rings = PLANET_TEX[id].rings;   // anillo incluido en el modelo
-if (BODY[id].credit && BODY[id].credit.url !== c.url) PREV_CREDITS.push({ id, credit: BODY[id].credit });
-BODY[id].credit = c;
+BODY[id].credit = Object.assign({}, BODY[id].credit, c);   // los datos del modelo completan la licencia y la nota por defecto
 }
 for (const name in MODEL_PACKS) if (MODEL_PACKS[name].credit && !MODEL_CREDITS[name]) { MODEL_CREDITS[name] = MODEL_PACKS[name].credit; if (BODY[name]) BODY[name].credit = MODEL_CREDITS[name]; }
 Object.assign(PackedModels, {
 state: {}, bodyState: {},
-gunzip(s) { return Assets.gunzip(s); },
 request(name, visible) {
 if (this.state[name] === 'ok' || this.state[name] === 'fail') return Promise.resolve(this.state[name] === 'ok');
 if (visible) Assets.busy('m:' + name, 'Cargando modelo…');
@@ -1542,17 +1403,16 @@ let ok = false;
 try { ok = name === 'jwst' ? await this.loadJWST() : await this.loadPack(name); } catch (e) { console.warn('Modelo detallado no disponible: ' + name, e); }
 this.state[name] = ok ? 'ok' : 'fail'; Assets.changed();
 if (ok) this.apply(name);
-Assets.done('m:' + name);
 return ok;
 }).finally(() => Assets.done('m:' + name));
 },
 apply(name) {
 const mesh = CraftModels.mesh(name);
-World.rb.filter(rb => rb.isCraft && rb.def.model === name).forEach(rb => {
+(World.systems ? World.systems.solar.rb : World.rb).filter(rb => rb.isCraft && rb.def.model === name).forEach(rb => {
 rb.mesh = mesh; rb.lodMesh = CraftModels.mesh(name + '-lite');
 if (mesh.R) rb.R = rb.def.R = mesh.R / 1000;
 });
-World.hd[name] = true; if (name === 'jwst') World.jwstHD = true;
+World.hd[name] = true;
 if (MODEL_PACKS[name] && MODEL_PACKS[name].nozzles) { SHIP_NOZZLES[name] = MODEL_PACKS[name].nozzles; }
 if (Flight.ship && Flight.ship.id === name && Flight.syncModel) Flight.syncModel();
 if (Flight.state === 'hangar') Flight.renderHangar();
@@ -1769,7 +1629,6 @@ interface: { uiScale: 1, panelOpacity: 0.6, info: 'advanced', hud: 'full', anim:
 controls: ctl,
 simulation: { timeSpeed: 'real', startDate: 'now', lastJD: null, scale: 'visual', rotCap: true,
 layers: { orbits: true, moonOrbits: true, moons: true, asteroids: true, kuiper: true, craft: true, constLines: false, constNames: false, namesPlanets: true, namesMoons: true, namesSmall: true, namesCraft: true, hz: false }, hzModel: 'conservador', sciPreset: null, plannerMode: 'simple' },
-language: 'es',
 accessibility: { reducedMotion: rm, contrast: false, text: 'normal', reduceFlashes: false },
 firstRun: true,
 };
@@ -1793,7 +1652,7 @@ st.firstRun = false;
 try { const m = JSON.parse(localStorage.getItem('solaris.music') || 'null'); if (m) { st.audio.musicOn = m.on !== false; if (typeof m.vol === 'number') st.audio.music = m.vol; } } catch (e) {}
 try { const a = JSON.parse(localStorage.getItem('solaris.audio') || 'null'); if (a) ['master', 'ui', 'ship', 'muted', 'hover'].forEach(k => { if (k in a) st.audio[k] = a[k]; }); if (a && 'ui' in a) st.audio.nav = a.ui; } catch (e) {}
 }
-st.v = SETTINGS_VERSION; st.language = 'es';
+st.v = SETTINGS_VERSION;
 this.state = st;
 return st;
 },
@@ -1825,16 +1684,17 @@ this.listeners.forEach(f => f('graphics.preset', name));
 reset() {
 const keep = this.state.simulation.lastJD;
 this.state = this.defaults(); this.state.firstRun = false; this.state.simulation.lastJD = keep;
-if (this.state.graphics.auto) Object.assign(this.state.graphics, GFX_PRESETS[this.detectQuality()], { preset: this.detectQuality() });
+if (this.state.graphics.auto) this.autoPreset();
 this.save();
 this.listeners.forEach(f => f('*', null));
 },
+autoPreset() { const p = this.detectQuality(); Object.assign(this.state.graphics, GFX_PRESETS[p], { preset: p }); },   // calidad según el equipo
 resetControls() {
 const d = this.defaults().controls; this.state.controls = d; this.save();
 this.listeners.forEach(f => f('controls', d));
 },
 detectQuality(gl) {
-gl = gl || (window.GLX && GLX.gl);
+gl = gl || GLX.gl;
 let r = '';
 try { const ext = gl && gl.getExtension('WEBGL_debug_renderer_info'); r = (ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl ? gl.getParameter(gl.RENDERER) : '') || ''; } catch (e) {}
 r = r.toLowerCase();
@@ -1851,7 +1711,7 @@ return ['low', 'medium', 'high'][level];
 },
 };
 const Keys = {
-norm(e) { const k = e.key; if (!k) return ''; if (k === ' ' || k === 'Spacebar') return 'space'; return k.length === 1 ? k.toLowerCase() : k.toLowerCase(); },
+norm(e) { const k = e.key; if (!k) return ''; if (k === ' ' || k === 'Spacebar') return 'space'; return k.toLowerCase(); },
 code(ctx, action) { return Settings.state.controls[ctx][action]; },
 action(ctx, key) {
 const m = Settings.state.controls[ctx];
@@ -1862,7 +1722,7 @@ return null;
 },
 label(k) {
 const map = { space: 'Espacio', arrowup: '↑', arrowdown: '↓', arrowleft: '←', arrowright: '→', backspace: '⌫', delete: 'Supr', insert: 'Insert', end: 'Fin' };
-return map[k] ? (window.I18N ? I18N.t(map[k]) : map[k]) : k.length === 1 ? k.toUpperCase() : k.charAt(0).toUpperCase() + k.slice(1);
+return map[k] ? I18N.t(map[k]) : k.length === 1 ? k.toUpperCase() : k.charAt(0).toUpperCase() + k.slice(1);
 },
 describe(ctx, action) { const r = KEY_ACTIONS[ctx].find(x => x[0] === action); return r ? r[2] : action; },
 assign(ctx, action, key) {
@@ -2061,8 +1921,8 @@ hypToEcl(a, e, iDeg, nodeDeg, periDeg, H) {
 const xp = a * (Math.cosh(H) - e), yp = -a * Math.sqrt(e * e - 1) * Math.sinh(H);
 return Astro.planeToEcl(xp, yp, iDeg, nodeDeg, periDeg);
 },
-helioPos(orbit, jd) {
-const k = Astro.elementsAt(orbit, jd);
+helioPos(orbit, jd) { return Astro.posFromElements(Astro.elementsAt(orbit, jd)); },
+posFromElements(k) {
 if (k.hyp) return Astro.hypToEcl(k.a, k.e, k.i, k.node, k.peri, Astro.keplerH(k.M * DEG, k.e));
 const E = Astro.keplerE(k.M * DEG, k.e);
 return Astro.elemToEcl(k.a, k.e, k.i, k.node, k.peri, E);
@@ -2216,10 +2076,8 @@ const ScaleState = {
 from: 'visual', to: 'visual', t: 1,
 set(name, animate) {
 if (name === this.to && this.t >= 1) return;
-this.from = animate ? this.current() : name; this.to = name; this.t = animate ? 0 : 1;
-if (!animate) this.from = name;
+this.from = animate ? this.to : name; this.to = name; this.t = animate ? 0 : 1;
 },
-current() { return this.t >= 1 ? this.to : this.to; },
 k() { return easeInOut(clamp(this.t, 0, 1)); },
 blend(fa, fb) { const k = this.k(); if (k >= 1 || this.from === this.to) return fb; if (k <= 0) return fa; return Math.exp(lerp(Math.log(Math.max(fa, 1e-30)), Math.log(Math.max(fb, 1e-30)), k)); },
 dist(r) { const A = SCALES[this.from], B = SCALES[this.to]; return this.blend(A.dist(r), B.dist(r)); },
@@ -2234,13 +2092,12 @@ mapVec(v) { const r = V.len(v); if (r < 1e-12) return [0, 0, 0]; const s = this.
 const GLX = {
 gl: null, canvas: null, W: 1, H: 1, dpr: 1, hdr: false, samples: 4,
 progs: {}, scratch16: new Float32Array(16), scratch9: new Float32Array(9),
-fsTri: null, targets: null, bloomLevels: 5, quality: 'alta',
+fsTri: null, targets: null, bloomLevels: 5,
 init(canvas) {
 const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, depth: false, stencil: false, premultipliedAlpha: false, powerPreference: 'high-performance', preserveDrawingBuffer: false });
 if (!gl) throw new Error('WebGL2 no disponible');
 this.gl = gl; this.canvas = canvas;
 this.hdr = !!gl.getExtension('EXT_color_buffer_float');
-gl.getExtension('OES_texture_float_linear');
 this.maxSamples = gl.getParameter(gl.MAX_SAMPLES) || 0;
 this.fsTri = gl.createVertexArray(); // triángulo de pantalla completa (usa gl_VertexID)
 return gl;
@@ -2302,10 +2159,11 @@ mesh(attribs, index, mode, dynamic) {
 const gl = this.gl, vao = gl.createVertexArray(), bufs = {};
 gl.bindVertexArray(vao);
 let count = 0;
+const same = new Map();                           // Geo.sphere entrega el mismo arreglo como posición, normal y dirección: se sube una vez
 for (const name in attribs) {
-const at = attribs[name], b = gl.createBuffer();
-gl.bindBuffer(gl.ARRAY_BUFFER, b);
-gl.bufferData(gl.ARRAY_BUFFER, at.data, dynamic ? gl.DYNAMIC_DRAW : gl.STATIC_DRAW);
+const at = attribs[name];
+let b = same.get(at.data);
+if (!b) { b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, at.data, dynamic ? gl.DYNAMIC_DRAW : gl.STATIC_DRAW); same.set(at.data, b); }
 bufs[name] = { b, size: at.size, loc: -1 };
 count = at.data.length / at.size;
 }
@@ -2356,7 +2214,7 @@ else if (s.blend === 'premul') gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 else gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 }
 },
-texFromCanvas(cv, opts) {
+texFromCanvas(cv) {
 const gl = this.gl, t = gl.createTexture();
 gl.bindTexture(gl.TEXTURE_2D, t);
 gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
@@ -2364,7 +2222,7 @@ gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, cv);
 gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, (opts && opts.clampS) ? gl.CLAMP_TO_EDGE : gl.REPEAT);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 return t;
 },
@@ -2519,7 +2377,7 @@ gl.viewport(0, 0, this.W, this.H);
 const C = P.comp; this.use(C);
 this.set(C, 'u_scene', t.sceneTex); this.set(C, 'u_bloom', t.bloom[0].tex);
 this.set(C, 'u_bloomK', post.bloom); this.set(C, 'u_exposure', post.exposure);
-this.set(C, 'u_inScale', this.hdr ? 1 : 4); this.set(C, 'u_res', [this.W, this.H]); this.set(C, 'u_vignette', post.vignette);
+this.set(C, 'u_inScale', this.hdr ? 1 : 4); this.set(C, 'u_vignette', post.vignette);
 gl.drawArrays(gl.TRIANGLES, 0, 3);
 },
 };
@@ -2784,7 +2642,7 @@ if (u_detail > 0.5) crC = craterField(p * 22.0, u_seed + 31.0, rim3, fr3);
 float cr = crA + crB * 0.45 + crC * 0.18;
 float fresh = max(fr1, max(fr2 * 0.7, fr3 * 0.45)) * u_crater;
 float craterK = u_crater;
-float spec = 0.0; float lunar = 0.75; float emit = 0.0;
+float spec = 0.0; float lunar = 0.75;
 #ifdef F_LUNA
 vec3 MAR[16] = vec3[16](vec3(32.8,-15.6,0.17), vec3(28.0,17.5,0.11), vec3(8.5,31.4,0.13), vec3(17.0,59.1,0.085), vec3(-7.8,51.3,0.1), vec3(-15.2,35.5,0.06), vec3(-21.3,-16.6,0.1), vec3(22.0,-55.0,0.2), vec3(2.0,-52.0,0.17), vec3(38.0,-45.0,0.1), vec3(56.0,-15.0,0.07), vec3(56.0,15.0,0.065), vec3(-24.4,-38.6,0.07), vec3(7.5,-30.9,0.08), vec3(13.3,3.6,0.05), vec3(-10.0,-23.0,0.06));
 float mare = 0.0;
@@ -2862,7 +2720,7 @@ vec2 q = p.xz; float s = dot(q, normalize(vec2(1.0, 0.6))) + 0.03 * snoise(p * 6
 float fs = abs(fract(s * 9.0) - 0.5);
 float line = (1.0 - smoothstep(0.02, 0.06, fs)) * (1.0 - smoothstep(0.18, 0.25, abs(s)));
 alb = mix(alb, vec3(0.4, 0.55, 0.65), line * south * 0.75);
-craterK *= 1.0 - smoothstep(-0.9, -0.3, -lat) * 0.0 - (1.0 - smoothstep(-0.9, -0.2, lat)) * 0.8;
+craterK *= 1.0 - (1.0 - smoothstep(-0.9, -0.2, lat)) * 0.8;
 lunar = 0.3;
 #endif
 #ifdef F_JAPETO
@@ -3446,7 +3304,7 @@ uniform int u_steps; uniform float u_rin; uniform float u_rout; uniform float u_
 float h3(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
 vec3 lensStars(vec3 d){
 vec3 q = d * 220.0, c = floor(q); float h = h3(c), s = smoothstep(0.988, 1.0, h);
-s *= smoothstep(0.42, 0.0, length(fract(q) - 0.5));
+s *= 1.0 - smoothstep(0.0, 0.42, length(fract(q) - 0.5));   // smoothstep con bordes invertidos no está definido en GLSL ES
 return s * mix(vec3(1.0, 0.86, 0.72), vec3(0.78, 0.86, 1.0), h3(c + 7.0)) * 1.6;
 }
 vec4 disk(vec3 p, float rr){
@@ -3583,9 +3441,9 @@ out vec2 v_uv;
 void main(){ vec2 p = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2)); v_uv = p; gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0); }`;
 SH.FS_SKY = SH.HEAD + SH.FRAG + `
 in vec2 v_uv;
-uniform samplerCube u_sky; uniform vec3 u_camR; uniform vec3 u_camU; uniform vec3 u_camF; uniform vec2 u_tan; uniform vec2 u_off; uniform float u_skyB; uniform vec2 u_shift;
+uniform samplerCube u_sky; uniform vec3 u_camR; uniform vec3 u_camU; uniform vec3 u_camF; uniform vec2 u_tan; uniform vec2 u_off; uniform float u_skyB;
 void main(){
-vec2 ndc = v_uv * 2.0 - 1.0 + u_shift;
+vec2 ndc = v_uv * 2.0 - 1.0;   // el desplazamiento de la vista se aplica una sola vez (u_off), igual que en estrellas y constelaciones
 vec3 d = normalize(u_camF + u_camR * (ndc.x + u_off.x) * u_tan.x + u_camU * (ndc.y + u_off.y) * u_tan.y);
 o_col = outc(texture(u_sky, d).rgb * u_skyB, 1.0);
 }`;
@@ -3674,7 +3532,7 @@ o_col = outc(col, 1.0);
 }`;
 SH.VS_CRAFT_TEX = SH.VS_CRAFT.replace('in vec4 a_col;', 'in vec4 a_col; in vec2 a_uv;').replace('out vec4 v_col;', 'out vec4 v_col; out vec2 v_uv;').replace('v_col = a_col;', 'v_col = a_col; v_uv = a_uv;');
 SH.FS_CRAFT_TEX = SH.FS_CRAFT.replace('in vec4 v_col;', 'in vec4 v_col; in vec2 v_uv; uniform sampler2D u_tex; uniform float u_hasTex; uniform sampler2D u_etex; uniform float u_eStr;')
-.replace('  writeDepth(v_depth);\n  o_col = outc(col, 1.0);', '  if (u_eStr > 0.0) col += pow(texture(u_etex, v_uv).rgb, vec3(2.2)) * u_eStr;\n  writeDepth(v_depth);\n  o_col = outc(col, 1.0);')
+.replace('writeDepth(v_depth);\no_col = outc(col, 1.0);', 'if (u_eStr > 0.0) col += pow(texture(u_etex, v_uv).rgb, vec3(2.2)) * u_eStr;   // mapas de emisión (luces de Atlas, Odisea, Orville)\nwriteDepth(v_depth);\no_col = outc(col, 1.0);')
 .replace('vec3 base = v_col.rgb;', 'vec3 base = v_col.rgb * (u_hasTex > 0.5 ? pow(texture(u_tex, v_uv).rgb, vec3(2.2)) : vec3(1.0));');
 SH.POST = `#version 300 es
 precision highp float;
@@ -3714,7 +3572,7 @@ c += 4.0 * texture(u_src, v_uv).rgb;
 o_col = vec4(c / 16.0, 1.0);
 }`;
 SH.FS_COMP = SH.POST + `
-uniform sampler2D u_scene; uniform sampler2D u_bloom; uniform float u_bloomK; uniform float u_exposure; uniform float u_inScale; uniform vec2 u_res; uniform float u_vignette;
+uniform sampler2D u_scene; uniform sampler2D u_bloom; uniform float u_bloomK; uniform float u_exposure; uniform float u_inScale; uniform float u_vignette;
 vec3 aces(vec3 x){ const float a = 2.51, b = 0.03, c = 2.43, d = 0.59, e = 0.14; return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0); }
 void main(){
 vec3 c = texture(u_scene, v_uv).rgb * u_inScale;
@@ -3731,7 +3589,7 @@ c += (nz - 0.5) / 255.0;
 o_col = vec4(c, 1.0);
 }`;
 const S = {
-scale: 'visual', quality: 'alta', ambient: 0.02, rotCap: true, mode: 'explore',
+scale: 'visual', ambient: 0.02, rotCap: true, mode: 'explore',
 layers: {
 orbits: true, moonOrbits: true, cometOrbits: false, asteroids: true, kuiper: true, moons: true,
 namesPlanets: true, namesMoons: true, namesSmall: true, constNames: false, constLines: false,
@@ -3755,7 +3613,7 @@ await step('Dibujando continentes', () => { this.landTex = GLX.texFromCanvas(Ear
 await step('Pintando la Vía Láctea', () => this.bakeSky());
 await step('Situando estrellas y constelaciones', () => this.buildStars());
 this.ptex = {}; this.texState = {};       // texturas y modelos detallados: bajo demanda (ver texTick y PackedModels.tick)
-await step('Calculando órbitas', () => { this.buildBodies(); this.applyPlanetTextures(); this.buildSystems(); });
+await step('Calculando órbitas', () => { this.buildBodies(); this.buildSystems(); });
 await step('Sembrando asteroides', () => this.buildBelts());
 await step('Preparando cometas', () => this.buildComets());
 gl.bindVertexArray(null);
@@ -3851,13 +3709,11 @@ const r = rng(), T = r < 0.12 ? 3200 + rng() * 800 : r < 0.45 ? 4200 + rng() * 1
 const c = tcol(T);
 pos.push(d[0], d[1], d[2]); col.push(c[0], c[1], c[2], mag);
 }
-this.namedStars = [];
 for (const k in STARS) {
 const s = STARS[k], d = Astro.radecToScene(s[1] * 15, s[2]);
 const ci = { betelgeuse: 3300, antares: 3400, aldebaran: 3900, arcturus: 4300, pollux: 4700, rigel: 12000, spica: 22000, vega: 9600, sirius: 9900 }[k] || 6500 + ((k.length * 977) % 5000);
 const c = tcol(ci);
 pos.push(d[0], d[1], d[2]); col.push(c[0], c[1], c[2], s[3]);
-this.namedStars.push({ id: k, name: s[0], dir: d });
 }
 this.stars = GLX.mesh({ a_pos: { data: new Float32Array(pos), size: 3 }, a_col: { data: new Float32Array(col), size: 4 } }, null, GLX.gl.POINTS);
 const lp = [];
@@ -3874,7 +3730,6 @@ return { id: c.id, name: c.name, dir: V.norm(cen) };
 this.constLines = GLX.mesh({ a_pos: { data: new Float32Array(lp), size: 3 } }, null, GLX.gl.LINES);
 },
 makeBody(def) {
-const jd0 = Astro.jdFromDate(new Date());
 const rb = { def, id: def.id, isSun: def.type === 'star', R: def.R, children: [], hover: 0, rotPhase: null,
 helio: [0, 0, 0], posS: [0, 0, 0], rS: 1, basis: [[1, 0, 0], [0, 1, 0], [0, 0, 1]], model: new Float64Array(16),
 proj: { x: 0, y: 0, w: 0, rpx: 0, on: false }, color: lin(def.color || '#cccccc'), occ: [], occBuf: new Float32Array(16) };
@@ -3894,7 +3749,6 @@ rb.irregular = true;
 }
 if (v.style === 'craft') {
 rb.mesh = CraftModels.mesh(def.model); rb.isCraft = true;
-if (def.model === 'jwst' && this.jwstHD) rb.lodMesh = CraftModels.mesh('jwst-lite');
 rb.vFrom = def.validFrom ? Astro.jdFromISO(def.validFrom) : null; rb.vTo = def.validTo ? Astro.jdFromISO(def.validTo) : null;
 if (o && o.t === 'drift') { o.dir = V.norm(Astro.eqToEcl(Astro.radecVec(o.ra, o.dec))); o.t0JD = Astro.jdFromISO(o.t0); }
 if (o && o.t === 'cruise' && !o.K) Cruise.prep(o);
@@ -3946,7 +3800,7 @@ GLX.drawRange(mesh, pr, g.first, g.count);
 }
 },
 requestTex(id, visible) {
-if (typeof PLANET_TEX === 'undefined' || !PLANET_TEX[id] || this.texState[id]) return;
+if (!PLANET_TEX[id] || this.texState[id]) return;
 this.texState[id] = 'loading'; Assets.changed();
 if (visible) Assets.busy('t:' + id, 'Preparando objeto…');
 if (ASSET_MANIFEST.bodyMeshes && ASSET_MANIFEST.bodyMeshes[id]) PackedModels.loadBody(id);   // forma real del cuerpo
@@ -3962,7 +3816,7 @@ if (UI.sel === this.byId[id]) UI.renderInfo(UI.sel);          // la ficha abiert
 .finally(() => Assets.done('t:' + id));
 },
 texTick() {
-if (typeof PLANET_TEX === 'undefined' || !this.texState) return;
+if (!this.texState) return;
 let pending = 0;
 for (const id in PLANET_TEX) {
 const rb = this.byId[id]; if (!rb || this.texState[id]) { if (this.texState[id] === 'loading') pending++; continue; }
@@ -3979,7 +3833,7 @@ applyPlanetTextures(only) {
 const feat = { mercurio: 'rock', marte: 'rock', pluton: 'rock', luna: 'luna', ganimedes: 'luna', titan: 'titan', tierra: 'earth', venus: 'venus', jupiter: 'gas', saturno: 'gasring', urano: 'gas', neptuno: 'gas',
 io: 'rock', calisto: 'luna', rea: 'luna', oberon: 'luna', ariel: 'luna', miranda: 'luna', fobos: 'rock', deimos: 'rock',
 ceres: 'rock', haumea: 'luna', makemake: 'luna', sedna: 'rock', quaoar: 'luna' };
-for (const id of only ? [only] : Object.keys(this.ptex)) {
+for (const id of [only]) {
 const rb = this.byId[id], t = this.ptex[id]; if (!rb || !t) continue;
 this.hd[id] = true;
 if (rb.isSun) { this.sunTex = t.map; continue; }
@@ -4064,15 +3918,11 @@ for (const rb of this.rb) {
 const o = rb.def.orbit;
 rb.rS = sc.body(rb.R, rb.isSun);
 if (rb.isSun) { rb.helio = [0, 0, 0]; rb.posS = [0, 0, 0]; continue; }
-if (o.t === 'jpl' || o.t === 'kep') {
-rb.helio = Astro.helioPos(o, jd);
+if (o.t === 'jpl' || o.t === 'kep' || o.t === 'hyp') {
+const k = Astro.elementsAt(o, jd);                 // una sola vez por cuerpo y cuadro
+rb.helio = Astro.posFromElements(k);
 rb.posS = sc.mapVec(Astro.eclToScene(rb.helio));
-rb.orbitFrac = Astro.elementsAt(o, jd).M / 360;
-} else if (o.t === 'hyp') {
-const k = Astro.elementsAt(o, jd);
-rb.helio = Astro.helioPos(o, jd);
-rb.posS = sc.mapVec(Astro.eclToScene(rb.helio));
-rb.orbitFrac = (k.M * DEG + o.Mmax) / (2 * o.Mmax);
+rb.orbitFrac = k.hyp ? (k.M * DEG + o.Mmax) / (2 * o.Mmax) : k.M / 360;
 }
 }
 for (const rb of this.rb) {
@@ -4120,10 +3970,10 @@ const E = rb.parent, s = V.norm(E.helio), z = [0, 0, 1], w = V.norm(V.cross(s, z
 const base = V.scale(s, (o.L === 2 ? 1 : -1) * o.dist);
 const th = (o.phase + 360 * d / o.P) * DEG;
 const off = V.add(base, V.add(V.scale(z, o.halo[0] * Math.sin(th)), V.scale(w, o.halo[1] * Math.cos(th))));
-const dk = V.len(off), map = km => sc.moon(km, E.R, sc.bodyA(E.R), sc.bodyB(E.R));
+const map = km => sc.moon(km, E.R, sc.bodyA(E.R), sc.bodyB(E.R));
 rb.helio = V.add(E.helio, V.scale(off, 1 / AU_KM));
-rb.posS = V.add(E.posS, V.scale(Astro.eclToScene(V.scale(off, 1 / dk)), map(dk)));
-const k = map(o.dist) / o.dist;
+const k = map(o.dist) / o.dist;                  // misma escala lineal que el halo dibujado: la nave queda sobre su órbita
+rb.posS = V.add(E.posS, V.scale(Astro.eclToScene(off), k));
 rb.halo = { c: V.scale(Astro.eclToScene(V.norm(base)), map(o.dist)), X: V.scale(Astro.eclToScene(w), o.halo[1] * k), Z: V.scale(Astro.eclToScene(z), -o.halo[0] * k), N: Astro.eclToScene(s) };
 rb.orbitFrac = ((th / TAU) % 1 + 1) % 1;
 } else if (o.t === 'drift') {
@@ -4200,7 +4050,7 @@ GLX.beginScene();
 if (L.deepSky && Settings.state.graphics.nebulae) {
 GLX.state({ depthTest: false, depthWrite: false, cull: 'none', blend: 'none' });
 const pr = useP(P.sky), v = this.view, f = 1 / this.proj[5];
-GLX.setAll(pr, { u_sky: this.sky, u_camR: [v[0], v[4], v[8]], u_camU: [v[1], v[5], v[9]], u_camF: [-v[2], -v[6], -v[10]], u_tan: [1 / this.proj[0], 1 / this.proj[5]], u_off: [this.proj[8], this.proj[9]], u_shift: [this.proj[8], this.proj[9]], u_skyB: 1.0 });
+GLX.setAll(pr, { u_sky: this.sky, u_camR: [v[0], v[4], v[8]], u_camU: [v[1], v[5], v[9]], u_camF: [-v[2], -v[6], -v[10]], u_tan: [1 / this.proj[0], 1 / this.proj[5]], u_off: [this.proj[8], this.proj[9]], u_skyB: 1.0 });
 gl.bindVertexArray(GLX.fsTri); gl.drawArrays(gl.TRIANGLES, 0, 3);
 }
 if (L.stars) {
@@ -4268,7 +4118,7 @@ GLX.draw(earth.proj.rpx > 160 ? this.meshes.hi : this.meshes.mid, pr);
 }
 GLX.state({ depthTest: true, depthWrite: false, cull: 'front', blend: 'add' });
 if (Settings.state.graphics.atmospheres) for (const rb of vis) {
-const A = rb.def.vis.atm; if (!A || rb.proj.rpx < 2) continue;
+const A = rb.def.vis.atm; if (!A || rb.occBH || rb.proj.rpx < 2) continue;   // tapado por Gargantúa: sin atmósfera
 const H = rb.rS * A.h, pr = useP(P.atm);
 const m = M4.fromBasis([1, 0, 0], [0, 1, 0], [0, 0, 1], rb.rS + H, rb.rel);
 GLX.setAll(pr, { u_model: m, u_center: rb.rel, u_R: rb.rS, u_H: H, u_atm: [...A.color, 1.0], u_k: A.k });
@@ -4380,7 +4230,7 @@ n++;
 GLX.update(this.markers, 'a_pos', mb.pos); GLX.update(this.markers, 'a_col', mb.col);
 GLX.state({ depthTest: true, depthWrite: false, cull: 'none', blend: 'alpha' });
 const pr = useP(P.mark); GLX.setAll(pr, { u_dpr: GLX.dpr, u_size: 5 });
-GLX.draw(this.markers, pr);
+GLX.draw(this.markers, pr, n);                    // solo los cuerpos del sistema activo (en Gargantúa quedaban puntos del Sistema Solar)
 }
 GLX.endScene({ progs: this.post.progs, bloom: Settings.state.graphics.bloom ? lerp(0.7, 0.18, smoothstep(30, 260, this.sun.proj.on ? this.sun.proj.rpx : 0)) * Gfx.flash() : 0, threshold: GLX.hdr ? 1.1 : 0.27, exposure: 1.05, vignette: 0.35 });
 },
@@ -4467,9 +4317,7 @@ od.data[i * 4 + 2] = L > 128 ? Math.min(255, mBlur[i * 4] * 1.6) : 0;
 od.data[i * 4 + 3] = 255;
 }
 oc.putImageData(od, 0, 0);
-const fin = mk(W, H), fc = fin.getContext('2d');
-fc.drawImage(blurSmall(out, W, H), 0, 0);
-return fin;
+return blurSmall(out, W, H);
 function blurSmall(c, w, h) { const s = mk(w / 2, h / 2); s.getContext('2d').drawImage(c, 0, 0, w / 2, h / 2); const b = mk(w, h), bx = b.getContext('2d'); bx.imageSmoothingEnabled = true; bx.drawImage(s, 0, 0, w, h); return b; }
 },
 };
@@ -4529,11 +4377,8 @@ const size = 0.762, u = V.norm([1, 0, 0]), w = V.norm([0, Math.cos(0.35), Math.s
 for (let q = -2; q <= 2; q++) for (let r = -2; r <= 2; r++) {
 const s = -q - r, d = Math.max(Math.abs(q), Math.abs(r), Math.abs(s));
 if (d === 0 || d > 2) continue;
-if (d === 2 && (Math.abs(q) === 2 && Math.abs(r) === 0 || 0) && false) continue;
 const x = size * Math.sqrt(3) * (q + r / 2), y = size * 1.5 * r;
-const n = V.norm(V.cross(u, w));
 B.poly(V.add(ctr, V.add(V.scale(u, x), V.scale(w, y))), u, w, hex(size * 0.96), C.mirror, C.black, 0.08);
-B.p.length; void n;
 }
 const nrm = V.norm(V.cross(u, w)), sec = V.add(ctr, V.scale(nrm, -7.0));
 B.cyl(sec, nrm, 0.37, 0.15, 12, C.mirror, C.black);
@@ -4565,7 +4410,7 @@ B.box([sx * x, 0, sz * 19], [0.5, 0.5, 34], C.dark);
 B.cyl([0, -4.5, -4], [0, 0, 1], 2.1, 46, 14, C.white);
 B.cyl([0, -4.5, 13], [1, 0, 0], 2.1, 18, 14, C.white);
 B.cyl([0, -4.5, -24], [1, 0, 0], 2.1, 14, 14, C.white);
-[-1, 1].forEach(s => B.box([0, -4.5, -38 + s * 0.0], [s * 0 + 3, 0.06, 20], C.panel));
+B.box([0, -4.5, -38], [3, 0.06, 20], C.panel);   // antes se dibujaba dos veces la misma caja
 },
 tiangong(B) {
 B.cyl([0, 0, 0], [0, 0, 1], 2.1, 16.6, 14, C.white);
@@ -4720,7 +4565,6 @@ return (cache[name] = m);
 },
 define(name, fn) { MODELS[name] = fn; },
 setMesh(name, mesh) { if (MODELS[name] && !MODELS[name + '-lite']) MODELS[name + '-lite'] = MODELS[name]; cache[name] = mesh; },
-hex,
 };
 })();
 COLORS.orbitFiction = '#c9a46e';
@@ -4744,11 +4588,13 @@ cinePos(o, a) { const x = o.a * Math.cos(a), z = -o.a * Math.sin(a); return [x, 
 setSystem(id) {
 const s = this.systems[id]; if (!s || id === this.system) return;
 this.system = id; this.rb = s.rb; this.sun = s.sun;
+if (id === 'solar') this.remapOrbits();             // por si la escala cambió en el otro sistema
 this.rb.forEach(rb => { rb.hover = 0; rb.drawOn = false; });
 for (const k in this.systems) this.systems[k].rb.forEach(rb => { const L = UI.labels[rb.id]; if (L) { L.el.style.display = k === id ? '' : 'none'; L.shown = false; } });
 },
 updateSystem(jd, dtReal, speed) {
 this.jd = jd; const d = jd - J2000;
+ScaleState.t = 1;                                  // la escala no se anima aquí: sin esto el zoom quedaba bloqueado tras cambiarla
 for (const rb of this.rb) {
 const o = rb.def.orbit; rb.rS = rb.def.visR;
 if (o && o.t === 'cine') { const a = (o.phase + d / o.P) * Math.PI * 2; rb.posS = this.cinePos(o, a); rb.orbitFrac = ((a / (Math.PI * 2)) % 1 + 1) % 1; }
@@ -4881,8 +4727,8 @@ init(cv) {
 cv.addEventListener('contextmenu', e => e.preventDefault());
 cv.addEventListener('pointerdown', e => { if (!Flight.on) this.onDown(e); });
 cv.addEventListener('pointermove', e => { if (!Flight.on) this.onMove(e); });
-cv.addEventListener('pointerup', e => { if (!Flight.on) this.onUp(e); });
-cv.addEventListener('pointercancel', e => { if (!Flight.on) this.onUp(e); });
+cv.addEventListener('pointerup', e => this.onUp(e));            // siempre: un arrastre que termina dentro del hangar no queda activo
+cv.addEventListener('pointercancel', e => this.onUp(e));
 cv.addEventListener('pointerleave', () => { if (!this.dragging && !Flight.on) UI.setHover(null); });
 cv.addEventListener('wheel', e => {
 e.preventDefault();
@@ -4898,6 +4744,7 @@ if (rb) { UI.select(rb, { fly: true, close: true }); }
 });
 },
 onDown(e) {
+if (this.pointers.size >= 2) return;               // un tercer dedo no altera el gesto en curso
 e.target.setPointerCapture(e.pointerId);
 this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 this.down = { x: e.clientX, y: e.clientY, t: performance.now(), moved: 0 };
@@ -4945,7 +4792,7 @@ if (this.pointers.size === 1 && this.mode === 'pinch') { this.mode = 'rot'; cons
 if (this.pointers.size > 0) return;
 const d = this.down;
 this.dragging = false;
-if (d && d.moved < 6 && performance.now() - d.t < 450 && e.type === 'pointerup') {
+if (d && !Flight.on && d.moved < 6 && performance.now() - d.t < 450 && e.type === 'pointerup') {
 const r = e.target.getBoundingClientRect();
 const rb = World.pick(e.clientX - r.left, e.clientY - r.top);
 if (rb) UI.select(rb, { fly: true });
@@ -4960,7 +4807,7 @@ if (!p.on || !UI.labelAllowed(rb, true)) continue;
 const d = Math.hypot(p.x - x, p.y - y), R = Math.max(p.rpx, 9);
 if (d > R + 4) continue;
 const inside = d < p.rpx;
-const score = inside ? -1e6 - (1e3 / Math.max(p.w, 1e-9)) * 0 + p.w * 1e-3 : d + (rb.def.type === 'moon' ? 3 : 0);
+const score = inside ? -1e6 + p.w * 1e-3 : d + (rb.def.type === 'moon' ? 3 : 0);
 if (score < bestScore) { bestScore = score; best = rb; }
 }
 return best;
@@ -5029,8 +4876,8 @@ help: s('<circle cx="12" cy="12" r="9"/><path d="M9.6 9.5a2.5 2.5 0 1 1 3.4 2.3c
 tour: s('<path d="M4 18c3-8 6 2 9-5s5-5 7-7"/><circle cx="20" cy="6" r="1.5"/>'),
 };
 })();
-const NF = new Intl.NumberFormat('es-MX', { maximumFractionDigits: 2 });
-const fmt = (x, d) => { const dd = d == null ? 2 : d; return new Intl.NumberFormat(I18N.loc(), { maximumFractionDigits: dd, minimumFractionDigits: 0 }).format(Math.abs(x) < 0.5 * Math.pow(10, -dd) ? 0 : x); };
+const NFMT = {};                                   // un formateador por número de decimales (se usa en cada cuadro)
+const fmt = (x, d) => { const dd = d == null ? 2 : d, f = NFMT[dd] || (NFMT[dd] = new Intl.NumberFormat(I18N.loc(), { maximumFractionDigits: dd, minimumFractionDigits: 0 })); return f.format(Math.abs(x) < 0.5 * Math.pow(10, -dd) ? 0 : x); };
 const SUP = { '-': '⁻', '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹' };
 function fmtSci(x, unit) {
 if (x == null) return null;
@@ -5046,7 +4893,7 @@ function fmtAU(au) { return fmt(au, au < 0.1 ? 4 : au < 10 ? 3 : 2) + ' ' + t('U
 function fmtDur(days) {
 if (days == null) return null;
 const a = Math.abs(days);
-if (a < 2) { const h = a * 24, hh = Math.floor(h), mm = Math.round((h - hh) * 60); return hh + ' h' + (mm ? ' ' + mm + ' min' : ''); }
+if (a < 2) { const m = Math.round(a * 1440), hh = Math.floor(m / 60), mm = m % 60; return hh ? hh + ' h' + (mm ? ' ' + mm + ' min' : '') : mm + ' min'; }   // 1 h 59.99 min → 2 h, no «1 h 60 min»
 if (a < 800) return t('{0} días', fmt(a, a < 30 ? 2 : 1));
 return t('{0} años ({1} días)', fmt(a / 365.25, a / 365.25 < 100 ? 2 : 0), fmt(a, 0));
 }
@@ -5182,7 +5029,7 @@ labels: {}, constLabels: [], tour: null, lastLive: 0, started: false, mmOn: true
 init() {
 this.buildRail(); this.buildCamTools(); this.buildTime(); this.buildModes(); this.buildSearch(); this.buildLabels(); this.bindKeys();
 $('#btn-menu').innerHTML = ICON.menu;
-$('#btn-menu').addEventListener('click', () => this.openSection(this.section ? null : 'explorar'));
+$('#btn-menu').addEventListener('click', () => this.openSection(this.section ? null : this.SECTIONS[0][0]));   // en Gargantúa no existe «explorar»
 $('#drawer-close').innerHTML = ICON.close; $('#drawer-close').addEventListener('click', () => this.openSection(null));
 $('#info-close').innerHTML = ICON.close; $('#info-close').addEventListener('click', () => this.select(null));
 $('#mm-toggle').innerHTML = ICON.map; $('#mm-toggle').addEventListener('click', () => this.toggleMinimap());
@@ -5281,8 +5128,7 @@ const o3 = $('#drawer-body [data-only3d]'); if (o3) o3.addEventListener('change'
 this.applyOnly3D();
 d.classList.add('open'); d.setAttribute('aria-hidden', 'false');
 this.bindSection(id);
-if (id === 'config') this.refreshAudio();
-if (innerWidth < 760) this.select(null, { keepCam: true });
+if (innerWidth < 760) this.select(null);
 },
 badge(rb) { return `<span class="vb" data-vb="${rb.id}">${this.badgeInner(rb)}</span>`; },
 badgeInner(rb) {
@@ -5385,17 +5231,6 @@ const L = [['orbits', 'Órbitas planetarias'], ['moonOrbits', 'Órbitas de lunas
 return L.map(([k, t]) => `<label class="check"><input type="checkbox" data-layer="${k}" ${S.layers[k] ? 'checked' : ''}><span>${t}</span></label>`).join('') +
 `<label class="check"><input type="checkbox" id="chk-real" ${S.scale === 'real' ? 'checked' : ''}><span>Escala realista</span></label>`;
 }
-case 'config': return `<h3>Audio</h3>${mixerHTML()}<h3>Escala</h3><div class="seg" role="radiogroup" aria-label="Escala">${Object.keys(SCALES).map(k => `<button role="radio" aria-checked="${k === S.scale}" class="${k === S.scale ? 'on' : ''}" data-scale="${k}">${SCALES[k].label}</button>`).join('')}</div>
-<h3>Calidad gráfica</h3><div class="seg" role="radiogroup" aria-label="Calidad">${['alta', 'media', 'baja'].map(k => `<button role="radio" aria-checked="${k === S.quality}" class="${k === S.quality ? 'on' : ''}" data-quality="${k}">${k[0].toUpperCase() + k.slice(1)}</button>`).join('')}</div>
-<p class="note">Media y baja reducen la resolución interna, el antialiasing y el brillo difuso para mantener la fluidez.</p>
-<h3>Luz en el lado nocturno</h3><input type="range" id="amb" min="0" max="0.25" step="0.005" value="${S.ambient}" aria-label="Luz ambiental">
-<p class="note">Es una ayuda visual: en el espacio, el lado nocturno es casi negro.</p>
-<label class="check"><input type="checkbox" id="chk-rotcap" ${S.rotCap ? 'checked' : ''}><span>Ralentizar la rotación a velocidades altas</span></label>
-<p class="note">Evita el parpadeo cuando un día dura menos de un fotograma. La posición orbital sigue siendo exacta.</p>
-<label class="check"><input type="checkbox" id="chk-mm" ${this.mmOn ? 'checked' : ''}><span>Mostrar minimapa</span></label>
-<button class="cta-row" data-act="help">${ICON.help}<span><b>Atajos de teclado</b><small>Ver la lista completa</small></span></button>
-<h3>Fuentes</h3><p class="note">NASA NSSDCA (fichas planetarias y de satélites), NASA Science, JPL Solar System Dynamics y Small-Body Database, elementos keplerianos aproximados de E. M. Standish (JPL). Recuento de lunas: Minor Planet Center y NASA, marzo de 2026.</p>
-<h3>Modelos 3D</h3><ul class="facts">${[['jwst', 'Telescopio James Webb'], ['hubble', 'Telescopio Hubble'], ['iss', 'Estación Espacial Internacional'], ['voyager', 'Voyager 1 y 2']].map(([k, t]) => `<li><b>${t}:</b> ${this.creditHTML(MODEL_CREDITS[k])}</li>`).join('')}${Object.keys(PLANET_TEX).map(id => `<li><b>${BODY[id].name}:</b> ${this.creditHTML(BODY[id].credit)}</li>`).join('')}${SHIPS.filter(sh => MODEL_CREDITS[sh.id]).map(sh => `<li><b>Nave ${sh.name}:</b> ${this.creditHTML(MODEL_CREDITS[sh.id])}</li>`).join('')}</ul><p class="note">El resto de naves espaciales son modelos procedurales propios.</p>`;
 }
 return '';
 },
@@ -5404,7 +5239,6 @@ const b = $('#drawer-body');
 b.querySelectorAll('[data-go]').forEach(el => el.addEventListener('click', () => { this.select(World.byId[el.dataset.go], { fly: true }); if (innerWidth < 760) this.openSection(null); }));
 b.querySelectorAll('[data-layer]').forEach(el => el.addEventListener('change', () => this.setLayer(el.dataset.layer, el.checked)));
 b.querySelectorAll('[data-scale]').forEach(el => el.addEventListener('click', () => this.setScale(el.dataset.scale)));
-b.querySelectorAll('[data-quality]').forEach(el => el.addEventListener('click', () => { App.setQuality(el.dataset.quality); this.openSection(id); }));
 b.querySelectorAll('[data-const]').forEach(el => el.addEventListener('click', () => {
 const c = World.constellations.find(x => x.id === el.dataset.const);
 this.setLayer('constLines', true); this.setLayer('constNames', true);
@@ -5412,11 +5246,8 @@ Cam.lookDir(c.dir); this.toast('Mirando hacia ' + c.name);
 this.openSection('constelaciones');
 }));
 const act = b.querySelectorAll('[data-act]');
-act.forEach(el => el.addEventListener('click', () => { if (el.dataset.act === 'overview') this.camAction('overview'); if (el.dataset.act === 'help') this.toggleHelp(true); if (el.dataset.act === 'home') App.home(); if (el.dataset.act === 'fly') Flight.openHangar(); }));
+act.forEach(el => el.addEventListener('click', () => { if (el.dataset.act === 'overview') this.camAction('overview'); if (el.dataset.act === 'home') App.home(); if (el.dataset.act === 'fly') Flight.openHangar(); }));
 const tb = $('#tour-btn'); if (tb) tb.addEventListener('click', () => { if (this.tour) { this.stopTour(); this.openSection(innerWidth < 760 ? null : 'explorar'); } else this.toggleTours(true); });
-const amb = $('#amb'); if (amb) amb.addEventListener('input', () => { S.ambient = +amb.value; });
-const rc = $('#chk-rotcap'); if (rc) rc.addEventListener('change', () => { S.rotCap = rc.checked; });
-const mm = $('#chk-mm'); if (mm) mm.addEventListener('change', () => this.toggleMinimap(mm.checked));
 const cr = $('#chk-real'); if (cr) cr.addEventListener('change', () => this.setScale(cr.checked ? 'real' : 'visual'));
 },
 setLayer(k, v) {
@@ -5479,7 +5310,8 @@ $('#t-now').addEventListener('click', () => { Time.goLive(); this.refreshTime();
 const pick = $('#t-pick');
 pick.addEventListener('change', () => {
 if (!pick.value) return;
-this.setSimDate(Astro.jdFromISO(pick.value) + 0.5);          // único punto de cambio de fecha
+this.setSimDate(Astro.jdFromDate(new Date(pick.value + 'T12:00')));   // mediodía local: la fecha mostrada es la elegida en cualquier huso
+pick.value = '';                                                     // elegir de nuevo la misma fecha vuelve a funcionar
 });
 $('#t-cal').innerHTML = ICON.calendar;
 $('#t-cal').addEventListener('click', () => { try { pick.showPicker(); } catch (e) { pick.focus(); } });
@@ -5528,10 +5360,10 @@ const app = $('#app');
 app.classList.toggle('cine', k === 'cine');
 Cam.auto = k === 'cine' ? 0.035 : 0;
 if (prev === 'edu' && k !== 'edu' && this.eduSaved) { Object.assign(S.layers, this.eduSaved); this.eduSaved = null; }
-if (k === 'edu') { this.eduSaved = { namesMoons: S.layers.namesMoons, namesSmall: S.layers.namesSmall, orbitInfo: S.layers.orbitInfo }; Object.assign(S.layers, { namesMoons: true, namesSmall: true, orbitInfo: true }); this.toast('Modo educativo: nombres y datos orbitales visibles'); }
+if (k === 'edu' && prev !== 'edu') { this.eduSaved = { namesMoons: S.layers.namesMoons, namesSmall: S.layers.namesSmall, orbitInfo: S.layers.orbitInfo }; Object.assign(S.layers, { namesMoons: true, namesSmall: true, orbitInfo: true }); this.toast('Modo educativo: nombres y datos orbitales visibles'); }
 if (k === 'follow') { const t = this.sel || World.byId.tierra; this.select(t, { fly: Cam.focus !== t }); Cam.follow = true; this.toast('Siguiendo a ' + t.def.name); }
 if (k === 'orbits') { this.toast('Órbitas resaltadas'); if (!this.sel) Cam.travelTo([0, 0, 0], ScaleState.get('overview') * 0.85, 1.1); }
-if (k === 'cine') { this.select(null, { keepCam: true }); this.openSection(null); this.hint(I18N.t('Modo cine: pulsa Esc para salir'), 2400); }
+if (k === 'cine') { this.select(null); this.openSection(null); this.hint(I18N.t('Modo cine: pulsa Esc para salir'), 2400); }
 if (this.section) this.openSection(this.section);
 this.refreshCamButtons();
 },
@@ -5570,6 +5402,7 @@ q.addEventListener('focus', () => { if (q.value) run(); });
 },
 select(rb, opts) {
 opts = opts || {};
+if (rb && !World.rb.includes(rb)) return;                    // cuerpos de otro sistema (p. ej. teclas 0–9 en Gargantúa)
 if (this.tour && !opts.tour) this.stopTour(true);
 const prev = this.sel;
 this.sel = rb;
@@ -5780,7 +5613,6 @@ $('#minimap-wrap').classList.toggle('off', !this.mmOn);
 $('#app').classList.toggle('mm-on', this.mmOn);
 $('#mm-toggle').classList.toggle('on', this.mmOn);
 $('#mm-toggle').setAttribute('aria-pressed', this.mmOn);
-const c = $('#chk-mm'); if (c) c.checked = this.mmOn;
 },
 refreshMinimap() { this.toggleMinimap(this.mmOn); },
 mmMap(x, z, R) { const r = Math.hypot(x, z); if (r < 1e-9) return [0, 0]; const k = R * Math.log(1 + r / 0.35) / Math.log(1 + 45 / 0.35) / r; return [x * k, z * k]; },
@@ -5788,7 +5620,7 @@ drawMinimap() {
 if (!this.mmOn) return;
 const cv = $('#minimap'), dpr = Math.min(devicePixelRatio || 1, 2), S2 = cv.clientWidth;
 if (!S2) return;
-if (cv.width !== S2 * dpr) { cv.width = cv.height = S2 * dpr; }
+const px = Math.round(S2 * dpr); if (cv.width !== px) cv.width = cv.height = px;
 const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 ctx.clearRect(0, 0, S2, S2);
 const c = S2 / 2, R = S2 / 2 - 8;
@@ -5838,6 +5670,7 @@ if (Flight.on) return;
 const tag = (e.target.tagName || '').toLowerCase();
 if (e.key === 'k' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); $('#q').focus(); return; }
 if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+if ((e.key === ' ' || e.key === 'Enter') && e.target.closest && e.target.closest('button, a, [role="radio"], [role="tab"]')) return;
 if ($('#settings') && $('#settings').classList.contains('open')) return;
 const key = Keys.norm(e), act = Keys.action('explore', key);
 if (act === 'search') { e.preventDefault(); $('#q').focus(); return; }
@@ -5980,17 +5813,17 @@ this.startTour(id, { cine });
 },
 startTour(id, opts) {
 opts = opts || {};
-const def = TOURS.find(t => t.id === (id || 'clasico'));
+const def = TOURS.find(t => t.id === id);
 if (this.tour) this.stopTour(true);
 if (S.mode === 'cine') this.setMode('explore');
 (def.layers || []).forEach(l => { if (!S.layers[l]) this.setLayer(l, true); });
-this.select(null, { keepCam: true, tour: true }); this.openSection(null);
+this.select(null, { tour: true }); this.openSection(null);
 this.tour = { def, i: -1, t: 0, phase: 'travel', paused: false, done: false };
 $('#app').classList.add('touring');
 $('#tourbar').classList.add('on'); $('#tourbar').classList.remove('done');
 if (opts.cine) {
 this.tour.phase = 'intro'; this.enterTourCine();
-const T = this.tour; setTimeout(() => { if (this.tour === T) this.gotoStop(0, 1); }, 1400);
+const T = this.tour; setTimeout(() => { if (this.tour === T && T.i < 0) this.gotoStop(0, 1); }, 1400);
 } else this.gotoStop(0, 1);
 },
 gotoStop(i, dir) {
@@ -6021,7 +5854,7 @@ this.gotoStop(T.i + d, d);
 restartTour() { const T = this.tour; if (!T) return; T.paused = false; this.gotoStop(0, 1); },
 pauseTour(v, manual) {
 const T = this.tour; if (!T || T.done) return;
-T.paused = v; T.manual = !!(v && manual);
+T.paused = v; T.manual = !!(v && manual); if (!v) T.cam0 = null;
 if (v) Cam.auto = 0;
 this.refreshTourBar(); this.refreshCine();
 },
@@ -6052,7 +5885,7 @@ if (T.phase === 'travel') { if (!Cam.fly) { T.phase = 'hold'; T.t = 0; $('#tourb
 T.t += dt;
 Cam.auto = T.phase === 'orbit' ? 0.02 : 0.05;
 if (this.tourCine && T.phase === 'hold' && !Cam.fly && !UI.reducedMotion) {
-if (!T.cam0) T.cam0 = { el: Cam.el, d: Cam.dDist };
+if (!T.cam0) T.cam0 = { el: Cam.el - 0.15 * Math.sin(T.t * 0.17), d: Cam.dDist / (1 - 0.16 * smoothstep(0, hold, T.t)) };   // continúa desde la cámara actual
 const k = T.t;
 Cam.auto = 0.032 + 0.018 * Math.sin(k * 0.21);
 Cam.el = clamp(T.cam0.el + 0.15 * Math.sin(k * 0.17), -1.2, 1.2);
@@ -6084,7 +5917,7 @@ if (stop.kind === 'system') {
 const names = stop.moons.map(m => BODY[m].name), cnt = d.info.moons;
 title = stop.group.charAt(0).toUpperCase() + stop.group.slice(1); kicker = TYPE_LABEL[d.type];
 const art = TOUR_SYSTEMS.find(s => s[0] === stop.id)[1];
-const who = I18N.lang === 'es' ? art.charAt(0).toUpperCase() + art.slice(1) : d.name;
+const who = art.charAt(0).toUpperCase() + art.slice(1);
 const list = names.length > 1 ? names.slice(0, -1).join(', ') + ' ' + t('y') + ' ' + names[names.length - 1] : names[0];
 text = cnt === 1 ? t('{0} tiene una sola luna: {1}.', who, names[0])
 : t('{0} tiene {1} lunas conocidas; en este recorrido visitamos {2}: {3}.', who, cnt, names.length === 1 ? t('una') : names.length, list);
@@ -6127,7 +5960,7 @@ return s;
 },
 updateTourLive(force) {
 const rb = this.tourRB, el = $('#tb-live'); if (!rb || !el) return;
-const rows = Info.live(rb).filter(r => /^Distancia actual|^Altitud|^Tiempo de luz/.test(r.label)).slice(0, 2);
+const rows = Info.live(rb).filter(r => /^Distancia|^Altitud|^Tiempo de la señal/.test(r.label)).slice(0, 2);
 el.innerHTML = rows.map(r => `<span>${esc(r.label)}: <b>${r.txt ? esc(r.txt) : esc(fmtKm(r.km))}</b>${r.au != null && r.au >= 0.01 ? ` <small>(${fmtAU(r.au)})</small>` : ''}</span>`).join('');
 },
 refreshTourBar() {
@@ -6206,7 +6039,7 @@ openCredits(push) {
 const el = $('#credits');
 if (el.classList.contains('open')) return;
 this._crFrom = document.activeElement; this._crFromIntro = !this.started;
-if (push !== false && location.hash !== '#creditos') { try { history.pushState({ solaris: 'creditos' }, '', '#creditos'); } catch (e) {} }
+if (push !== false && location.hash !== '#creditos') { try { history.pushState({ solaris: 'creditos' }, '', '#creditos'); this._crPushed = true; } catch (e) {} }
 $('#cr-scroll').scrollTop = 0;
 const els = [...document.querySelectorAll('#credits .cr-in')];
 els.forEach(x => x.classList.remove('vis'));
@@ -6217,7 +6050,8 @@ setTimeout(() => $('#cr-back').focus({ preventScroll: true }), 60);
 closeCredits(fromHistory) {
 const el = $('#credits');
 if (!el.classList.contains('open')) return;
-if (!fromHistory && history.state && history.state.solaris === 'creditos') { history.back(); return; }
+if (!fromHistory && this._crPushed) { this._crPushed = false; history.back(); return; }   // tras recargar en #creditos no hay entrada propia: atrás recargaría la página
+this._crPushed = false;
 el.classList.remove('open'); el.setAttribute('aria-hidden', 'true'); $('#app').classList.remove('in-credits');
 if (location.hash === '#creditos') { try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {} }
 if (this.started && this._crFromIntro) App.home();
@@ -6284,18 +6118,18 @@ s.connect(f); f.connect(g); g.connect(this.bus[bus]); s.start(t); s.stop(t + dur
 return { nodes: [s, f, g], g, end: t + dur };
 },
 SOUNDS: {
-hover: { bus: 'ui', gap: 0.07, max: 1, fn: S => [S.tone('ui', { f: 740, dur: 0.035, gain: 0.016, lp: 2200 }), S.hiss('ui', { f0: 2600, dur: 0.012, gain: 0.006, q: 2, peak: 0.2 })] },
-click: { bus: 'ui', gap: 0.05, max: 2, fn: S => [S.tone('ui', { f: 587, dur: 0.1, gain: 0.07, lp: 3000 }), S.tone('ui', { f: 880, dur: 0.09, gain: 0.04, delay: 0.022, lp: 3000 }), S.hiss('ui', { f0: 3200, dur: 0.014, gain: 0.018, q: 1.5, peak: 0.15 })] },
-minor: { bus: 'ui', gap: 0.05, max: 2, fn: S => [S.tone('ui', { f: 523, dur: 0.055, gain: 0.045, lp: 2400 }), S.hiss('ui', { f0: 2400, dur: 0.009, gain: 0.012, q: 1.6, peak: 0.15 })] },
-back: { bus: 'ui', gap: 0.06, max: 2, fn: S => [S.tone('ui', { f: 622, f2: 415, dur: 0.12, gain: 0.06, lp: 2600 }), S.tone('ui', { f: 466, f2: 311, dur: 0.12, gain: 0.03, delay: 0.035, lp: 2000 })] },
-on: { bus: 'ui', gap: 0.06, max: 2, fn: S => [S.tone('ui', { f: 440, dur: 0.07, gain: 0.05, lp: 2600 }), S.tone('ui', { f: 659, dur: 0.1, gain: 0.055, delay: 0.06, lp: 2600 })] },
-off: { bus: 'ui', gap: 0.06, max: 2, fn: S => [S.tone('ui', { f: 659, dur: 0.07, gain: 0.05, lp: 2600 }), S.tone('ui', { f: 440, dur: 0.11, gain: 0.045, delay: 0.06, lp: 2000 })] },
-select: { bus: 'navigation', gap: 0.12, max: 1, fn: S => [
+hover: { gap: 0.07, max: 1, fn: S => [S.tone('ui', { f: 740, dur: 0.035, gain: 0.016, lp: 2200 }), S.hiss('ui', { f0: 2600, dur: 0.012, gain: 0.006, q: 2, peak: 0.2 })] },
+click: { gap: 0.05, max: 2, fn: S => [S.tone('ui', { f: 587, dur: 0.1, gain: 0.07, lp: 3000 }), S.tone('ui', { f: 880, dur: 0.09, gain: 0.04, delay: 0.022, lp: 3000 }), S.hiss('ui', { f0: 3200, dur: 0.014, gain: 0.018, q: 1.5, peak: 0.15 })] },
+minor: { gap: 0.05, max: 2, fn: S => [S.tone('ui', { f: 523, dur: 0.055, gain: 0.045, lp: 2400 }), S.hiss('ui', { f0: 2400, dur: 0.009, gain: 0.012, q: 1.6, peak: 0.15 })] },
+back: { gap: 0.06, max: 2, fn: S => [S.tone('ui', { f: 622, f2: 415, dur: 0.12, gain: 0.06, lp: 2600 }), S.tone('ui', { f: 466, f2: 311, dur: 0.12, gain: 0.03, delay: 0.035, lp: 2000 })] },
+on: { gap: 0.06, max: 2, fn: S => [S.tone('ui', { f: 440, dur: 0.07, gain: 0.05, lp: 2600 }), S.tone('ui', { f: 659, dur: 0.1, gain: 0.055, delay: 0.06, lp: 2600 })] },
+off: { gap: 0.06, max: 2, fn: S => [S.tone('ui', { f: 659, dur: 0.07, gain: 0.05, lp: 2600 }), S.tone('ui', { f: 440, dur: 0.11, gain: 0.045, delay: 0.06, lp: 2000 })] },
+select: { gap: 0.12, max: 1, fn: S => [
 S.tone('navigation', { type: 'triangle', f: 330, f2: 494, dur: 0.16, gain: 0.05, lp: 1600, glide: 0.9 }),
 S.tone('navigation', { f: 494, dur: 0.55, gain: 0.04, delay: 0.12, a: 0.02, detune: -4 }),
 S.tone('navigation', { f: 740, dur: 0.6, gain: 0.03, delay: 0.15, a: 0.03, detune: 5 }),
 S.hiss('navigation', { f0: 1800, f1: 3400, dur: 0.18, gain: 0.012, q: 3, delay: 0.1 })] },
-arrive: { bus: 'navigation', gap: 0.3, max: 1, fn: (S, d) => [
+arrive: { gap: 0.3, max: 1, fn: (S, d) => [
 S.hiss('navigation', { f0: 1300 - d * 400, f1: 260, dur: 0.45 + d * 0.25, gain: 0.028 + d * 0.012, q: 0.9, peak: 0.08, sweep: 0.8 }),
 S.tone('navigation', { f: 587, dur: 0.7, gain: 0.04, delay: 0.16 + d * 0.06, a: 0.015 }),
 S.tone('navigation', { f: 880, dur: 0.85, gain: 0.03, delay: 0.25 + d * 0.06, a: 0.02, detune: 3 })] },
@@ -6422,28 +6256,13 @@ document.querySelectorAll('[data-music]').forEach(b => b.classList.toggle('all-m
 });
 const MUSIC_INFO = { title: 'Metamorphosis', artist: 'Laura Platt', role: 'Tema musical principal', url: 'https://www.youtube.com/watch?v=G7-1z_8Mn5M', license: 'CC BY 4.0', licenseUrl: 'https://creativecommons.org/licenses/by/4.0/' };
 const Music = {
-el: null, url: null, ctx: null, gain: null, ready: false, playing: false, duck: 1, waiting: false, fadeTimer: null,
+el: null, ctx: null, gain: null, ready: false, playing: false, duck: 1, waiting: false, fadeTimer: null,
 get prefs() { return Settings.state.audio; },
-ensureSource() {
-if (this.el) return true;
-if (ASSET_MANIFEST.music) {           // versión web: la pista es un archivo que se descarga al empezar a sonar
+ensureSource() {                                 // la pista es un archivo que se descarga al empezar a sonar
+if (this.el) return;
 const el = this.el = new Audio(), M = ASSET_MANIFEST.music;
 el.src = el.canPlayType('audio/webm; codecs=opus') ? M.webm : M.mp3;
 el.loop = true; el.preload = 'auto'; el.crossOrigin = 'anonymous';
-return true;
-}
-const node = document.getElementById('solaris-music'); if (!node) return false;
-try {
-const txt = node.textContent.trim(), b64 = txt.slice(txt.indexOf(',') + 1), bin = atob(b64), u8 = new Uint8Array(bin.length);
-for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
-this.url = URL.createObjectURL(new Blob([u8], { type: 'audio/webm' }));
-node.textContent = '';                      // libera la copia de texto
-const el = this.el = new Audio();
-el.src = this.url; el.loop = true; el.preload = 'auto'; el.crossOrigin = 'anonymous';
-el.addEventListener('ended', () => { if (!el.loop) el.play(); });
-if (!el.canPlayType('audio/webm; codecs=opus')) { this.unsupported = true; UI.refreshMusic && UI.refreshMusic(); }
-return true;
-} catch (e) { console.warn('No se pudo preparar la música', e); return false; }
 },
 ensureGraph() {
 if (this.ctx || this.noGraph) return;
@@ -6477,13 +6296,14 @@ step();
 if (done) this.fadeTimer = setTimeout(done, sec * 1000 + 40);
 },
 async play(fade) {
-if (!this.prefs.musicOn || !this.ensureSource() || this.unsupported) return;
-this.ensureGraph();
+if (!this.prefs.musicOn) return;
+this.ensureSource(); this.ensureGraph();
 try {
 if (this.ctx && this.ctx.state !== 'running') await Promise.race([this.ctx.resume(), new Promise(r => setTimeout(r, 400))]);
 if (this.ctx && this.ctx.state !== 'running') throw new Error('audio bloqueado hasta la primera interacción');
 if (!this.gain) this.el.volume = 0;
 await this.el.play();
+if (!this.prefs.musicOn) { this.el.pause(); this.waiting = false; UI.refreshMusic(); return; }   // se desactivó mientras arrancaba
 this.playing = true; this.waiting = false;
 this.fadeTo(this.level(), fade == null ? 3.5 : fade);
 } catch (e) { this.playing = false; this.waitForGesture(); }
@@ -6501,7 +6321,6 @@ if (on === this.prefs.musicOn) { if (on) this.play(2.2); else this.pause(); }
 Settings.set('audio.musicOn', on);
 UI.refreshMusic();
 },
-setVolume(v) { Settings.set('audio.music', clamp(v, 0, 1)); },
 setDuck(f) {
 if (Math.abs(f - this.duck) < 1e-3) return;
 this.duck = f; if (this.playing) this.fadeTo(this.level(), 1.0);
@@ -6532,7 +6351,6 @@ btn.setAttribute('aria-expanded', 'true'); this._musicBtn = btn;
 setTimeout(() => $('#music-toggle').focus({ preventScroll: true }), 30);
 };
 const close = () => { pop.classList.remove('open'); pop.setAttribute('aria-hidden', 'true'); if (this._musicBtn) this._musicBtn.setAttribute('aria-expanded', 'false'); };
-this.closeMusic = close;
 document.querySelectorAll('[data-music]').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); const a = b.closest('#more-menu') ? $('#more-btn') : b; pop.classList.contains('open') && this._musicBtn === a ? close() : open(a); }));
 $('#music-toggle').addEventListener('click', () => Music.toggle());
 $('#music-pop .mp-mix').innerHTML = mixerHTML();
@@ -6545,13 +6363,13 @@ this.refreshAudio();
 },
 refreshMusic() {
 if (!$('#music-pop')) return;
-const on = Music.prefs.on && (Music.playing || Music.waiting);
+const on = Music.prefs.musicOn && (Music.playing || Music.waiting);
 document.querySelectorAll('[data-music]').forEach(b => { b.classList.toggle('muted', !on); b.setAttribute('aria-label', on ? 'Música: activada' : 'Música: desactivada'); b.dataset.tip = on ? 'Música: ' + MUSIC_INFO.title : 'Música desactivada'; });
 const st = $('#music-btn .mm-state'); if (st) st.textContent = on ? 'Activada' : 'Desactivada';
 const mb = $('#more-btn'); if (mb) mb.classList.toggle('music-on', !!on);   // !!: toggle con undefined alternaría la clase en vez de fijarla
 const t = $('#music-toggle');
-t.textContent = Music.unsupported ? 'No compatible con este navegador' : on ? (Music.playing ? 'Pausar música' : 'Comenzará al interactuar') : 'Reproducir música';
-t.disabled = !!Music.unsupported; t.classList.toggle('on', on);
+t.textContent = on ? (Music.playing ? 'Pausar música' : 'Comenzará al interactuar') : 'Reproducir música';
+t.classList.toggle('on', !!on);
 t.setAttribute('aria-pressed', on ? 'true' : 'false');
 this.refreshAudio && this.refreshAudio();
 if (Flight.on && Flight.state) Flight.refreshBar && Flight.refreshBar();
@@ -6564,7 +6382,6 @@ graphics: '<rect x="3" y="5" width="18" height="12.5" rx="2"/><path d="M8.5 21h7
 interface: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 8.5h18M8 8.5V20"/>',
 controls: '<rect x="2.5" y="7" width="19" height="10.5" rx="2"/><path d="M6 10.5h1M9.5 10.5h1M13 10.5h1M16.5 10.5h1M7 14h10"/>',
 simulation: '<circle cx="12" cy="12" r="3"/><ellipse cx="12" cy="12" rx="9.5" ry="4" transform="rotate(-25 12 12)"/>',
-language: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.6 3.8 5.6 3.8 9s-1.2 6.4-3.8 9c-2.6-2.6-3.8-5.6-3.8-9S9.4 5.6 12 3z"/>',
 accessibility: '<circle cx="12" cy="4.8" r="1.8"/><path d="M5 8.5l7 1.5 7-1.5M12 10v4.5l-3 6M12 14.5l3 6"/>',
 };
 const PCT = v => Math.round(v * 100) + ' %';
@@ -6655,6 +6472,7 @@ if (this._setFrom && this._setFrom.focus) this._setFrom.focus({ preventScroll: t
 },
 itemValue(it) { return it.get ? it.get() : it.path ? Settings.get(it.path) : undefined; },
 renderSettings() {
+this.cancelRebind();
 const cat = SETTINGS_SCHEMA.find(c => c.id === this.setCat) || SETTINGS_SCHEMA[0];
 $('#set-nav').innerHTML = SETTINGS_SCHEMA.map(c => `<button role="tab" aria-selected="${c.id === cat.id}" class="${c.id === cat.id ? 'on' : ''}" data-cat="${c.id}"><svg viewBox="0 0 24 24" aria-hidden="true">${SET_ICONS[c.id]}</svg><span>${t(c.title)}</span></button>`).join('');
 const g = Settings.state.graphics;
@@ -6677,7 +6495,7 @@ return '';
 this.renderKeyHelp();
 },
 keysHTML() {
-const row = (ctx, [a]) => { const k = Keys.code(ctx, a); return `<div class="key-row"><span>${t(Keys.describe(ctx, a))}</span><button class="kbd-btn" data-ctx="${ctx}" data-act-key="${a}" aria-label="${t('Cambiar la tecla de «{0}»', t(Keys.describe(ctx, a)))}">${Keys.label(k)}</button></div>`; };
+const row = (ctx, [a]) => { const k = Keys.code(ctx, a); return `<div class="key-row"><span>${t(Keys.describe(ctx, a))}</span><button class="kbd-btn" data-ctx="${ctx}" data-act-key="${a}" aria-label="${t('Cambiar la tecla de «{0}»', t(Keys.describe(ctx, a)))}">${esc(Keys.label(k))}</button></div>`; };
 const fixed = (rows) => rows.map(([l, k]) => `<div class="key-row fixed"><span>${t(l)}</span><kbd>${t(k)}</kbd></div>`).join('');
 return `<p class="set-desc">${t('Haz clic en una tecla y pulsa la nueva. Si ya estaba en uso, se intercambia para que ninguna acción quede sin control.')}</p>
 <p id="key-msg" class="set-note" role="status" aria-live="polite"></p>
@@ -6687,6 +6505,7 @@ return `<p class="set-desc">${t('Haz clic en una tecla y pulsa la nueva. Si ya e
 },
 initSettings() {
 const m = $('#settings');
+const resetAll = () => this.confirmDialog(t('¿Restaurar todos los ajustes?'), t('Se borrarán tus preferencias de audio, gráficos, interfaz y controles.'), t('Restaurar'), t('Cancelar')).then(ok => { if (ok) { Settings.reset(); this.renderSettings(); this.toast(t('Ajustes restaurados')); } });
 m.addEventListener('click', e => {
 if (e.target === m) return this.closeSettings();
 const nav = e.target.closest('[data-cat]'); if (nav) { this.setCat = nav.dataset.cat; this.renderSettings(); $('#set-body').scrollTop = 0; return; }
@@ -6699,7 +6518,7 @@ this.renderSettings(); return;
 }
 const kb = e.target.closest('[data-act-key]'); if (kb) return this.startRebind(kb);
 const act = e.target.closest('[data-act]'); if (!act) return;
-if (act.dataset.act === 'reset-all') this.confirmDialog(t('¿Restaurar todos los ajustes?'), t('Se borrarán tus preferencias de audio, gráficos, interfaz, controles e idioma.'), t('Restaurar'), t('Cancelar')).then(ok => { if (ok) { Settings.reset(); this.renderSettings(); this.toast(t('Ajustes restaurados')); } });
+if (act.dataset.act === 'reset-all') resetAll();
 if (act.dataset.act === 'reset-keys') { Settings.resetControls(); this.renderSettings(); this.toast(t('Controles restaurados')); }
 if (act.dataset.act === 'open-credits') { this.closeSettings(); this.openCredits(); }
 });
@@ -6707,11 +6526,10 @@ m.addEventListener('change', e => { const el = e.target; if (!el.matches('input[
 m.addEventListener('input', e => { const el = e.target; if (!el.matches('input[type="range"][data-i]')) return; const it = this.curItems()[+el.dataset.i], v = +el.value; Settings.set(it.path, v); el.nextElementSibling.textContent = (it.fmt || PCT)(v); });
 $('#set-close').addEventListener('click', () => this.closeSettings());
 $('#set-done').addEventListener('click', () => this.closeSettings());
-$('#set-reset').addEventListener('click', () => this.confirmDialog(t('¿Restaurar todos los ajustes?'), t('Se borrarán tus preferencias de audio, gráficos, interfaz, controles e idioma.'), t('Restaurar'), t('Cancelar')).then(ok => { if (ok) { Settings.reset(); this.renderSettings(); this.toast(t('Ajustes restaurados')); } }));
+$('#set-reset').addEventListener('click', resetAll);
 document.querySelectorAll('[data-open-settings]').forEach(b => b.addEventListener('click', () => this.openSettings()));
 addEventListener('keydown', e => { if (e.key === 'Escape' && m.classList.contains('open') && !this.rebind) { e.stopImmediatePropagation(); this.closeSettings(); } }, true);
 Settings.on(() => { if (m.classList.contains('open') && !this._rendering) { this._rendering = true; requestAnimationFrame(() => { this._rendering = false; if (!this.rebind && !document.activeElement.matches('input[type="range"]')) this.renderSettings(); }); } });
-document.addEventListener('solaris:lang', () => this.onLanguage());
 this.renderKeyHelp();
 },
 curItems() { return (SETTINGS_SCHEMA.find(c => c.id === this.setCat) || SETTINGS_SCHEMA[0]).items; },
@@ -6738,7 +6556,7 @@ if (!done) { this.rebind.btn.textContent = this.rebind.old; this.rebind.btn.clas
 this.rebind = null;
 },
 renderKeyHelp() {
-const K = (c, a) => `<kbd>${Keys.label(Keys.code(c, a))}</kbd>`;
+const K = (c, a) => `<kbd>${esc(Keys.label(Keys.code(c, a)))}</kbd>`;
 const dl = rows => '<dl>' + rows.map(([k, d]) => `<dt>${k}</dt><dd>${t(d)}</dd>`).join('') + '</dl>';
 const ex = a => [K('explore', a), Keys.describe('explore', a)];
 const fl = a => [K('flight', a), Keys.describe('flight', a)];
@@ -6763,28 +6581,13 @@ addEventListener('keydown', kh, true);
 setTimeout(() => $('#cf-cancel').focus({ preventScroll: true }), 30);
 });
 },
-onLanguage() {
-this.relabel();
-if ($('#settings').classList.contains('open')) this.renderSettings();
-this.renderKeyHelp();
-if (this.sel) this.renderInfo(this.sel);
-if (this.section) this.openSection(this.section);
-if (this.tour && !this.tour.done) { const st = this.tour.def.stops[this.tour.i]; this.renderTourCard(st, World.byId[st.id]); this.refreshTourBar(); }
-if ($('#tours-list')) this.renderTourCards && this.renderTourCards();
-this.refreshTime(); this.tickTime && this.tickTime(); this.refreshMusic(); this.updateScaleBadge && this.updateScaleBadge();
-if (Flight.on) { if (Flight.state === 'hangar') Flight.renderHangar(); else Flight.refreshBar(); }
-},
-relabel() {
-for (const rb of World.rb) { const L = this.labels[rb.id]; if (L && L.n) { L.n.textContent = rb.def.short || rb.def.name; L.w = 0; } }
-for (const c of this.constLabels) { const src = CONSTELLATIONS.find(x => x.id === c.c.id); if (src) { c.c.name = src.name; c.el.textContent = src.name; } }
-},
 });
 const SettingsApply = {
 timers: {},
 debounce(k, ms, f) { clearTimeout(this.timers[k]); this.timers[k] = setTimeout(f, ms); },
 boot() {
 const st = Settings.state || Settings.load();
-if (st.graphics.auto) { const p = Settings.detectQuality(); Object.assign(st.graphics, GFX_PRESETS[p]); st.graphics.preset = p; }
+if (st.graphics.auto && st.firstRun) Settings.autoPreset();   // después, la calidad bajada automáticamente se conserva entre visitas
 this.syncRuntime();
 this.applyCSS();
 GLX.setTexQuality(st.graphics.textures);
@@ -6794,7 +6597,9 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) Setti
 },
 syncRuntime() {
 const st = Settings.state, sim = st.simulation;
-S.scale = sim.scale; ScaleState.set(sim.scale, false);
+if (!SCALES[sim.scale]) sim.scale = 'visual';
+if (typeof sim.lastJD !== 'number' || !isFinite(sim.lastJD)) sim.lastJD = null;
+S.scale = sim.scale; ScaleState.set(sim.scale, false); World.remapOrbits();
 S.ambient = st.graphics.ambient; S.rotCap = sim.rotCap; S.hzModel = HZ_MODELS[sim.hzModel] ? sim.hzModel : 'conservador';
 Object.assign(S.layers, sim.layers);
 UI.mmOn = st.interface.minimap && innerWidth >= 760;
@@ -6813,7 +6618,7 @@ if (app) { app.classList.toggle('hud-reduced', I.hud === 'reduced'); app.classLi
 },
 onChange(path, v) {
 const st = Settings.state;
-if (path === '*') { this.syncRuntime(); this.applyCSS(); App.applyQuality(true); GLX.setTexQuality(st.graphics.textures); this.applyAtmos(); this.rebakeSky(); SFX.apply(); Music.applyLevel(); UI.toggleMinimap(UI.mmOn); I18N.set(st.language); UI.refreshAudio(); this.refreshViews(); return; }
+if (path === '*') { this.syncRuntime(); this.applyCSS(); App.applyQuality(true); GLX.setTexQuality(st.graphics.textures); this.applyAtmos(); this.rebakeSky(); SFX.apply(); Music.applyLevel(); UI.toggleMinimap(UI.mmOn); UI.refreshAudio(); this.refreshViews(); return; }
 const [sec, key, sub] = path.split('.');
 if (sec === 'audio') {
 SFX.apply();
@@ -6837,10 +6642,8 @@ this.applyCSS();
 if (key === 'layers') { S.layers[sub] = v; document.querySelectorAll(`[data-layer="${sub}"]`).forEach(el => { el.checked = v; }); }
 if (key === 'scale') UI.setScale(v);
 if (key === 'rotCap') S.rotCap = v;
-} else if (sec === 'language') {
-I18N.set(v);
 }
-if (sec === 'controls' || sec === 'language') UI.renderKeyHelp && UI.renderKeyHelp();
+if (sec === 'controls') UI.renderKeyHelp && UI.renderKeyHelp();
 },
 applyAtmos() {
 const on = Settings.state.graphics.atmospheres;
@@ -6854,7 +6657,7 @@ if (!World.sky) return;
 const size = { basic: 512, high: 1024, max: 2048 }[Settings.state.graphics.sky];
 if (size === World.skySize) return;
 UI.toast(I18N.t('Este cambio puede tardar unos segundos en aplicarse.'), 2200);
-setTimeout(() => { World.bakeSky(); GLX.resize(innerWidth, innerHeight, App.dpr, true); }, 60);
+setTimeout(() => { World.bakeSky(); GLX.resize(innerWidth, innerHeight, App.dpr); }, 60);
 },
 refreshViews() {
 if (UI.sel) UI.renderInfo(UI.sel);
@@ -6870,7 +6673,7 @@ const fps = a.n / a.t; a.t = 0; a.n = 0;
 const order = ['low', 'medium', 'high'], i = order.indexOf(g.preset);
 if (fps < 26 && i > 0) { Settings.applyPreset(order[i - 1]); g.auto = true; Settings.save(); a.cool = 12; UI.hint(I18N.t('Calidad gráfica ajustada automáticamente a «{0}» para mantener la fluidez.', I18N.t(GFX_NAMES[order[i - 1]]))); }
 },
-saveDate() { if (!Flight.on && window.Time) { Settings.state.simulation.lastJD = Time.jd; Settings.save(); } },
+saveDate() { if (!Flight.on) { Settings.state.simulation.lastJD = Time.jd; Settings.save(); } },
 };
 const GFX_NAMES = { low: 'Bajo', medium: 'Medio', high: 'Alto', ultra: 'Ultra', custom: 'Personalizado' };
 const CINE_ICON = {
@@ -6880,7 +6683,6 @@ pause: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 6v12M15.5 6v12
 play: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>',
 ui: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 9.5h18M8 9.5V19"/></svg>',
 exit: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
-film: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 5v14M17 5v14M3 9.5h4M3 14.5h4M17 9.5h4M17 14.5h4"/></svg>',
 };
 Object.assign(UI, {
 tourCine: false,
@@ -6912,7 +6714,7 @@ enterTourCine() {
 if (this.tourCine || !this.tour) return;
 this.tourCine = true;
 this.openSection(null); this.toggleHelp(false);
-if (this.sel) this.select(null, { keepCam: true, tour: true });
+if (this.sel) this.select(null, { tour: true });
 $('#app').classList.add('tour-cine');
 SFX.apply();
 this.cineWake();
@@ -6964,9 +6766,7 @@ this.capT = setTimeout(() => cap.classList.remove('on'), 6500);
 },
 hideCineCaption() { clearTimeout(this.capT); $('#cine-cap').classList.remove('on'); },
 });
-const JD_UNIX = 2440587.5;
-const jdToDate = jd => new Date((jd - JD_UNIX) * 86400000);
-const dateToJD = d => d.getTime() / 86400000 + JD_UNIX;
+const jdToDate = Astro.dateFromJD, dateToJD = Astro.jdFromDate;
 ICON.herramientas = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16M7 16V9M12 16V5M17 16v-4"/></svg>';
 UI.SECTIONS.splice(UI.SECTIONS.findIndex(s => s[0] === 'capas'), 0, ['herramientas', 'Herramientas']);
 Object.assign(UI, {
@@ -7175,12 +6975,17 @@ this.paintEvents();
 p.addEventListener('click', e => {
 const j = e.target.closest('[data-j]');
 if (j) { const d = jdToDate(Time.jd), n = +j.dataset.j, u = j.dataset.u;
-if (u === 'd') d.setUTCDate(d.getUTCDate() + n); else if (u === 'm') d.setUTCMonth(d.getUTCMonth() + n); else d.setUTCFullYear(d.getUTCFullYear() + n);
+if (u === 'd') d.setUTCDate(d.getUTCDate() + n);
+else {                                          // ±1 mes o año sin desbordar: 31 mar − 1 mes → 28 feb, no 3 mar
+const day = d.getUTCDate(); d.setUTCDate(1);
+if (u === 'm') d.setUTCMonth(d.getUTCMonth() + n); else d.setUTCFullYear(d.getUTCFullYear() + n);
+d.setUTCDate(Math.min(day, new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate()));
+}
 UI.setSimDate(dateToJD(d), { toast: false }); }
 const ev = e.target.closest('[data-ev]'); if (ev) this.showEvent(+ev.dataset.ev);
 const a = e.target.closest('[data-tla]');
 if (a) { const E = EVENTS[this.sel], rb = World.byId[E.obj];
-if (a.dataset.tla === 'date') { UI.setSimDate(dateToJD(new Date(E.date + 'T12:00:00Z')), { pause: true }); if (rb && !rb.hidden) UI.select(rb, { fly: true }); }
+if (a.dataset.tla === 'date') { const jd = dateToJD(new Date(E.date + 'T12:00:00Z')); UI.setSimDate(jd, { pause: true }); if (rb && !(rb.vFrom && jd < rb.vFrom) && !(rb.vTo && jd > rb.vTo)) UI.select(rb, { fly: true }); }   // p. ej. el lanzamiento del JWST: aún no está en L2
 else if (a.dataset.tla === 'go' && rb) { if (rb.hidden) UI.toast(rb.def.name + ' no existe en la fecha simulada.'); else UI.select(rb, { fly: true }); } }
 });
 $('#tl-x').addEventListener('click', () => this.toggle(false));
@@ -7304,7 +7109,7 @@ const d = $('#sci-date'); if (d) d.textContent = '· ' + UI.dateStr(Time.jd);
 labels() {
 let A = $('#hz-labels');
 if (!A) { A = document.createElement('div'); A.id = 'hz-labels'; A.innerHTML = '<span class="hz-lab" id="hz-in"></span><span class="hz-lab" id="hz-out"></span>'; $('#labels').appendChild(A); }
-const show = S.layers.hz && (World.cineK || 0) < 0.4 && !Flight.on;
+const show = S.layers.hz && World.system === 'solar' && (World.cineK || 0) < 0.4 && !Flight.on;
 A.hidden = !show; if (!show) return;
 const H = this.hz(), cam = World.cam, h = Math.hypot(cam[0], cam[2]) || 1, dir = [cam[0] / h, 0, cam[2] / h];
 const put = (id, au, name) => {
@@ -7392,6 +7197,10 @@ phase = wrap(lon(d) - lon(o)); phi = wrap(Math.PI - n2 * T);
 win = Math.abs(w) < 1e-9 ? null : w > 0 ? wrap(phi - phase) / w : wrap(phase - phi) / -w;
 const dphi = Math.abs(((phase - phi + Math.PI * 3) % TAU) - Math.PI);            // margen propio de usar movimientos medios
 if (dphi < 6 * Math.PI / 180) win = 0;
+else if (win != null && /^(jpl|kep)$/.test(o.def.orbit.t) && /^(jpl|kep)$/.test(d.def.orbit.t)) {   // las órbitas no son circulares: se corrige con las posiciones en la fecha estimada
+const lonAt = (rb, jd) => { const p = Astro.helioPos(rb.def.orbit, jd); return Math.atan2(p[1], p[0]); };
+for (let k = 0; k < 3; k++) { const jd = Time.jd + win, err = ((wrap(lonAt(d, jd) - lonAt(o, jd)) - phi + Math.PI * 3) % TAU) - Math.PI; win -= err / w; if (win < 0) win += TAU / Math.abs(w); }
+}
 syn = Math.abs(w) < 1e-9 ? null : TAU / Math.abs(w);
 }
 R.hoh = { r1, r2, a, T, dv1, dv2, win, phase, phi, syn };
@@ -7514,7 +7323,6 @@ const SECTIONS_SOLAR = UI.SECTIONS.slice();
 const SECTIONS_BY_SYSTEM = { gargantua: [['gargantua', 'Sistema Gargantúa'], ['capas', 'Capas'], ['config', 'Ajustes']] };
 const Systems = {
 busy: false,
-current() { return World.system; },
 openPicker() {
 let p = $('#sys-pick');
 if (!p) {
@@ -7533,8 +7341,8 @@ go(id) {
 if (this.busy || id === World.system || !SYSTEMS[id]) return;
 if (Flight.on) { UI.toast('Termina el vuelo antes de cambiar de sistema.'); return; }
 if (UI.tour) UI.stopTour(true);
-UI.select(null, { keepCam: true }); UI.openSection(null);
-[Compare, Planner, TL].forEach(T => T.close ? T.close() : T.toggle && T.toggle(false)); Sci.closePop && Sci.closePop();
+UI.select(null); UI.openSection(null);
+[Compare, Planner, TL].forEach(T => { if (T.isOpen()) T.close ? T.close() : T.toggle(false); }); Sci.closePop && Sci.closePop(); Planner.hideRoute();
 id === 'gargantua' ? this.enterGargantua() : this.enterSolar();
 },
 fade(on, ms) { const f = $('#sys-fade') || this.mkFade(); f.style.transitionDuration = ms + 'ms'; f.classList.toggle('on', on); },
@@ -7554,7 +7362,7 @@ const T = [];
 const done = () => { T.forEach(clearTimeout); this.busy = false; this.skip = null; Cam.introSY = 0; app.classList.remove('sys-intro'); f.classList.remove('on', 'titled'); World.bhReveal = 1;
 Cam.fly = null; Cam.focus = World.sun; Cam.follow = true; Cam.target = [0, 0, 0]; Cam.dDist = Cam.dist = G.H * 34; Cam.el = 0.12; UI.hint('Sistema Gargantúa: elige un objeto en el menú o en el buscador'); };
 T.push(setTimeout(() => {
-this.apply('gargantua'); app.classList.add('sys-intro'); Cam.introSY = -0.33;     // Gargantúa en el tercio superior, título en el inferior
+this.apply('gargantua'); app.classList.add('sys-intro'); Cam.introSY = -0.33; this.skip = done;   // «Omitir» solo cuando ya se está en Gargantúa     // Gargantúa en el tercio superior, título en el inferior
 World.bhReveal = 0; Cam.fly = null; Cam.focus = World.sun; Cam.follow = true; Cam.target = [0, 0, 0]; Cam.az = 0.55; Cam.el = 0.05; Cam.dDist = Cam.dist = G.H * 150;
 this.fade(false, reduce ? 300 : 1800);                                   // 2. aparecen las estrellas
 if (reduce) { done(); return; }
@@ -7565,7 +7373,6 @@ T.push(setTimeout(() => { $('#sys-t1').textContent = 'SISTEMA GARGANTÚA'; $('#s
 T.push(setTimeout(() => f.classList.remove('titled'), 6200));
 T.push(setTimeout(done, 7000));                                           // 7. controles
 }, reduce ? 260 : 950));
-this.skip = done;
 },
 enterSolar() {
 const reduce = UI.reducedMotion; this.busy = true;
@@ -7611,16 +7418,13 @@ ${i.science ? `<section class="gx-sci"><h3><span class="gx-tag sci">Ciencia real
 <footer class="src"><p><b>Fuente:</b> ${esc(d.src)}</p><p class="sys-note">${esc(SYSTEMS.gargantua.note)}</p>${rb.def.orbit ? `<p class="note">${esc(SYSTEMS.gargantua.orbitsNote)}</p>` : ''}</footer>`;
 P.scrollTop = 0; this.hudScan();
 $('#info-travel').addEventListener('click', () => { this.userActed(); Cam.travel(rb); });
-$('#info-follow').addEventListener('click', () => { this.userActed(); if (Cam.focus === rb && Cam.follow) Cam.follow = false; else Cam.travel(rb, { keepAngles: true }); this.refreshCamButtons(); });
+$('#info-follow').addEventListener('click', () => { this.userActed(); if (Cam.focus === rb && Cam.follow) Cam.follow = false; else { if (Cam.focus !== rb) Cam.travel(rb, { keepAngles: true, dist: clamp(Cam.dist, rb.rS * 1.3, Cam.maxDist()) }); Cam.follow = true; } this.refreshCamButtons(); });
 $('#info-close2').addEventListener('click', () => { this.userActed(); Cam.travel(rb, { close: true }); });
-if (i.dilation) Dilation.start();
 this.refreshCamButtons();
 };
 const _updateLive = UI.updateLive;
 UI.updateLive = function (force) { if (this.sel && this.sel.def.system === 'gargantua') return; return _updateLive.call(this, force); };
 const Dilation = {
-RATIO: 7 * 365.25 * 24,                          // horas externas por hora local ≈ 61,362
-t: 0, run: true, last: 0, timer: 0,
 html() {
 const ex = [[600, '10 minutos'], [3600, '1 hora'], [3 * 3600, '3 horas']];
 return `<section class="gx-dil" id="info-dil"><h3>Dilatación temporal <span class="gx-tag fic">Universo de Interstellar</span></h3>
@@ -7629,14 +7433,6 @@ return `<section class="gx-dil" id="info-dil"><h3>Dilatación temporal <span cla
 <div class="gx-clocks"><div><span>Tiempo en Miller<a class="gx-egg" href="https://www.youtube.com/watch?v=60h6lpnSgck" target="_blank" rel="noopener noreferrer" aria-label="El tiempo no espera… (abre un video en una pestaña nueva)" data-tip="El tiempo no espera…"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><circle cx="12" cy="12" r="8.2"/><path class="egg-h" d="M12 12V8.2"/><path class="egg-m" d="M12 12l3.4 2"/></svg></a></span><b id="dil-local">00:00:00</b></div><div><span>Tiempo externo equivalente</span><b id="dil-ext">0 horas</b></div></div>
 <p class="gx-ex">${ex.map(([s, t]) => `${t} → ${MillerFX.ext(s)}`).join(' · ')}</p>
 <p class="note">El contador sigue el reloj de la ambientación sonora de Miller: cada tic llega cada ${fmt(MILLER_TIME.TICK_T, 4)} s locales (≈ ${fmt(MILLER_TIME.TICK_T * MILLER_TIME.RATIO / 3600, 1)} horas externas). La dilatación temporal gravitacional es real; esta relación concreta pertenece a la película.</p></section>`;
-},
-start() { /* sin reloj propio: lo actualiza MillerFX con el reloj de audio */ },
-paint() {
-const el = $('#dil-local'), ex = $('#dil-ext'); if (!el) return;
-const s = Math.floor(this.t), p2 = n => String(n).padStart(2, '0');
-el.textContent = `${p2(Math.floor(s / 3600))}:${p2(Math.floor(s / 60) % 60)}:${p2(s % 60)}`;
-const days = this.t * this.RATIO / 86400; let y = Math.floor(days / 365.25), m = Math.round((days - y * 365.25) / 30.44); if (m === 12) { y++; m = 0; } const dd = Math.max(0, Math.round(days - y * 365.25 - m * 30.44));
-ex.textContent = days < 1 ? fmt(days * 24, 1) + ' horas' : '≈ ' + [y ? y + (y === 1 ? ' año' : ' años') : '', m ? m + (m === 1 ? ' mes' : ' meses') : '', !y && dd ? dd + (dd === 1 ? ' día' : ' días') : ''].filter(Boolean).join(' y ');
 },
 };
 (() => {
@@ -7665,7 +7461,7 @@ registry: {}, run: null, speed: 1,
 register(def) { this.registry[def.id] = def; },
 briefing(id) {
 const M = this.registry[id]; if (!M) return;
-UI.openSection(null); UI.select(null, { keepCam: true });
+UI.openSection(null); UI.select(null);
 this.overlay(`<span class="ms-kicker">${esc(M.kicker)}</span><h2>${esc(M.title)}</h2><p class="ms-sub">${esc(M.sub)}</p><p class="ms-desc">${esc(M.desc)}</p>
 <ol class="ms-route">${M.stages.filter(s => s.label).map(s => `<li>${esc(s.label)}</li>`).join('')}</ol><p class="note">${esc(M.note)}</p>
 <div class="ms-btns"><button class="cta" data-ms="start" data-id="${id}">Iniciar misión</button><button class="cta-ghost" data-ms="close">Volver</button></div>`);
@@ -7680,9 +7476,9 @@ const M = this.registry[id]; if (!M) return;
 this.closeOverlay();
 if (this.run) this.exit({ restore: true, silent: true });
 const saved = { cam: Object.assign(MissionCam.pose(), { focus: Cam.focus, follow: Cam.follow, fov: Cam.fov }), time: { jd: Time.jd, paused: Time.paused, idx: Time.idx, live: Time.live },
-sel: UI.sel, mode: S.mode, section: UI.section };
+sel: UI.sel, mode: S.mode };
 if (S.mode === 'cine') UI.setMode('explore');
-UI.select(null, { keepCam: true }); UI.openSection(null);
+UI.select(null); UI.openSection(null);
 Time.paused = true;                                                       // las posiciones no avanzan durante la misión
 this.run = { M, i: -1, t: 0, paused: false, saved, cine: false, hidden: false, shot: null, path: null, pathA: 0, ship: null };
 $('#app').classList.add('in-mission'); this.hud(); this.go(0);
@@ -7699,8 +7495,8 @@ Cam.fov = s.cam.fov;
 if (opts.keepCamera) { Cam.focus = opts.focus || null; Cam.follow = !!opts.focus; }
 else { MissionCam.apply(s.cam); Cam.focus = s.cam.focus; Cam.follow = s.cam.follow; }
 if (s.mode === 'cine' && !opts.keepCamera) UI.setMode('cine');
-if (opts.select) UI.select(opts.select, { keepCam: true }); else if (s.sel && !opts.keepCamera && World.rb.includes(s.sel)) UI.select(s.sel, { keepCam: true });
-['ms-hud', 'ms-ctl', 'ms-cap', 'ms-warn', 'ms-dil'].forEach(id => { const e = $('#' + id); if (e) e.remove(); });
+if (opts.select) UI.select(opts.select); else if (s.sel && !opts.keepCamera && World.rb.includes(s.sel)) UI.select(s.sel);
+['ms-hud', 'ms-ctl', 'ms-cap', 'ms-warn'].forEach(id => { const e = $('#' + id); if (e) e.remove(); });
 this.closeOverlay();
 if (!opts.silent) UI.toast(opts.msg || 'Has salido de la misión: vuelves al explorador libre');
 },
@@ -7742,7 +7538,7 @@ const c = document.createElement('div'); c.id = 'ms-ctl'; c.setAttribute('role',
 c.addEventListener('click', e => { const b = e.target.closest('[data-mc]'); if (!b) return; ({ prev: () => this.prev(), play: () => this.pause(), next: () => this.next(), restart: () => this.restart(), cine: () => this.toggleCine(), hide: () => this.toggleHide(), exit: () => this.exit({ restore: true }) })[b.dataset.mc](); this.wake(); });
 const cap = document.createElement('div'); cap.id = 'ms-cap'; $('#app').appendChild(cap);
 const w = document.createElement('div'); w.id = 'ms-warn'; $('#app').appendChild(w);
-['pointermove', 'pointerdown', 'keydown'].forEach(t => addEventListener(t, () => { if (this.run) this.wake(); }, { passive: true }));
+if (!this._wakeOn) { this._wakeOn = true; ['pointermove', 'pointerdown', 'keydown'].forEach(t => addEventListener(t, () => { if (this.run) this.wake(); }, { passive: true })); }
 this.wake();
 },
 paintHud() {
@@ -7781,7 +7577,6 @@ hide: '<svg viewBox="0 0 24 24"><path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9
 exit: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
 };
 Missions.ctx = {
-get t() { return Missions.run ? Missions.run.t : 0; },
 rb: id => World.byId[id],
 shot(to, dur) { const R = Missions.run; R.shot = { from: MissionCam.pose(), to, t0: R.t, dur: Math.max(dur, 0.01) }; },
 poseBehind(rb, bg, distK, daz, del) { const a = MissionCam.angles(V.sub(rb.posS, bg.posS)); return { target: rb.posS.slice(), dist: rb.rS * distK, az: a.az + (daz || 0), el: a.el + (del || 0) }; },
@@ -7791,15 +7586,8 @@ setPath(pts) { const R = Missions.run; R.path = pts; R.pathA = 1; R.pathKeep = t
 fadePath() { const R = Missions.run; if (R) R.pathKeep = false; },
 ship(v) { const R = Missions.run; if (!v) { R.ship = null; return; } R.ship = R.ship || { pos: [0, 0, 0], vel: [0, 0, 1], size: 0.9, thr: 1 }; Object.assign(R.ship, v); },
 grade(c) { $('#gl').style.filter = c || ''; },
-dilation(on, factor) {
-let d = $('#ms-dil');
-if (!on) { if (d) d.remove(); return; }
-if (!d) { d = document.createElement('div'); d.id = 'ms-dil'; $('#app').appendChild(d); }
-d.dataset.f = factor; d.dataset.t = d.dataset.t || 0;
-},
 cleanup() {
 World.bhBoost = 0; World.bhReveal = 1; Cam.introSY = 0; this.grade(''); Missions.warn('');
-const d = $('#ms-dil'); if (d) d.remove();
 },
 };
 Missions.draw = function (useP, t) {
@@ -7813,7 +7601,7 @@ const F = V.norm(sh.vel), U0 = Math.abs(F[1]) > 0.95 ? [1, 0, 0] : [0, 1, 0], X 
 const tex = !!sh.mesh.groups, pr = useP(tex ? P.craftTex : P.craft), rel = V.sub(sh.pos, cam);
 GLX.state({ depthTest: true, depthWrite: true, cull: 'back', blend: 'none' });
 const ep = V.add(rel, V.scale(F, -sh.size * 1.1));
-GLX.setAll(pr, { u_model: M4.fromBasis(X, U, F, sh.size, rel), u_occ: new Float32Array(16), u_occN: 0, u_sunR: World.shadowSunR, u_ambient: S.ambient + 0.02, u_hover: 0,
+GLX.setAll(pr, { u_model: M4.fromBasis(X, U, F, sh.size, rel), u_occ: this.occ0 || (this.occ0 = new Float32Array(16)), u_occN: 0, u_sunR: World.shadowSunR, u_ambient: S.ambient + 0.02, u_hover: 0,
 u_eng: [...ep, sh.thr * 1.3], u_engCol: [0.55, 0.75, 1.0], u_engR: sh.size * 0.5 });
 if (tex) World.drawGroups(sh.mesh, pr); else GLX.draw(sh.mesh, pr);
 }
@@ -7866,7 +7654,7 @@ exit() { World.bhBoost = 0; } },
 { id: 'MILLER', label: 'Miller', dur: 24, sfx: 'whoosh',
 enter(c) { const m = c.rb('miller'); c.shot(() => c.poseBehind(m, bh(), 7, 0.95, 0.16), 9); },
 update(c, t) {
-if (t > 8.5) c.once('cap', () => { c.caption('PLANETA DE MILLER', 'Dilatación temporal extrema · 1 hora local ≈ 7 años externos', 7000); MillerFX.enter({ mission: true }); });
+if (t > 8.5) c.once('cap', () => { c.caption('PLANETA DE MILLER', 'Dilatación temporal extrema · 1 hora local ≈ 7 años externos', 7000); MillerFX.enter(); });
 if (t > 13) c.once('drift', () => c.shot(() => c.poseBehind(c.rb('miller'), bh(), 5.5, 1.2, 0.18), 10));
 },
 exit(c) { MillerFX.exit(); } },
@@ -7924,22 +7712,19 @@ RATIO: 7 * 365.25 * 24,              // horas externas por hora local (relación
 TICK_FIRST: 0.614, TICK_T: 1.2535,
 };
 const MillerFX = {
-active: false, paused: false, src: null, nodes: null, t0: 0, pausedAt: 0, lastTick: -1, raf: 0, sched: 0, prevDuck: 1,
+active: false, paused: false, nodes: null, t0: 0, pausedAt: 0, lastTick: -1, raf: 0, sched: 0, prevDuck: 1,
 ctx() { try { return SFX.ensure ? SFX.ensure() : SFX.ctx; } catch (e) { return null; } },
 level() { const A = Settings.state.audio; return (A.musicOn === false || A.muted) ? 0 : (A.music != null ? A.music : 0.6); },
 clock() {
 if (!this.active) return 0;
 if (this.paused) return this.pausedAt;
-if (this.src === 'track' && this.el) return this.el.currentTime;
 const c = this.ctx(); return this.useAudio && c ? Math.max(0, c.currentTime - this.t0) : Math.max(0, performance.now() / 1000 - this.t0);
 },
-enter(opts) {
-opts = opts || {};
+enter() {
 if (this.active) { this.exit({ quick: true }); }                       // volver a Miller: la experiencia se reinicia sincronizada
-this.active = true; this.paused = false; this.lastTick = -1; this.mission = !!opts.mission;
+this.active = true; this.paused = false; this.lastTick = -1;
 this.prevDuck = Music.duck; Music.setDuck(0);                           // fundido cruzado: la música principal baja
-const c = this.ctx(), M = ASSET_MANIFEST.millerTrack;
-if (M) this.startTrack(M); else this.startSynth(c);
+this.startSynth(this.ctx());
 this.hud(); this.loop();
 },
 exit(opts) {
@@ -7948,7 +7733,6 @@ this.active = false; cancelAnimationFrame(this.raf); clearInterval(this.sched);
 const c = this.ctx(), N = this.nodes, fade = opts.quick ? 0.25 : 1.6;
 if (N && c) { const t = c.currentTime; N.out.gain.cancelScheduledValues(t); N.out.gain.setValueAtTime(N.out.gain.value, t); N.out.gain.linearRampToValueAtTime(0, t + fade);
 setTimeout(() => { try { N.oscs.forEach(o => o.stop()); N.out.disconnect(); } catch (e) {} }, fade * 1000 + 100); }
-if (this.el) { const el = this.el; const g = this.trackGain; if (g && c) g.gain.linearRampToValueAtTime(0, c.currentTime + fade); setTimeout(() => { el.pause(); }, fade * 1000); }
 this.nodes = null;
 Music.setDuck(this.prevDuck || 1);                                      // la música principal vuelve
 const h = $('#mx-hud'); if (h) { h.classList.remove('on'); setTimeout(() => { if (!this.active) h.remove(); }, 700); }
@@ -7956,15 +7740,14 @@ const h = $('#mx-hud'); if (h) { h.classList.remove('on'); setTimeout(() => { if
 pause(v) {
 if (!this.active || v === this.paused) return;
 const c = this.ctx();
-if (v) { this.pausedAt = this.clock(); this.paused = true; clearInterval(this.sched); if (this.nodes && c) { this.nodes.out.gain.setTargetAtTime(0, c.currentTime, 0.08); this.tickBus.gain.setValueAtTime(0, c.currentTime); } if (this.el) this.el.pause(); this.tickUI(); }
+if (v) { this.pausedAt = this.clock(); this.paused = true; clearInterval(this.sched); if (this.nodes && c) { this.nodes.out.gain.setTargetAtTime(0, c.currentTime, 0.08); this.tickBus.gain.setValueAtTime(0, c.currentTime); } this.tickUI(); }
 else { this.paused = false; this.t0 = (this.useAudio && c ? c.currentTime : performance.now() / 1000) - this.pausedAt;
 if (this.nodes && c) { this.nodes.out.gain.setTargetAtTime(this.level() * 0.55, c.currentTime, 0.15);
 const nb = c.createGain(); nb.gain.value = 1; nb.connect(this.nodes.out); this.tickBus = nb;      // los tics ya programados quedan en el bus silenciado
 this.nextTick = Math.ceil((this.pausedAt - MILLER_TIME.TICK_FIRST) / MILLER_TIME.TICK_T); }
-if (this.el) this.el.play().catch(() => {}); else this.schedule(); }
+this.schedule(); }
 },
 startSynth(c) {
-this.src = 'synth';
 this.useAudio = !!(c && c.state === 'running');
 if (!this.useAudio) { this.t0 = performance.now() / 1000; return; }       // audio aún no permitido: reloj del navegador, igual de continuo
 const out = c.createGain(); out.gain.value = 0; out.connect(SFX.bus && SFX.bus.music ? SFX.bus.music : c.destination);
@@ -7995,22 +7778,11 @@ const o = c.createOscillator(), g = c.createGain(), bp = c.createBiquadFilter();
 o.type = 'square'; o.frequency.value = 2100; bp.type = 'bandpass'; bp.frequency.value = 3200; bp.Q.value = 6;
 g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(0.09, at + 0.0015); g.gain.exponentialRampToValueAtTime(0.0008, at + 0.035);
 o.connect(bp); bp.connect(g); g.connect(this.tickBus); o.start(at); o.stop(at + 0.05);
-(this.sched_log = this.sched_log || []).push(+(at - this.t0).toFixed(4)); if (this.sched_log.length > 32) this.sched_log.shift();   // diagnóstico
 }
 this.nextTick = k;
 };
 run(); this.sched = setInterval(run, 90);
 },
-startTrack(url) {
-this.src = 'track';
-const el = this.el || (this.el = new Audio()); el.src = url; el.preload = 'auto'; el.currentTime = 0;
-const c = this.ctx();
-if (c && !this.trackNode) { try { this.trackNode = c.createMediaElementSource(el); this.trackGain = c.createGain(); this.trackNode.connect(this.trackGain); this.trackGain.connect(SFX.bus.music); } catch (e) {} }
-if (this.trackGain && c) { this.trackGain.gain.setValueAtTime(0, c.currentTime); this.trackGain.gain.linearRampToValueAtTime(this.level(), c.currentTime + 2.5); }
-if (el.readyState < 3) this.loading(true); el.oncanplay = () => this.loading(false);
-el.play().catch(() => {});
-},
-loading(v) { const h = $('#mx-hud'); if (h) h.classList.toggle('loading', v); },
 hud() {
 let h = $('#mx-hud');
 if (!h) { h = document.createElement('div'); h.id = 'mx-hud'; h.setAttribute('role', 'status'); $('#app').appendChild(h); }
@@ -8019,7 +7791,6 @@ h.innerHTML = `<span class="mx-k">Dilatación temporal</span>
 <div class="mx-row mx-ext"><span>Exterior</span><b id="mx-ext">0 horas</b></div>
 <div class="mx-line"><i id="mx-dot"></i></div>
 <small class="mx-rel">1 hora ≈ 7 años · relación de Interstellar</small>
-<span class="mx-load">Preparando audio de Miller…</span>
 <div class="mx-min"><b>MILLER</b><span>1 hora ≈ 7 años</span></div>`;
 requestAnimationFrame(() => h.classList.add('on'));
 },
@@ -8142,7 +7913,7 @@ setTimeout(done, 2600);
 },
 };
 const App = {
-last: 0, scaleRatio: null, ready: false,
+last: 0, scaleRatio: null,
 qualityParams() {
 const g = Settings.state.graphics, d = Math.min(devicePixelRatio || 1, 2);
 const lv = { low: 3, medium: 4 }[g.preset] || 5;
@@ -8164,7 +7935,6 @@ $('#app').classList.add('failed'); Splash.fail(); return;
 }
 document.querySelectorAll('img[data-logo]').forEach(i => { i.src = document.querySelector(i.dataset.logo === 'big' ? '.intro-logo img' : '.about-logo').src; });
 SettingsApply.boot();
-I18N.set(Settings.state.language, true);
 this.applyQuality(false); this.resize();
 addEventListener('resize', () => this.resize());
 Time.startState();
@@ -8185,9 +7955,9 @@ const st = $('#start'); st.disabled = false;
 st.addEventListener('click', () => this.begin());
 const sg = $('#start-tours'); sg.disabled = false; sg.addEventListener('click', () => UI.toggleTours(true));
 const sf = $('#start-fly'); sf.disabled = false; sf.addEventListener('click', () => { this.begin(); Flight.openHangar(); });
-this.ready = true;
 const explore = Settings.state.general.startup === 'explore' && location.hash !== '#creditos';
-Splash.finish(explore, () => { if (explore) this.begin(); else st.focus({ preventScroll: true }); });   // la carga se retira cuando todo está listo
+const go = () => { if (explore) this.begin(); else st.focus({ preventScroll: true }); };
+Splash.finish(explore, go).catch(e => { console.error(e); Splash.reveal(true, go); });   // la carga se retira cuando todo está listo
 window.Solaris = { World, Cam, UI, Time, S, select: id => UI.select(World.byId[id], { fly: true }), App, Flight, Music, SFX, Settings, Keys, Gfx, GLX, I18N, BODY, PackedModels, Assets, Compare, TL, Sci, ScaleState, Planner, Flight, Systems, Dilation, Missions, Cam: Cam, MillerFX, Music };
 requestAnimationFrame(t => this.loop(t));
 },
@@ -8215,28 +7985,19 @@ setTimeout(() => UI.hint(I18N.t(matchMedia('(pointer: coarse)').matches ? 'Toca 
 $('#gl').focus({ preventScroll: true });
 },
 prepare() {
-const W = innerWidth, H = innerHeight;
+const W = innerWidth, H = innerHeight, dpx = Gfx.distPx();
 for (const rb of World.rb) {
 const p = World.project(rb.posS, rb.proj);
 p.rpx = p.on ? rb.rS * World.pxPerUnit(p.w) : 0;
 const near = V.dist(rb.posS, Cam.pos) < rb.rS * 3;
 const onScreen = p.on && p.x > -p.rpx - 40 && p.x < W + p.rpx + 40 && p.y > -p.rpx - 40 && p.y < H + p.rpx + 40;
-const secondary = /^(moon|asteroid|comet|tno|craft)$/.test(rb.def.type);
-rb.drawOn = (onScreen && p.rpx > (secondary ? Gfx.distPx() : 0.3)) || near;
+if (rb.secondary == null) rb.secondary = /^(moon|asteroid|comet|tno|craft)$/.test(rb.def.type);   // se calcula una vez por cuerpo
+rb.drawOn = (onScreen && p.rpx > (rb.secondary ? dpx : 0.3)) || near;
 if (rb.def.type === 'moon' && !S.layers.moons) rb.drawOn = false;
 if (rb.isCraft && (rb.hidden || !S.layers.craft)) { rb.drawOn = false; p.on = false; p.rpx = 0; }
 }
 const sp = World.sun.proj;
 World.starDim = 1 - 0.55 * (sp.on ? smoothstep(8, 220, sp.rpx) : 0);
-},
-advance(sec) {
-this.hold = true;
-const dt = 0.05;
-if (Flight.on) { for (let t = 0; t < sec; t += dt) { Flight.simulate(dt); Flight.camera(dt); } Flight.forceHud = true; Flight.renderFrame(performance.now() / 1000); return; }
-for (let t = 0; t < sec; t += dt) { Time.step(dt); World.update(Time.jd, dt, Time.speed); this.scaleCam(); Cam.update(dt); UI.tickTour(dt); this.prepare(); }
-World.texTick(); PackedModels.tick();
-World.render(performance.now() / 1000); World.frame++;
-if (UI.started) { UI.updateLabels(); UI.updateLive(true); UI.tickTime(); UI.drawMinimap(); }
 },
 adapt(dt) {
 this.ema = this.ema == null ? dt : this.ema * 0.93 + dt * 0.07;
@@ -8260,7 +8021,6 @@ if (ScaleState.t >= 1) this.scaleRatio = null;
 },
 loop(t) {
 requestAnimationFrame(tt => this.loop(tt));
-if (this.hold) return;
 const cap = Settings.state.graphics.fps;
 if (cap && this.last && t - this.last < 1000 / cap - 1.5) return;
 const dt = this.last ? Math.min(0.1, (t - this.last) / 1000) : 0.016;
@@ -8279,7 +8039,9 @@ World.frame++;
 if (UI.started) UI.frame(dt);
 },
 };
-window.addEventListener('DOMContentLoaded', () => App.start());
+window.addEventListener('DOMContentLoaded', () => App.start().catch(e => {    // error inesperado al arrancar: se avisa y se retira la carga
+console.error(e); $('#load-msg').textContent = 'No se pudo iniciar SOLARIS (' + e.message + '). Recarga la página.'; $('#app').classList.add('failed'); Splash.fail();
+}));
 const SHIPS = [
 { id: 'colibri', name: 'Colibrí', type: 'Nave exploradora ligera', len: 22, maxSpeed: 300, accel: 60, angAcc: 110, maxAng: 80, mass: 18,
 prop: 'Motor magnetoplasmático de alto empuje (concepto)', eng: [0.45, 0.68, 1.0],
@@ -8401,8 +8163,7 @@ this.alertOut = ctx.createGain(); this.alertOut.gain.value = 0.7; this.alertOut.
 const len = ctx.sampleRate * 2, buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0);
 let last = 0; for (let i = 0; i < len; i++) { const w = Math.random() * 2 - 1; last = (last + 0.02 * w) / 1.02; d[i] = last * 3.5; }
 this.brown = buf;
-const wbuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate), wd = wbuf.getChannelData(0); for (let i = 0; i < wd.length; i++) wd[i] = Math.random() * 2 - 1;
-this.white = wbuf;
+const wbuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate), wd = wbuf.getChannelData(0); for (let i = 0; i < wd.length; i++) wd[i] = Math.random() * 2 - 1;   // ruido blanco: aire de cabina y propulsores RCS
 const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
 this.engF = ctx.createBiquadFilter(); this.engF.type = 'lowpass'; this.engF.frequency.value = 90;
 this.engG = ctx.createGain(); this.engG.gain.value = 0;
@@ -8437,9 +8198,9 @@ beep(freq, dur, type, vol) {
 if (!this.ctx || !this.on) return;
 const t = this.ctx.currentTime, o = this.ctx.createOscillator(), g = this.ctx.createGain();
 o.type = type || 'square'; o.frequency.value = freq; g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol || 0.06, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-o.connect(g); g.connect(this.alertOut || this.master); o.start(t); o.stop(t + dur + 0.02);
+o.connect(g); g.connect(this.alertOut); o.start(t); o.stop(t + dur + 0.02);
 },
-ping() { if (!this.ctx) return; const t = this.ctx.currentTime, o = this.ctx.createOscillator(), g = this.ctx.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(660, t); o.frequency.exponentialRampToValueAtTime(990, t + 0.18); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.08, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.35); o.connect(g); g.connect(this.alertOut || this.master); o.start(t); o.stop(t + 0.4); },
+ping() { if (!this.ctx) return; const t = this.ctx.currentTime, o = this.ctx.createOscillator(), g = this.ctx.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(660, t); o.frequency.exponentialRampToValueAtTime(990, t + 0.18); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.08, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.35); o.connect(g); g.connect(this.alertOut); o.start(t); o.stop(t + 0.4); },
 thud() { if (!this.ctx) return; const t = this.ctx.currentTime, s = this.ctx.createBufferSource(), f = this.ctx.createBiquadFilter(), g = this.ctx.createGain(); s.buffer = this.brown; f.type = 'lowpass'; f.frequency.value = 160; g.gain.setValueAtTime(0.8, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9); s.connect(f); f.connect(g); g.connect(this.master); s.start(t); s.stop(t + 1); },
 stop() { this.active = false; if (this.master) this.setMute(!this.on); },
 };
@@ -8497,7 +8258,7 @@ this.initBodies();
 this.on = true; this.state = 'hangar';
 this.setShip(this.shipIdx); this.placeAtStart();
 this.free = { az: 0.9, el: 0.22, dist: 2.2 };
-const app = $('#app'); app.classList.add('flying', 'hangar'); app.classList.remove('fl-fly', 'fl-pause');
+const app = $('#app'); app.classList.add('flying', 'hangar'); app.classList.remove('fl-fly', 'fl-pause', 'fl-cockpit'); $('#fl-targets').classList.remove('open');
 this.renderHangar();
 setTimeout(() => { const b = document.querySelector('#fl-launch'); if (b) b.focus({ preventScroll: true }); }, 60);
 PackedModels.preloadShips(this.ship.id);     // modelos del hangar: primero la nave elegida
@@ -8525,7 +8286,8 @@ this.state = 'fly'; this.placeAtStart();
 this.aim = this.match = this.intercept = false; this.hold = null; this.orbit = null; this.warpIdx = 0; this.particles = [];
 this.autoBrake = this.assisted; this.stab = true;
 this.thrCmd = 0; this.thrAct = 0; this.thrRef = { v: 0 }; this.rcsL = this.rcsU = 0; this.cfx = null;
-if (!this.target || this.target === this.startB) this.target = this.startB;
+this.zoomK = 1; this.trajT = 0; this.trajPts = null; this.landed = null; this.refreshKeyTips();
+if (!this.target) this.target = this.startB;
 UI.sel = this.target;
 const app = $('#app'); app.classList.remove('hangar', 'fl-pause'); app.classList.add('fl-fly');
 this.msg('Sistemas en línea. ' + this.ship.name + ' lista para maniobrar.', 'info', 4000);
@@ -8548,7 +8310,7 @@ this.exit();
 },
 exit() {
 this.on = false; this.state = null; FlightAudio.update(0, 0); FlightAudio.stop(); Music.setDuck(1);
-const app = $('#app'); app.classList.remove('flying', 'hangar', 'fl-fly', 'fl-pause', 'fl-cockpit');
+const app = $('#app'); app.classList.remove('flying', 'hangar', 'fl-fly', 'fl-pause', 'fl-cockpit'); $('#fl-targets').classList.remove('open');
 const ref = this.ref || World.byId.tierra;
 S.scale = this.saved.scale; ScaleState.set(S.scale, false); World.remapOrbits(); UI.updateScaleBadge();
 Time.idx = this.saved.idx; Time.paused = this.saved.paused; Time.live = this.saved.live; if (Time.live) Time.jd = Astro.jdFromDate(new Date()); UI.refreshTime();
@@ -8564,7 +8326,7 @@ addEventListener('keydown', e => {
 if (!this.on) return;
 const tag = (e.target.tagName || '').toLowerCase();
 if (tag === 'input' || tag === 'select') { if (e.key === 'Escape') e.target.blur(); return; }
-if (this.state === 'hangar') { if (e.key === 'Escape') this.exit(); else if (e.key === 'Enter') this.launch(); return; }
+if (this.state === 'hangar') { if (e.key === 'Escape') this.exit(); else if (e.key === 'Enter' && !e.target.closest('button, a')) this.launch(); return; }
 if (e.key === 'Escape') { e.preventDefault(); if ($('#fl-targets').classList.contains('open')) this.toggleTargets(false); else this.pause(this.state !== 'pause'); return; }
 if (this.state !== 'fly') return;
 if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key) || e.code === 'Tab') e.preventDefault();
@@ -8576,7 +8338,7 @@ addEventListener('blur', () => this.keys.clear());
 cv.addEventListener('pointerdown', e => {
 if (!this.on) return;
 cv.setPointerCapture(e.pointerId);
-this.drag = { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, moved: 0, btn: e.button };
+this.drag = { x: e.clientX, y: e.clientY, moved: 0 };
 if (CAMS[this.camIdx][0] !== 'free' && this.state === 'fly' && e.button === 0) this.stick = { x0: e.clientX, y0: e.clientY, x: 0, y: 0 };
 });
 cv.addEventListener('pointermove', e => {
@@ -8587,8 +8349,8 @@ if (this.stick) { this.stick.x = clamp((e.clientX - this.stick.x0) / 140, -1, 1)
 else { this.free.az -= dx * 0.006; this.free.el = clamp(this.free.el + dy * 0.006, -1.5, 1.5); }
 });
 const up = e => {
-if (!this.on || !this.drag) return;
-if (this.drag.moved < 5) { const r = cv.getBoundingClientRect(); const rb = World.pick(e.clientX - r.left, e.clientY - r.top); if (rb && this.state === 'fly') this.setTarget(rb); }
+if (!this.drag) return;
+if (this.on && this.drag.moved < 5) { const r = cv.getBoundingClientRect(); const rb = World.pick(e.clientX - r.left, e.clientY - r.top); if (rb && this.state === 'fly') this.setTarget(rb); }
 this.drag = null; this.stick = null;
 };
 cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
@@ -8624,14 +8386,14 @@ case 'sound': this.toggleSound(); break;
 setThrottle(v, src) {
 v = clamp(Math.round(v * 100) / 100, DETENTS[0], 1);
 if (src !== 'auto' && (this.intercept || this.match || this.hold || this.orbit) && Math.abs(v - this.thrCmd) > 1e-3) {
-this.cancelAuto(); this.msg('Control manual del empuje: asistencias de navegación desactivadas.', 'quiet');
+this.cancelAuto(); this.msg('Control manual del empuje: asistencias de navegación desactivadas.', 'quiet'); this.refreshBar();
 }
 if (Math.abs(v - this.thrCmd) > 1e-3 && src !== 'quiet') {
 FlightAudio.beep(v > this.thrCmd ? 1250 : 980, 0.035, 'triangle', 0.025);
 const name = DETENT_NAMES[String(v)];
 if (name && src !== 'auto') this.msg('Empuje ' + Math.round(v * 100) + ' %: ' + name.toLowerCase(), 'quiet', 1600);
 }
-this.thrCmd = v; this.refreshBar();
+this.thrCmd = v;
 },
 stepThrottle(dir) {
 const c = this.thrCmd + 1e-6 * dir;
@@ -8738,7 +8500,7 @@ this.accNow = 0; this.thr = 0; this.thrAuto = 0; this.rcs = Math.min(1, Math.abs
 for (let i = 0; i < n; i++) this.step(h, (i + 1) / n, I);
 if (dtSim === 0) this.step(0, 1, I);
 this.ref = this.refBody();
-this.effects(dt, I);
+this.effects(dt);
 },
 bodyAt(rb, f) { return V.lerp(rb.kmPrev || rb.km, rb.km, f); },
 updateWarpLimit() {
@@ -8759,7 +8521,7 @@ if (this.warpIdx > m) { this.warpIdx = m; this.warpLimited = performance.now() +
 rotate(dt, I) {
 const sh = this.ship, aA = sh.angAcc * DEG, mA = sh.maxAng * DEG;
 const R = V.scale(this.L(), -1), U = this.U, F = this.F;
-let des = null, rate = null;
+let des = null;
 let want = null;
 if (this.aim && this.target) want = V.norm(V.sub(this.target.km, this.pos));
 if (this.plan && this.plan.dir && (this.intercept || this.match || this.hold)) want = this.plan.dir;
@@ -8785,8 +8547,8 @@ const om = V.len(wv);
 if (om > 1e-12) { const ax = V.scale(wv, 1 / om); this.F = V.rot(this.F, ax, om * dt); this.U = V.rot(this.U, ax, om * dt); }
 this.F = V.norm(this.F); this.U = V.norm(V.sub(this.U, V.scale(this.F, V.dot(this.U, this.F))));
 },
-thrustToward(D, h, power) {
-const sh = this.ship, main = sh.accel / 1000 * (power || 1), m = V.len(D);
+thrustToward(D, h) {
+const sh = this.ship, main = sh.accel / 1000, m = V.len(D);
 if (m < 1e-9) return [0, 0, 0];
 const d = V.scale(D, 1 / m), al = V.dot(this.F, d);
 let a = al > 0.985 ? main : al < -0.985 ? main * 0.4 : main * 0.25;
@@ -8854,21 +8616,29 @@ g = V.add(g, V.scale(r, G.GM / (d2 * d)));
 const tA = V.len(acc);
 this.accNow = Math.max(this.accNow, tA * 1000);
 this.thr = Math.max(this.thr, Math.min(1, thr));
+const sp0 = V.len(V.sub(this.vel, vRef));
 this.vel = V.add(this.vel, V.scale(V.add(acc, g), h));
-const vl = V.sub(this.vel, vRef), sp = V.len(vl);
-if (sp > sh.maxSpeed) this.vel = V.add(vRef, V.scale(vl, sh.maxSpeed / sp));
+const vl = V.sub(this.vel, vRef), sp = V.len(vl), cap = Math.max(sh.maxSpeed, sp0);   // el tope solo impide que el empuje sume velocidad: cruzar a otra esfera de influencia no la recorta
+if (sp > cap) this.vel = V.add(vRef, V.scale(vl, cap / sp));
+const p0 = this.pos;
 this.pos = V.add(this.pos, V.scale(this.vel, h));
+const seg = V.sub(this.pos, p0), L2 = V.dot(seg, seg);
 for (const rb of World.rb) {
-if (rb.isCraft) continue;
-const B = this.bodyAt(rb, f), r = V.sub(this.pos, B), d = V.len(r), lim = rb.R + this.sRad();
-if (d < lim && rb.R > 0) {
-this.pos = V.add(B, V.scale(r, (lim * 1.0005) / d)); this.vel = rb.vel.slice(); this.cancelAuto(); this.warpIdx = 0; this.thrCmd = 0; this.thrAct = 0; this.thrRef.v = 0;
+if (rb.isCraft || !(rb.R > 0)) continue;
+const B = this.bodyAt(rb, f), lim = rb.R + this.sRad();
+const u = L2 > 0 ? clamp(V.dot(V.sub(B, p0), seg) / L2, 0, 1) : 1, r = V.sub(V.add(p0, V.scale(seg, u)), B), d = V.len(r);   // punto del paso más cercano: a gran velocidad la nave no atraviesa cuerpos pequeños
+if (d < lim) {
+const n = d > 1e-9 ? V.scale(r, 1 / d) : [0, 1, 0];
+this.pos = V.add(B, V.scale(n, lim * 1.0005)); this.vel = rb.vel.slice();
+if (this.landed !== rb) {                          // posada: la gravedad la vuelve a apoyar sin repetir la alarma
+this.landed = rb; this.cancelAuto(); this.warpIdx = 0; this.thrCmd = 0; this.thrAct = 0; this.thrRef.v = 0;
 this.msg('Contacto con ' + rb.def.name + '. La nave se ha detenido sobre la superficie.', 'alert', 5000); FlightAudio.thud(); this.refreshBar();
 }
+} else if (this.landed === rb && d > lim * 1.01) this.landed = null;
 }
 },
-effects(dt, I) {
-const sh = this.ship, len = sh.len / 1000;
+effects(dt) {
+const sh = this.ship;
 if (this.thr > 0.02) for (const nz of this.nozzles) for (let k = 0; k < 3; k++) {
 if (Math.random() > this.thr) continue;
 const j = [(Math.random() - 0.5) * nz[3] * 0.6, (Math.random() - 0.5) * nz[3] * 0.6, 0];
@@ -8882,7 +8652,7 @@ this.alert = null;
 for (const rb of [this.target, this.ref].filter(Boolean)) {
 const r = V.sub(rb.km, this.pos), d = V.len(r), clos = V.dot(V.sub(this.vel, rb.vel), r) / Math.max(d, 1e-9);
 const tti = clos > 0 ? (d - rb.R) / clos : Infinity;
-if (tti < 20 * Math.max(1, WARPS[this.warpIdx] / 1)) { this.alert = { kind: 'prox', txt: 'Proximidad: impacto con ' + rb.def.name + ' en ' + fmtDur(tti / 86400 / WARPS[this.warpIdx] * WARPS[this.warpIdx]) }; break; }
+if (tti < 20 * Math.max(1, WARPS[this.warpIdx])) { this.alert = { kind: 'prox', txt: 'Proximidad: impacto con ' + rb.def.name + ' en ' + fmtDur(tti / 86400) }; break; }
 if (d - rb.R < this.safeDist(rb) && clos > Math.sqrt(2 * sh.accel / 1000 * 0.5 * Math.max(d - rb.R, 0.001))) { this.alert = { kind: 'speed', txt: 'Velocidad excesiva para la aproximación a ' + rb.def.name }; break; }
 }
 if (this.alert && now > this.alarmT) { this.alarmT = now + (this.alert.kind === 'prox' ? 600 : 1100); FlightAudio.beep(this.alert.kind === 'prox' ? 880 : 620, 0.16, 'square', 0.05); if (this.alert.kind === 'speed') setTimeout(() => FlightAudio.beep(480, 0.16, 'square', 0.05), 180); }
@@ -8948,7 +8718,7 @@ const fov = this.state === 'hangar' ? 50 : fx.fov;
 World.proj = M4.perspInf(fov * DEG, GLX.W / GLX.H, Math.max(len * 0.004 * 1000 / AU_KM, 1e-12), World.proj);
 if (this.state === 'hangar' && innerWidth >= 760) World.proj[8] = (396 - 316) / innerWidth;
 if (this.state === 'hangar' && innerWidth < 760) World.proj[9] = -0.25;
-this.camMode = mode; this.camKm = pos; this.fovNow = fov;
+this.camMode = mode; this.camKm = pos;
 },
 frame(dt, t) { this.simulate(dt); this.renderFrame(t, dt); },
 renderFrame(t, dt) {
@@ -9060,6 +8830,14 @@ pts.push(p.slice());
 }
 this.trajPts = pts;
 },
+refreshKeyTips() {                                 // atajos según Ajustes › Controles
+const L = a => esc(Keys.label(Keys.code('flight', a))), K = (...a) => a.map(x => `<kbd>${L(x)}</kbd>`).join(' ');
+const box = $('#fp-keys'); if (box) box.innerHTML = `<dl><dt>${K('thrUp', 'thrDown')}</dt><dd>Subir y bajar el empuje por posiciones</dd><dt><kbd>1</kbd>–<kbd>4</kbd></dt><dd>Empuje 25, 50, 75 y 100 %</dd><dt>${K('thr0')} o <kbd>0</kbd></dt><dd>Motores en reposo</dd><dt>${K('left', 'right')}</dt><dd>Propulsores laterales</dd><dt>${K('up', 'down')}</dt><dd>Propulsores arriba y abajo</dd><dt>${K('pitchUp', 'pitchDown')} o arrastrar</dt><dd>Cabeceo</dd><dt>${K('yawL', 'yawR')} o arrastrar</dt><dd>Guiñada</dd><dt>${K('rollL', 'rollR')}</dt><dd>Alabeo</dd><dt>${K('brake')}</dt><dd>Frenar (corta el empuje)</dd></dl>
+<dl><dt>${K('stab')}</dt><dd>Estabilización automática</dd><dt>${K('mode')}</dt><dd>Modo asistido o simulación</dd><dt>${K('cam')} o <kbd>Mayús</kbd> + <kbd>1</kbd>–<kbd>6</kbd></dt><dd>Cámara</dd><dt>${K('warpDown', 'warpUp')}</dt><dd>Aceleración temporal</dd><dt>${K('target')} o clic</dt><dd>Elegir objetivo</dd><dt>${K('sound')}</dt><dd>Silenciar sonido</dd><dt><kbd>Esc</kbd></dt><dd>Pausa</dd></dl>
+<dl><dt>${K('aim')}</dt><dd>Orientar hacia el objetivo</dd><dt>${K('match')}</dt><dd>Igualar velocidad</dd><dt>${K('autobrake')}</dt><dd>Freno de aproximación</dd><dt>${K('hold')}</dt><dd>Mantener distancia</dd><dt>${K('orbit')}</dt><dd>Entrar o salir de órbita</dd><dt>${K('intercept')}</dt><dd>Interceptar (piloto automático)</dd></dl>`;
+const u = $('[data-thr="up"]'), d = $('[data-thr="down"]');
+if (u) u.dataset.tip = `Aumentar empuje (${L('thrUp')})`; if (d) d.dataset.tip = `Disminuir empuje (${L('thrDown')})`;
+},
 buildDOM() {
 const el = $('#flight');
 el.innerHTML = `
@@ -9084,9 +8862,9 @@ el.innerHTML = `
 <span class="thr-tick" style="bottom:0.00%"><em>−25</em></span><span class="thr-tick z" style="bottom:20.00%"><em>0</em></span><span class="thr-tick" style="bottom:28.00%"><em>10</em></span><span class="thr-tick" style="bottom:40.00%"><em>25</em></span><span class="thr-tick" style="bottom:60.00%"><em>50</em></span><span class="thr-tick" style="bottom:80.00%"><em>75</em></span><span class="thr-tick" style="bottom:92.00%"><em>90</em></span><span class="thr-tick" style="bottom:100.00%"><em>100</em></span><i id="thr-fill"></i><i id="thr-lever"></i>
 </div>
 <div class="thr-btns">
-<button data-thr="up" aria-label="Aumentar empuje" data-tip="Aumentar empuje (W)">+</button>
+<button data-thr="up" aria-label="Aumentar empuje" data-tip="Aumentar empuje">+</button>
 <button data-thr="1" data-tip="Empuje 100 % (4)">100</button><button data-thr="0.75" data-tip="Empuje 75 % (3)">75</button><button data-thr="0.5" data-tip="Empuje 50 % (2)">50</button><button data-thr="0.25" data-tip="Empuje 25 % (1)">25</button><button data-thr="0" data-tip="Motores en reposo (X)">0</button>
-<button data-thr="down" aria-label="Disminuir empuje" data-tip="Disminuir empuje (S)">−</button>
+<button data-thr="down" aria-label="Disminuir empuje" data-tip="Disminuir empuje">−</button>
 </div>
 </div>
 <div class="thr-foot"><span>Solicitado <b id="thr-cmd">0 %</b></span><span id="thr-acc">0 m/s²</span><span id="thr-name"></span></div>
@@ -9099,11 +8877,7 @@ el.innerHTML = `
 <div id="fl-targets" role="dialog" aria-label="Elegir objetivo"><div class="ft-head"><input id="ft-q" type="search" placeholder="Buscar objetivo…" aria-label="Buscar objetivo"><button class="txt-btn" id="ft-close">Cerrar</button></div><div id="ft-list"></div></div>
 <div id="fl-pause" role="dialog" aria-modal="true" aria-labelledby="fp-title"><div class="fp-card">
 <h2 id="fp-title">Vuelo en pausa</h2>
-<div class="fp-grid">
-<dl><dt><kbd>W</kbd> <kbd>S</kbd></dt><dd>Subir y bajar el empuje por posiciones</dd><dt><kbd>1</kbd>–<kbd>4</kbd></dt><dd>Empuje 25, 50, 75 y 100 %</dd><dt><kbd>X</kbd> o <kbd>0</kbd></dt><dd>Motores en reposo</dd><dt><kbd>A</kbd> <kbd>D</kbd></dt><dd>Propulsores laterales</dd><dt><kbd>R</kbd> <kbd>F</kbd></dt><dd>Propulsores arriba y abajo</dd><dt><kbd>↑</kbd> <kbd>↓</kbd> o arrastrar</dt><dd>Cabeceo</dd><dt><kbd>←</kbd> <kbd>→</kbd> o arrastrar</dt><dd>Guiñada</dd><dt><kbd>Q</kbd> <kbd>E</kbd></dt><dd>Alabeo</dd><dt><kbd>Espacio</kbd></dt><dd>Frenar (corta el empuje)</dd></dl>
-<dl><dt><kbd>Z</kbd></dt><dd>Estabilización automática</dd><dt><kbd>V</kbd></dt><dd>Modo asistido o simulación</dd><dt><kbd>C</kbd> o <kbd>Mayús</kbd> + <kbd>1</kbd>–<kbd>6</kbd></dt><dd>Cámara</dd><dt><kbd>,</kbd> <kbd>.</kbd></dt><dd>Aceleración temporal</dd><dt><kbd>T</kbd> o clic</dt><dd>Elegir objetivo</dd><dt><kbd>M</kbd></dt><dd>Silenciar sonido</dd><dt><kbd>Esc</kbd></dt><dd>Pausa</dd></dl>
-<dl><dt><kbd>G</kbd></dt><dd>Orientar hacia el objetivo</dd><dt><kbd>B</kbd></dt><dd>Igualar velocidad</dd><dt><kbd>N</kbd></dt><dd>Freno de aproximación</dd><dt><kbd>H</kbd></dt><dd>Mantener distancia</dd><dt><kbd>O</kbd></dt><dd>Entrar o salir de órbita</dd><dt><kbd>I</kbd></dt><dd>Interceptar (piloto automático)</dd></dl>
-</div>
+<div class="fp-grid" id="fp-keys"></div>
 <p class="note">En modo asistido no hay gravedad y la nave corrige su deriva. En modo simulación la nave conserva su inercia y la gravedad del Sol, los planetas y las lunas grandes curva tu trayectoria.</p>
 <div class="fp-actions"><button class="cta" id="fl-resume">Continuar vuelo</button><button class="txt-btn" id="fl-tohangar">Cambiar de nave</button><button class="txt-btn" id="fl-exit">Salir del modo de vuelo</button></div>
 </div></div>
@@ -9201,25 +8975,26 @@ document.querySelectorAll('#ft-list [data-t]').forEach(b => b.addEventListener('
 },
 refreshBar() {
 if (!this.dom) return;
-const btn = (id, label, on, tip, key) => `<button class="fb ${on ? 'on' : ''}" data-fb="${id}" aria-pressed="${!!on}" data-tip="${tip} (${key})">${label}</button>`;
+const K = a => esc(Keys.label(Keys.code('flight', a)));
+const btn = (id, label, on, tip, act) => `<button class="fb ${on ? 'on' : ''}" data-fb="${id}" aria-pressed="${!!on}" data-tip="${tip} (${K(act)})">${label}</button>`;
 $('#fl-bar').innerHTML =
 `<span class="fb-grp">` +
-`<button class="fb cam" data-fb="cam" data-tip="Cambiar cámara (C)">${CAMS[this.camIdx][1]}</button>` +
-btn('mode', this.assisted ? 'Asistido' : 'Simulación', !this.assisted, 'Modo de vuelo', 'V') +
-btn('stab', 'Estabilizar', this.stab, 'Estabilización automática', 'Z') +
+`<button class="fb cam" data-fb="cam" data-tip="Cambiar cámara (${K('cam')})">${CAMS[this.camIdx][1]}</button>` +
+btn('mode', this.assisted ? 'Asistido' : 'Simulación', !this.assisted, 'Modo de vuelo', 'mode') +
+btn('stab', 'Estabilizar', this.stab, 'Estabilización automática', 'stab') +
 `</span><span class="fb-grp">` +
-`<button class="fb tgt" data-fb="tgt" data-tip="Elegir objetivo (T)">${this.target ? esc(this.target.def.short || this.target.def.name) : 'Sin objetivo'}</button>` +
-btn('aim', 'Orientar', this.aim, 'Orientar hacia el objetivo', 'G') + btn('match', 'Igualar', this.match, 'Igualar velocidad con el objetivo', 'B') +
-btn('intercept', 'Interceptar', this.intercept, 'Piloto automático hasta el objetivo', 'I') + btn('hold', 'Mantener', !!this.hold, 'Mantener la distancia actual', 'H') +
-btn('orbit', 'Órbita', !!this.orbit, 'Entrar o salir de órbita', 'O') + btn('autoBrake', 'Freno aprox.', this.autoBrake, 'Freno automático de aproximación', 'N') +
+`<button class="fb tgt" data-fb="tgt" data-tip="Elegir objetivo (${K('target')})">${this.target ? esc(this.target.def.short || this.target.def.name) : 'Sin objetivo'}</button>` +
+btn('aim', 'Orientar', this.aim, 'Orientar hacia el objetivo', 'aim') + btn('match', 'Igualar', this.match, 'Igualar velocidad con el objetivo', 'match') +
+btn('intercept', 'Interceptar', this.intercept, 'Piloto automático hasta el objetivo', 'intercept') + btn('hold', 'Mantener', !!this.hold, 'Mantener la distancia actual', 'hold') +
+btn('orbit', 'Órbita', !!this.orbit, 'Entrar o salir de órbita', 'orbit') + btn('autoBrake', 'Freno aprox.', this.autoBrake, 'Freno automático de aproximación', 'autobrake') +
 `</span><span class="fb-grp">` +
 `<span class="fb-warpctl" role="group" aria-label="Aceleración temporal">` +
-`<button class="fb fb-step" data-fb="w-" data-tip="Menos aceleración temporal ( , )" aria-label="Menos aceleración temporal">−</button>` +
+`<button class="fb fb-step" data-fb="w-" data-tip="Menos aceleración temporal (${K('warpDown')})" aria-label="Menos aceleración temporal">−</button>` +
 `<span class="fb-warp" data-tip="Aceleración temporal" aria-live="polite">×${fmt(WARPS[this.warpIdx], 0)}</span>` +
-`<button class="fb fb-step" data-fb="w+" data-tip="Más aceleración temporal ( . )" aria-label="Más aceleración temporal">+</button>` +
+`<button class="fb fb-step" data-fb="w+" data-tip="Más aceleración temporal (${K('warpUp')})" aria-label="Más aceleración temporal">+</button>` +
 `</span>` +
-btn('snd', FlightAudio.on ? 'Sonido' : 'Silencio', FlightAudio.on, 'Sonido de cabina', 'M') +
-`<button class="fb ${Music.prefs.on && (Music.playing || Music.waiting) ? 'on' : ''}" data-fb="music" aria-pressed="${!!(Music.prefs.on && (Music.playing || Music.waiting))}" data-tip="Música de fondo: ${MUSIC_INFO.title}">Música</button>` +
+btn('snd', FlightAudio.on ? 'Sonido' : 'Silencio', FlightAudio.on, 'Sonido de cabina', 'sound') +
+`<button class="fb ${Music.prefs.musicOn && (Music.playing || Music.waiting) ? 'on' : ''}" data-fb="music" aria-pressed="${!!(Music.prefs.musicOn && (Music.playing || Music.waiting))}" data-tip="Música de fondo: ${MUSIC_INFO.title}">Música</button>` +
 `<button class="fb" data-fb="pause" data-tip="Pausa y ayuda (Esc)">Pausa</button>` +
 `<span class="fb-touch"><button class="fb hold" data-hold="Space">Frenar</button></span>` +
 `</span>`;
@@ -9272,8 +9047,7 @@ ar.classList.add('on');
 } else { mt.classList.remove('on'); ar.classList.remove('on'); }
 this.updateThrottleUI();
 this.frameN++;
-if (this.frameN % 4 && !this.forceHud) return this.hudWarn();
-this.forceHud = false;
+if (this.frameN % 4) return this.hudWarn();
 const dl = (rows) => rows.map(([k, v, s]) => `<div><dt>${k}</dt><dd>${v}${s ? `<small>${s}</small>` : ''}</dd></div>`).join('');
 const north = [0, 1, 0], F = this.F;
 const z0 = x => (Math.abs(x) < 0.5 ? 0 : x);
