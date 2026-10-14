@@ -1339,7 +1339,7 @@ return true;
 },
 };
 const ASSET_MANIFEST = {"music": {"webm": "assets/audio/metamorphosis.webm", "mp3": "assets/audio/metamorphosis.mp3"}, "bodyMeshes": {"fobos": {"url": "assets/models/moons/fobos.bin", "k": 1.26255}, "deimos": {"url": "assets/models/moons/deimos.bin", "k": 1.37497}, "haumea": {"url": "assets/models/dwarfs/haumea.bin", "k": 1.44255}}};
-const SOLARIS_BUILD = '2026.10.14-0904-web';
+const SOLARIS_BUILD = '2026.10.14-1020-web';
 console.info('SOLARIS · versión ' + SOLARIS_BUILD);
 const Assets = {
 cache: new Map(), busyN: new Map(),
@@ -1612,6 +1612,7 @@ flight: [
 ['match', 'b', 'Igualar velocidad'], ['aim', 'g', 'Orientar hacia el objetivo'], ['intercept', 'i', 'Piloto automático'], ['hold', 'h', 'Mantener distancia'],
 ['orbit', 'o', 'Entrar o salir de órbita'], ['autobrake', 'n', 'Freno de aproximación'], ['stab', 'z', 'Estabilización'], ['mode', 'v', 'Modo asistido o simulación'],
 ['warpUp', '.', 'Más aceleración temporal'], ['warpDown', ',', 'Menos aceleración temporal'], ['sound', 'm', 'Sonido de cabina'],
+['scan', 'k', 'Escanear el objetivo'], ['logbook', 'j', 'Bitácora, logros y retos'],
 ],
 };
 const KEY_RESERVED = new Set(['escape', 'home', 'tab', 'enter', '?', 'shift', 'control', 'alt', 'meta', 'altgraph', 'capslock', 'f1', 'f5', 'f11', 'f12', 'pageup', 'pagedown', 'contextmenu', 'dead', 'unidentified', ...'0123456789']);
@@ -3498,13 +3499,59 @@ writeDepth(v_depth * 0.9995);
 o_col = outc(v_col.rgb, a);
 }`;
 SH.VS_CRAFT = SH.HEAD + `
-in vec3 a_pos; in vec3 a_nrm; in vec4 a_col; uniform mat4 u_model;
-out vec4 v_col; out vec3 v_wn; out vec3 v_wp; out float v_depth;
-void main(){ vec4 wp = u_model * vec4(a_pos, 1.0); v_wp = wp.xyz; v_wn = normalize(mat3(u_model) * a_nrm); v_col = a_col; vec4 vp = u_view * wp; v_depth = -vp.z; gl_Position = u_proj * vp; }`;
-SH.FS_CRAFT = SH.HEAD + SH.FRAG + `
+in vec3 a_pos; in vec3 a_nrm; in vec4 a_col; in float a_mat; uniform mat4 u_model;
+out vec4 v_col; out vec3 v_wn; out vec3 v_wp; out float v_depth; out vec3 v_op; out vec3 v_on; out float v_mat;
+void main(){ vec4 wp = u_model * vec4(a_pos, 1.0); v_wp = wp.xyz; v_wn = normalize(mat3(u_model) * a_nrm); v_col = a_col; v_op = a_pos; v_on = a_nrm; v_mat = a_mat; vec4 vp = u_view * wp; v_depth = -vp.z; gl_Position = u_proj * vp; }`;
+// materiales procedurales de los satélites sin modelo importado: coordenadas del objeto en metros (u_mR = radio del modelo)
+SH.CRAFT_MATS = `
+in vec3 v_op; in vec3 v_on; in float v_mat; uniform float u_mR; uniform mat4 u_model;
+float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+vec2 faceUV(vec3 p, vec3 n){ vec3 a = abs(n); return a.x > a.y && a.x > a.z ? p.yz : (a.y > a.z ? p.xz : p.xy); }
+float lines(vec2 uv, vec2 cell, float w){
+vec2 g = abs(fract(uv / cell + 0.5) - 0.5) * cell, fw = max(fwidth(uv), vec2(1e-6));
+vec2 l = 1.0 - smoothstep(vec2(w) - fw * 0.5, vec2(w) + fw, g), fade = 1.0 - smoothstep(cell * 0.15, cell * 0.5, fw);
+return max(l.x * fade.x, l.y * fade.y);
+}
+void craftMat(inout vec3 N, inout vec3 base, inout float spk, inout float shin, inout float met, inout float env){
+int m = int(v_mat + 0.5);
+if (m == 0 || u_mR <= 0.0) return;
+vec3 P = v_op * u_mR, n0 = normalize(v_on); if (!gl_FrontFacing) n0 = -n0;
+vec2 uv = faceUV(P, n0); float h = 0.0, px = length(fwidth(P));
+float fine = 1.0 - smoothstep(0.015, 0.12, px), mid = 1.0 - smoothstep(0.08, 0.6, px);
+if (m == 1 || m == 2) {                      // aislamiento multicapa (MLI) dorado o plateado: arrugas, cinta en las costuras y brillo metálico
+float n1 = snoise(P * 7.0), n2 = snoise(P * 19.0 + 3.1), n3 = snoise(P * 2.3 + 7.7);
+h = (n1 * 0.6 + n2 * 0.4) * 0.008 * fine + n3 * 0.01 * mid;
+base *= 0.9 + 0.14 * n1 * fine * mid + n3 * 0.07;
+float seam = lines(uv, vec2(0.75), 0.012) * mid;
+base = mix(base, base * 0.55, seam); h -= seam * 0.002;
+shin = m == 1 ? 90.0 : 70.0; met = 0.85; spk *= 1.25;
+} else if (m == 3) {                         // pintura blanca y tela beta acolchada
+vec2 c = abs(fract(uv / 0.55 + 0.5) - 0.5) * 2.0; float pil = 1.0 - pow(max(c.x, c.y), 4.0), n = snoise(P * 1.7);
+h = pil * 0.012 * mid;
+base *= 0.93 + 0.07 * n - lines(uv, vec2(0.55), 0.008) * 0.18 * mid;
+shin = 18.0;
+} else if (m == 4 || m == 9) {               // superficies oscuras: radiadores y estructura
+float n = snoise(P * 5.0); base *= 0.9 + 0.12 * n * fine; h = n * 0.0015 * fine; shin = 24.0;
+} else if (m == 5 || m == 6) {               // paneles solares: celdas, separaciones plateadas y marcos de los módulos
+vec2 cell = vec2(0.156), id = floor(uv / cell); float v = h21(id), cl = lines(uv, cell, 0.004), md = lines(uv, vec2(1.25, 0.94), 0.018);
+vec3 cc = m == 5 ? vec3(0.035, 0.06, 0.17) : vec3(0.44, 0.27, 0.09);
+base = mix(cc * (0.82 + 0.36 * v), vec3(0.46, 0.48, 0.52), max(cl * 0.55, md * 0.9));
+shin = 170.0; spk = 1.1; env = 1.0;
+} else if (m == 7) {                         // membranas de kapton del parasol: ondulaciones amplias y costuras
+float n = snoise(P * 0.45), n2 = snoise(P * 3.0);
+h = n * 0.05 * mid + n2 * 0.004 * fine; base *= 0.92 + 0.1 * n2 - lines(uv, vec2(2.2), 0.01) * 0.25 * mid;
+shin = 110.0; met = 0.6; spk *= 1.2;
+} else if (m == 8) { shin = 260.0; met = 1.0; spk = 1.6; env = 1.0; }   // espejos recubiertos de oro
+vec3 dpx = dFdx(P), dpy = dFdy(P), r1 = cross(dpy, n0), r2 = cross(n0, dpx); float det = dot(dpx, r1);
+if (abs(det) > 1e-20) N = normalize(mat3(u_model) * normalize(abs(det) * n0 - sign(det) * (dFdx(h) * r1 + dFdy(h) * r2)));
+}`;
+SH.FS_CRAFT = SH.HEAD + '#define MATS\n' + SH.FRAG + SH.NOISE + `
 in vec4 v_col; in vec3 v_wn; in vec3 v_wp; in float v_depth;
 uniform vec4 u_occ[4]; uniform int u_occN; uniform float u_sunR; uniform float u_ambient; uniform float u_hover;
 uniform vec4 u_eng; uniform vec3 u_engCol; uniform float u_engR;
+#ifdef MATS
+${SH.CRAFT_MATS}
+#endif
 float eclipse(vec3 wp){
 float f = 1.0; vec3 ts = u_sun - wp; float ds = length(ts); vec3 s = ts / ds; float as = u_sunR / ds;
 for (int i = 0; i < 4; i++){
@@ -3518,20 +3565,26 @@ return f;
 }
 void main(){
 vec3 N = normalize(v_wn); if (!gl_FrontFacing) N = -N;
+vec3 base = v_col.rgb;
+float spk = v_col.a, shin = 48.0, met = 0.0, env = 0.0;
+#ifdef MATS
+craftMat(N, base, spk, shin, met, env);
+#endif
 vec3 L = normalize(u_sun - v_wp), Vv = normalize(-v_wp);
 float ndl = dot(N, L);
 float sh = eclipse(v_wp);
-vec3 base = v_col.rgb;
 vec3 H = normalize(L + Vv);
-float sp = pow(max(dot(N, H), 0.0), 48.0) * v_col.a * step(0.0, ndl);
-vec3 col = base * (max(ndl, 0.0) * 1.2 * sh + u_ambient + 0.03 + max(dot(N, Vv), 0.0) * 0.2) + vec3(1.0, 0.94, 0.82) * sp * sh * 1.2;
+float sp = pow(max(dot(N, H), 0.0), shin) * spk * step(0.0, ndl) * (0.5 + shin / 96.0);
+vec3 spc = mix(vec3(1.0, 0.94, 0.82), base * 1.5 + 0.08, met);
+vec3 col = base * (max(ndl, 0.0) * 1.2 * sh + u_ambient + 0.03 + max(dot(N, Vv), 0.0) * 0.2 * (1.0 - met * 0.6)) + spc * sp * sh * 1.2;
+col += env * pow(1.0 - max(dot(N, Vv), 0.0), 5.0) * vec3(0.03, 0.045, 0.07);
 col += vec3(0.55, 0.7, 1.0) * pow(max(1.0 - max(dot(N, Vv), 0.0), 0.0), 3.0) * u_hover * 0.3;
 if (u_eng.w > 0.0){ vec3 le = u_eng.xyz - v_wp; float de = length(le); col += base * u_engCol * u_eng.w * (0.35 + 0.65 * max(dot(N, le / de), 0.0)) / (1.0 + sq(de / u_engR)); }
 writeDepth(v_depth);
 o_col = outc(col, 1.0);
 }`;
 SH.VS_CRAFT_TEX = SH.VS_CRAFT.replace('in vec4 a_col;', 'in vec4 a_col; in vec2 a_uv;').replace('out vec4 v_col;', 'out vec4 v_col; out vec2 v_uv;').replace('v_col = a_col;', 'v_col = a_col; v_uv = a_uv;');
-SH.FS_CRAFT_TEX = SH.FS_CRAFT.replace('in vec4 v_col;', 'in vec4 v_col; in vec2 v_uv; uniform sampler2D u_tex; uniform float u_hasTex; uniform sampler2D u_etex; uniform float u_eStr;')
+SH.FS_CRAFT_TEX = SH.FS_CRAFT.replace('#define MATS\n', '').replace('in vec4 v_col;', 'in vec4 v_col; in vec2 v_uv; uniform sampler2D u_tex; uniform float u_hasTex; uniform sampler2D u_etex; uniform float u_eStr;')
 .replace('writeDepth(v_depth);\no_col = outc(col, 1.0);', 'if (u_eStr > 0.0) col += pow(texture(u_etex, v_uv).rgb, vec3(2.2)) * u_eStr;   // mapas de emisión (luces de Atlas, Odisea, Orville)\nwriteDepth(v_depth);\no_col = outc(col, 1.0);')
 .replace('vec3 base = v_col.rgb;', 'vec3 base = v_col.rgb * (u_hasTex > 0.5 ? pow(texture(u_tex, v_uv).rgb, vec3(2.2)) : vec3(1.0));');
 SH.POST = `#version 300 es
@@ -4092,7 +4145,7 @@ M4.fromBasis(rb.basis[0], rb.basis[1], rb.basis[2], rb.rS, rel, rb.model);
 const mesh = rb.lodMesh && rb.proj.rpx < Gfx.lod()[2] ? rb.lodMesh : rb.mesh;
 const pr = useP(mesh.groups ? P.craftTex : P.craft), ob = rb.occBuf; let n = 0; const occMaxC = Gfx.occluders();
 for (const o of rb.occ) { if (n >= occMaxC) break; const r2 = V.sub(o.posS, cam); ob[n * 4] = r2[0]; ob[n * 4 + 1] = r2[1]; ob[n * 4 + 2] = r2[2]; ob[n * 4 + 3] = o.rS; n++; }
-GLX.setAll(pr, { u_model: rb.model, u_occ: ob, u_occN: n, u_sunR: this.shadowSunR, u_ambient: S.ambient, u_hover: rb.hover, u_eng: [0, 0, 0, 0] });
+GLX.setAll(pr, { u_model: rb.model, u_occ: ob, u_occN: n, u_sunR: this.shadowSunR, u_ambient: S.ambient, u_hover: rb.hover, u_eng: [0, 0, 0, 0], u_mR: mesh.groups ? 0 : mesh.R });
 if (mesh.groups) this.drawGroups(mesh, pr); else GLX.draw(mesh, pr);
 }
 if (Flight.on) Flight.drawShip(useP);
@@ -4322,14 +4375,34 @@ function blurSmall(c, w, h) { const s = mk(w / 2, h / 2); s.getContext('2d').dra
 },
 };
 const CraftModels = (() => {
-const C = {
-gold: [0.86, 0.62, 0.22, 0.9], silver: [0.5, 0.52, 0.56, 0.5], white: [0.72, 0.73, 0.75, 0.25], dark: [0.12, 0.12, 0.13, 0.2],
-panel: [0.08, 0.12, 0.3, 0.7], panelGold: [0.6, 0.38, 0.14, 0.6], kapton: [0.62, 0.55, 0.68, 0.6], mirror: [0.95, 0.72, 0.25, 1.2], black: [0.03, 0.03, 0.035, 0.1],
+const C = {                                     // color, brillo especular y material procedural del shader (SH.CRAFT_MATS)
+gold: [0.86, 0.62, 0.22, 0.9, 1], silver: [0.5, 0.52, 0.56, 0.5, 2], white: [0.72, 0.73, 0.75, 0.25, 3], dark: [0.12, 0.12, 0.13, 0.2, 4],
+panel: [0.08, 0.12, 0.3, 0.7, 5], panelGold: [0.6, 0.38, 0.14, 0.6, 6], kapton: [0.62, 0.55, 0.68, 0.6, 7], mirror: [0.95, 0.72, 0.25, 1.2, 8], black: [0.03, 0.03, 0.035, 0.1, 9],
+alu: [0.62, 0.63, 0.66, 0.55, 2], radiator: [0.86, 0.87, 0.88, 0.2, 3], thruster: [0.2, 0.2, 0.22, 0.6, 4],
 };
-function Builder() { this.p = []; this.n = []; this.c = []; }
+function Builder() { this.p = []; this.n = []; this.c = []; this.m = []; }
 Builder.prototype.tri = function (a, b, c, col) {
 let n = V.norm(V.cross(V.sub(b, a), V.sub(c, a)));
-for (const v of [a, b, c]) { this.p.push(v[0], v[1], v[2]); this.n.push(n[0], n[1], n[2]); this.c.push(col[0], col[1], col[2], col[3]); }
+for (const v of [a, b, c]) { this.p.push(v[0], v[1], v[2]); this.n.push(n[0], n[1], n[2]); this.c.push(col[0], col[1], col[2], col[3]); this.m.push(col[4] || 0); }
+};
+Builder.prototype.strut = function (a, b, r, col, seg) { const d = V.sub(b, a); this.cyl(V.scale(V.add(a, b), 0.5), d, r, V.len(d), seg || 5, col); };   // barra entre dos puntos
+Builder.prototype.nozzle = function (ctr, dir, r, len, col) {    // tobera: garganta y campana abierta hacia dir (sentido del chorro)
+dir = V.norm(dir); this.cyl(V.sub(ctr, V.scale(dir, len * 0.45)), dir, r * 0.45, len * 0.25, 10, col || C.thruster);
+this.dish(V.add(ctr, V.scale(dir, len * 0.4)), dir, r, len * 0.75, 14, [0.07, 0.06, 0.06, 0.3, 4], col || C.thruster);
+};
+Builder.prototype.hga = function (ctr, dir, r, depth, mast) {   // antena de alta ganancia: reflector, subreflector sobre trípode y mástil
+dir = V.norm(dir); const u = V.norm(V.cross(dir, Math.abs(dir[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0])), w = V.cross(dir, u), f = V.add(ctr, V.scale(dir, r * 0.62));
+this.dish(ctr, dir, r, depth, 28, C.white, C.silver);
+this.dish(f, V.scale(dir, -1), r * 0.12, r * 0.03, 12, C.silver, C.dark);
+for (let k = 0; k < 3; k++) { const a = TAU * k / 3; this.strut(V.add(ctr, V.add(V.scale(u, Math.cos(a) * r * 0.82), V.add(V.scale(w, Math.sin(a) * r * 0.82), V.scale(dir, -depth * 0.25)))), f, r * 0.012, C.alu, 4); }
+this.cyl(V.add(ctr, V.scale(dir, -depth * 0.85)), dir, r * 0.09, depth * 0.6, 8, C.dark);
+if (mast) this.strut(V.add(ctr, V.scale(dir, -depth)), mast, Math.max(r * 0.03, 0.04), C.alu, 6);
+};
+Builder.prototype.tracker = function (ctr, dir) { dir = V.norm(dir); this.cyl(ctr, dir, 0.09, 0.22, 8, C.dark, C.black); this.cyl(V.add(ctr, V.scale(dir, 0.13)), dir, 0.12, 0.05, 8, C.black); };   // sensor estelar con parasol
+Builder.prototype.rcs = function (ctr, dirs) { this.box(ctr, [0.16, 0.16, 0.16], C.alu); dirs.forEach(d => this.nozzle(V.add(ctr, V.scale(V.norm(d), 0.12)), d, 0.035, 0.08)); };   // bloque de propulsores de control
+Builder.prototype.wing = function (root, dir, n, size, gap, col, ax) {   // ala de n paneles con su yugo
+const d = V.norm(dir); for (let k = 0; k < n; k++) this.box(V.add(root, V.scale(d, size[0] / 2 + k * (size[0] + gap))), size, col || C.panel, ax);
+this.strut(root, V.add(root, V.scale(d, n * (size[0] + gap))), 0.035, C.alu);
 };
 Builder.prototype.quad = function (a, b, c, d, col) { this.tri(a, b, c, col); this.tri(a, c, d, col); };
 Builder.prototype.box = function (ctr, size, col, ax) {
@@ -4353,9 +4426,9 @@ this.tri(a1, q0, q1, capCol || col); this.tri(a0, p1, p0, capCol || col);
 Builder.prototype.dish = function (ctr, axis, r, depth, seg, col, backCol) {
 axis = V.norm(axis);
 let u = V.norm(V.cross(axis, Math.abs(axis[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0])), w = V.cross(axis, u);
-const apex = V.add(ctr, V.scale(axis, -depth));
+const apex = V.add(ctr, V.scale(axis, -depth)), off = V.scale(axis, -Math.max(depth * 0.04, r * 0.006));   // la cara trasera, un poco desplazada: sin parpadeo entre ambos colores
 const rim = k => V.add(ctr, V.add(V.scale(u, Math.cos(TAU * k / seg) * r), V.scale(w, Math.sin(TAU * k / seg) * r)));
-for (let k = 0; k < seg; k++) { this.tri(apex, rim(k + 1), rim(k), col); this.tri(apex, rim(k), rim(k + 1), backCol || col); }
+for (let k = 0; k < seg; k++) { this.tri(apex, rim(k + 1), rim(k), col); if (backCol !== false) this.tri(V.add(apex, off), V.add(rim(k), off), V.add(rim(k + 1), off), backCol || col); }
 };
 Builder.prototype.poly = function (ctr, u, w, pts, col, backCol, thick) {
 const n = V.norm(V.cross(u, w)), t = (thick || 0.02) / 2;
@@ -4420,16 +4493,29 @@ B.box([s * 13, 0, 8.6], [2.5, 0.06, 27], C.panel);
 });
 B.box([0, 0, -6], [27, 0.06, 2.3], C.panel);
 },
-soho(B) {
-B.box([0, 0, 0], [4.3, 3.7, 2.7], C.gold);
-B.box([0, 2.0, 0], [3.0, 0.4, 2.0], C.white);
-[-1, 1].forEach(s => B.box([s * 4.45, 0, 0], [4.6, 0.06, 1.3], C.panel));
-B.dish([0, -1.85, 1.2], [0, -1, 0.5], 0.6, 0.18, 12, C.white);
+soho(B) {                                        // módulo de carga útil (hacia el Sol) sobre el módulo de servicio, alas de 2 paneles y antena hacia la Tierra
+B.box([0, -1.05, 0], [3.6, 1.6, 2.6], C.gold);
+B.box([0, 0.85, 0], [3.8, 2.2, 2.7], C.white);
+B.box([0, 2.0, 0], [3.0, 0.1, 2.2], C.dark);
+[[-1.1, -0.6, 0.22, 0.5], [-0.3, 0.55, 0.18, 0.45], [0.55, -0.45, 0.25, 0.6], [1.2, 0.5, 0.14, 0.4], [0.2, 0.15, 0.3, 0.7], [-1.25, 0.6, 0.12, 0.35]].forEach(([x, z, r, l]) => B.cyl([x, 2.05 + l / 2, z], [0, 1, 0], r, l, 12, C.alu, C.black));
+B.box([1.92, 0.9, 0], [0.06, 1.6, 2.2], C.radiator);
+[-1, 1].forEach(s => { B.strut([s * 1.8, -1.0, 0], [s * 2.35, -1.0, 0], 0.05, C.alu); B.wing([s * 2.35, -1.0, 0], [s, 0, 0], 2, [2.1, 0.05, 1.3], 0.1, C.panel); });
+B.hga([0.9, -2.35, 0.95], [0.15, -1, 0.35], 0.5, 0.14, [0.9, -1.85, 0.6]);
+[[-1.6, -1.2], [1.6, -1.2], [-1.6, 1.2], [1.6, 1.2]].forEach(([x, z]) => B.nozzle([x, -1.95, z], [0, -1, 0], 0.06, 0.16));
+B.tracker([-1.4, -0.3, 1.38], [0, 0.3, 1]);
 },
-euclid(B) {
-B.cyl([0, 0, 0], [0, 0, 1], 1.4, 3.6, 8, C.silver, C.dark);
-B.box([0, 1.75, 0], [3.4, 0.08, 4.7], C.panel);
-B.box([0, -0.9, -1.9], [2.6, 1.2, 0.9], C.gold);
+euclid(B) {                                      // telescopio Korsch de 1.2 m bajo el parasol con paneles solares, módulo de servicio hexagonal
+B.box([0, 1.75, 0.1], [3.4, 0.06, 4.6], C.panel);
+B.box([0, 1.68, 0.1], [3.5, 0.08, 4.7], C.radiator);
+[-1.2, 0, 1.2].forEach(x => B.strut([x, 1.65, -1.6], [x * 0.7, 1.1, -1.6], 0.04, C.alu));
+B.cyl([0, 0.15, 0.55], [0, 0, 1], 1.2, 2.9, 20, C.silver, C.black);
+B.cyl([0, 0.15, 2.02], [0, 0, 1], 1.05, 0.04, 20, C.black);
+B.cyl([0, 0.15, 1.2], [0, 0, 1], 1.24, 0.12, 20, C.dark);
+B.cyl([0, 0.0, -1.55], [0, 0, 1], 1.55, 1.1, 6, C.gold);
+B.box([0, -1.25, -1.55], [1.6, 0.12, 0.9], C.radiator);
+B.hga([0.6, -1.5, -2.0], [0.2, -1, -0.3], 0.35, 0.1, [0.4, -1.2, -1.8]);
+[[-1.2, -2.1], [1.2, -2.1]].forEach(([x, z]) => B.rcs([x, -0.6, z], [[0, 0, -1], [0, -1, 0]]));
+B.tracker([-0.9, 1.0, -2.15], [-0.3, 0.4, -1]);
 },
 voyager(B) {
 B.dish([0, 1.0, 0], [0, 1, 0], 1.85, 0.45, 24, C.white, C.silver);
@@ -4452,103 +4538,199 @@ B.cyl([0, 0.15, 0], [0, 1, 0], 0.5, 1.6, 6, C.gold);
 [-1, 1].forEach(s => B.box([s * 1.0, -0.2, 0], [0.9, 0.04, 0.45], C.panel));
 B.cyl([0, -1.1, 0], [0, 1, 0], 0.04, 1.4, 4, C.silver);
 },
-europaclipper(B) {                               // cuerpo cilíndrico, antena de 3 m y dos alas de 5 paneles (30.5 m)
-B.cyl([0, 0, 0], [0, 1, 0], 0.75, 3.0, 12, C.silver, C.dark);
-B.dish([0, 2.1, 0], [0, 1, 0], 1.5, 0.35, 24, C.white, C.silver);
-B.box([0, 1.6, 0], [0.5, 0.6, 0.5], C.dark);
-[-1, 1].forEach(s => { B.cyl([s * 1.3, 0, 0], [1, 0, 0], 0.05, 1.2, 4, C.silver); for (let k = 0; k < 5; k++) B.box([s * (2.3 + k * 2.6), 0, 0], [2.5, 0.06, 4.1], C.panel); });
-B.cyl([0, -0.3, -2.6], [0, 0, 1], 0.04, 4.0, 4, C.silver);
+europaclipper(B) {                               // módulo de propulsión, antena de 3 m, bóveda de radiación, alas de 5 paneles con las antenas del radar REASON y mástil del magnetómetro
+B.cyl([0, 0, 0], [0, 1, 0], 0.78, 3.0, 16, C.gold, C.dark);
+[-1.1, 0.2, 1.3].forEach(y => B.cyl([0, y, 0], [0, 1, 0], 0.8, 0.08, 16, C.silver));
+B.box([0, 0.35, 0.95], [1.3, 1.1, 0.7], C.alu);
+B.box([0, 0.35, 1.32], [1.1, 0.9, 0.04], C.radiator);
+B.box([-0.86, -0.4, 0], [0.05, 1.2, 0.9], C.radiator);
+B.hga([0, 2.05, 0], [0, 1, 0], 1.5, 0.35, null);
+B.cyl([0, 1.62, 0], [0, 1, 0], 0.45, 0.25, 12, C.dark);
+B.box([0.5, -1.25, -0.55], [0.5, 0.35, 0.4], C.dark); B.cyl([0.5, -1.5, -0.55], [0, 1, 0], 0.12, 0.2, 10, C.black, C.black);
+[-1, 1].forEach(s => {
+B.strut([s * 0.75, 0, 0], [s * 1.05, 0, 0], 0.07, C.alu);
+for (let k = 0; k < 5; k++) B.box([s * (2.3 + k * 2.6), 0, 0], [2.5, 0.06, 4.1], C.panel);
+B.strut([s * 1.05, 0, 0], [s * 13.9, 0, 0], 0.04, C.alu);
+[-1, 1].forEach(z => B.strut([s * 3.2, 0.06, z * 2.12], [s * 13.6, 0.06, z * 2.12], 0.035, C.white, 4));
+});
+B.strut([0, -0.3, -0.8], [0, -0.3, -4.55], 0.04, C.alu); [-2.4, -4.55].forEach(z => B.box([0, -0.3, z], [0.18, 0.18, 0.18], C.white));
+[[0.6, 0.6], [-0.6, 0.6], [0.6, -0.6], [-0.6, -0.6]].forEach(([x, z]) => B.nozzle([x, -1.62, z], [0, -1, 0], 0.07, 0.2));
+B.tracker([-0.6, 1.1, -0.6], [-0.4, 0.3, -1]);
 },
-juice(B) {                                       // dos alas en cruz de 5 paneles, antena de 2.5 m, mástil del magnetómetro y antena del radar
+juice(B) {                                       // cuerpo con aislamiento, antena de 2.5 m, dos alas en cruz de 5 paneles, mástil del magnetómetro y antena del radar RIME
 B.box([0, 0, 0], [2.6, 3.2, 2.4], C.gold);
-B.dish([0, 2.0, 0], [0, 1, 0], 1.25, 0.3, 24, C.white, C.silver);
-[-1, 1].forEach(s => { const c = s * 8.5; B.box([s * 2.2, 0, 0], [1.8, 0.06, 0.5], C.silver); [[0, 0], [2.6, 0], [-2.6, 0], [0, 2.6], [0, -2.6]].forEach(([dx, dz]) => B.box([c + dx, 0, dz], [2.5, 0.06, 2.5], C.panel)); });
-B.cyl([0, -0.2, 6.6], [0, 0, 1], 0.04, 10.6, 4, C.silver);
-B.cyl([0, 1.4, -1.2], [1, 0, 0], 0.03, 16, 4, C.white);
+B.box([1.32, -0.3, 0], [0.04, 2.0, 1.8], C.radiator);
+B.hga([0, 2.0, 0], [0, 1, 0], 1.25, 0.3, null);
+B.cyl([0, 1.68, 0], [0, 1, 0], 0.35, 0.3, 10, C.dark);
+B.hga([-0.9, 1.75, 0.9], [-0.3, 1, 0.3], 0.3, 0.08, [-0.9, 1.6, 0.9]);
+[-1, 1].forEach(s => {
+const c = s * 8.5;
+B.strut([s * 1.3, 0, 0], [s * 6.0, 0, 0], 0.06, C.alu);
+[[0, 0], [2.6, 0], [-2.6, 0], [0, 2.6], [0, -2.6]].forEach(([dx, dz]) => B.box([c + dx, 0, dz], [2.5, 0.06, 2.5], C.panel));
+});
+B.strut([0, -0.2, 1.2], [0, -0.2, 11.9], 0.05, C.alu); [6.0, 9.0, 11.9].forEach(z => B.box([0, -0.2, z], [0.16, 0.16, 0.16], C.white));
+B.strut([-8.0, 1.4, -1.2], [8.0, 1.4, -1.2], 0.03, C.white, 4); B.box([0, 1.4, -1.2], [0.4, 0.2, 0.3], C.dark);
+[[1, 1], [-1, 0.5], [0.3, -1]].forEach(([x, z]) => B.strut([x * 1.2, -1.5, z * 1.1], [x * 3.2, -1.6, z * 3.0], 0.025, C.silver, 4));
+B.nozzle([0, -1.85, 0], [0, -1, 0], 0.32, 0.7);
+B.box([0.8, -1.2, -1.22], [0.5, 0.4, 0.06], C.dark); B.cyl([0.8, -1.2, -1.3], [0, 0, 1], 0.1, 0.15, 10, C.black);
+B.tracker([-1.0, 1.0, -1.25], [0, 0.3, -1]);
 },
-bepicolombo(B) {                                 // pila de crucero: módulo de transferencia (alas de 14 m), orbitador MPO y Mio bajo su escudo
+bepicolombo(B) {                                 // pila de crucero: módulo de transferencia con motores iónicos y alas de 14 m, orbitador MPO con su radiador y Mio bajo el parasol MOSIF
 B.box([0, -1.6, 0], [3.0, 1.8, 3.0], C.silver);
-[-1, 1].forEach(s => B.box([s * 8.6, -1.6, 0], [14, 0.06, 2.4], C.panel));
+[-1, 1].forEach(s => { B.strut([s * 1.5, -1.6, 0], [s * 2.1, -1.6, 0], 0.06, C.alu); B.box([s * 8.6, -1.6, 0], [13, 0.06, 2.4], C.panel); B.strut([s * 2.1, -1.6, 0], [s * 15.1, -1.6, 0], 0.04, C.alu); });
+[[-0.7, -0.7], [0.7, -0.7], [-0.7, 0.7], [0.7, 0.7]].forEach(([x, z]) => { B.cyl([x, -2.6, z], [0, 1, 0], 0.32, 0.2, 14, C.dark, C.black); B.cyl([x, -2.72, z], [0, 1, 0], 0.26, 0.04, 14, C.black); });
 B.box([0, 0.3, 0], [2.4, 2.0, 2.2], C.white);
-B.box([0, 0.3, 4.3], [2.2, 0.06, 6.2], C.panel);
+B.box([-1.23, 0.3, 0], [0.06, 1.9, 2.1], C.radiator);
+[-0.55, 0, 0.55].forEach(y => B.box([-1.32, 0.3 + y, 0], [0.12, 0.05, 2.0], C.alu));
+B.strut([0, 0.3, 1.1], [0, 0.3, 1.25], 0.06, C.alu); B.box([0, 0.3, 4.3], [2.2, 0.06, 6.0], C.panel);
+B.hga([1.25, 0.9, -0.6], [1, 0.4, 0], 0.5, 0.12, [1.2, 0.8, -0.6]);
 B.cyl([0, 1.9, 0], [0, 1, 0], 1.0, 0.9, 8, C.silver, C.dark);
 B.cyl([0, 2.8, 0], [0, 1, 0], 1.5, 1.0, 16, C.kapton, C.white);
+B.dish([0, 3.3, 0], [0, 1, 0], 1.5, 0.35, 16, C.kapton, C.white);
 },
-lucy(B) {                                        // dos paneles circulares de 7.3 m, antena de 2 m y plataforma de instrumentos
+lucy(B) {                                        // dos paneles UltraFlex circulares de 7.3 m, antena de 2 m y plataforma de instrumentos orientable
 B.box([0, 0, 0], [2.0, 2.0, 2.0], C.gold);
-B.dish([0, 1.4, 0], [0, 1, 0], 1.0, 0.25, 20, C.white, C.silver);
-const disk = [...Array(24)].map((_, k) => [Math.cos(TAU * k / 24) * 3.65, Math.sin(TAU * k / 24) * 3.65]);
-[-1, 1].forEach(s => { B.cyl([s * 1.6, 0, 0], [1, 0, 0], 0.05, 1.2, 4, C.silver); B.poly([s * 5.8, 0, 0], [1, 0, 0], [0, 0, -1], disk, C.panel, C.panel, 0.06); });
-B.box([0, -0.7, 1.5], [1.0, 0.6, 1.0], C.dark);
+B.box([1.02, 0, 0.3], [0.04, 1.4, 1.0], C.radiator);
+B.hga([0, 1.4, 0], [0, 1, 0], 1.0, 0.25, null);
+const disk = [...Array(32)].map((_, k) => [Math.cos(TAU * k / 32) * 3.65, Math.sin(TAU * k / 32) * 3.65]);
+[-1, 1].forEach(s => {
+B.strut([s * 1.0, 0, 0], [s * 2.15, 0, 0], 0.05, C.alu);
+B.poly([s * 5.8, 0, 0], [1, 0, 0], [0, 0, -1], disk, C.panel, C.radiator, 0.06);
+for (let k = 0; k < 10; k++) { const a = TAU * k / 10; B.strut([s * 5.8, 0.05, 0], [s * 5.8 + Math.cos(a) * 3.65, 0.05, Math.sin(a) * 3.65], 0.025, C.alu, 4); }
+B.cyl([s * 5.8, 0.06, 0], [0, 1, 0], 0.25, 0.12, 12, C.alu);
+});
+B.box([0, -0.7, 1.5], [1.2, 0.5, 1.0], C.dark);
+B.cyl([-0.25, -0.7, 2.25], [0, 0, 1], 0.22, 0.6, 12, C.alu, C.black);
+B.box([0.35, -0.7, 2.1], [0.4, 0.35, 0.3], C.gold);
+[[0.8, -0.8], [-0.8, -0.8], [0.8, 0.8], [-0.8, 0.8]].forEach(([x, z]) => B.nozzle([x, -1.1, z], [0, -1, 0], 0.05, 0.14));
+B.tracker([-0.8, 0.6, -1.05], [0, 0.2, -1]);
 },
-mro(B) {                                         // antena de 3 m, dos paneles de 5.4 × 2.5 m, cámara HiRISE hacia el planeta y antena del radar SHARAD
+mro(B) {                                         // antena de 3 m sobre mástil, dos paneles de 5.35 × 2.53 m, cámara HiRISE hacia el planeta, radar SHARAD e instrumentos
 B.box([0, 0, 0], [2.0, 2.4, 2.0], C.gold);
-B.dish([0, 1.9, -1.0], [0, 1, -0.4], 1.5, 0.35, 24, C.white, C.silver);
-[-1, 1].forEach(s => { B.cyl([s * 1.5, 0, 0], [1, 0, 0], 0.05, 1.0, 4, C.silver); B.box([s * 4.7, 0, 0], [5.4, 0.06, 2.5], C.panel); });
-B.cyl([0.5, -1.7, 0.4], [0, 1, 0], 0.5, 1.2, 12, C.silver, C.dark);
-B.cyl([0, -1.3, 0], [0, 0, 1], 0.03, 10, 4, C.white);
+B.box([0, -1.3, 0], [2.3, 0.2, 2.3], C.dark);
+B.box([-1.02, 0.2, 0], [0.04, 1.6, 1.6], C.radiator);
+B.hga([0, 1.95, -1.0], [0, 1, -0.4], 1.5, 0.35, [0, 1.15, -0.4]);
+[-1, 1].forEach(s => { B.strut([s * 1.0, 0.2, 0], [s * 2.0, 0.2, 0], 0.06, C.alu); B.cyl([s * 2.0, 0.2, 0], [1, 0, 0], 0.12, 0.2, 10, C.dark); B.box([s * 4.7, 0.2, 0], [5.35, 0.06, 2.53], C.panel); B.strut([s * 2.1, 0.2, 0], [s * 7.35, 0.2, 0], 0.035, C.alu); });
+B.cyl([0.45, -1.95, 0.35], [0, 1, 0], 0.55, 1.3, 16, C.silver, C.black);
+B.cyl([0.45, -2.6, 0.35], [0, 1, 0], 0.5, 0.04, 16, C.black);
+B.cyl([-0.55, -1.6, -0.55], [0, 1, 0], 0.15, 0.6, 10, C.alu, C.black);
+B.box([-0.6, -1.55, 0.55], [0.4, 0.35, 0.35], C.dark); B.cyl([-0.6, -1.8, 0.55], [1, 0, 0], 0.13, 0.3, 10, C.alu);
+B.box([0.8, 1.35, 0.7], [0.35, 0.3, 0.3], C.white); B.cyl([0.8, 1.55, 0.7], [1, 0, 0], 0.14, 0.35, 10, C.dark);
+B.strut([0, -1.3, -5.0], [0, -1.3, 5.0], 0.025, C.white, 4);
+[[0.85, 0.85], [-0.85, 0.85], [0.85, -0.85], [-0.85, -0.85]].forEach(([x, z]) => B.nozzle([x, -1.5, z], [0, -1, 0], 0.07, 0.2));
+B.tracker([0.95, 0.9, -1.05], [0.4, 0.4, -1]);
 },
-maven(B) {                                       // antena de 2 m, alas solares en forma de gaviota y brazo articulado de instrumentos
+maven(B) {                                       // antena de 2 m, alas solares en forma de gaviota con magnetómetros y brazo articulado de instrumentos
 B.box([0, 0, 0], [2.3, 2.3, 2.3], C.gold);
-B.dish([0, 1.5, 0], [0, 1, 0], 1.0, 0.3, 24, C.white, C.silver);
+B.box([0, 0, 1.17], [1.6, 1.6, 0.04], C.radiator);
+B.hga([0, 1.5, 0], [0, 1, 0], 1.0, 0.3, null);
+B.cyl([0, 1.25, 0], [0, 1, 0], 0.3, 0.2, 10, C.dark);
 const c = Math.cos(0.35), sn = Math.sin(0.35);
 [-1, 1].forEach(s => {
+B.strut([s * 1.15, 0, 0], [s * 1.3, 0, 0], 0.06, C.alu);
 B.box([s * 2.6, 0, 0], [3.0, 0.06, 2.0], C.panel);
 B.box([s * 5.37, 0.46, 0], [2.7, 0.06, 2.0], C.panel, [[c, s * sn, 0], [-s * sn, c, 0], [0, 0, 1]]);
-B.cyl([s * 6.75, 0.95, 0], [1, 0, 0], 0.08, 0.5, 6, C.silver);
+B.strut([s * 1.1, 0, 0], [s * 6.6, 0.92, 0], 0.035, C.alu);
+B.cyl([s * 6.75, 0.95, 0], [1, 0, 0], 0.09, 0.4, 8, C.white);
 });
-B.cyl([0, -1.6, 1.6], [0, -1, 1], 0.05, 2.6, 4, C.silver);
-B.box([0, -2.5, 2.5], [0.6, 0.5, 0.5], C.dark);
+B.strut([0, -1.15, 1.15], [0, -2.3, 2.3], 0.05, C.silver); B.cyl([0, -1.6, 1.6], [0, -1, 1], 0.1, 0.18, 8, C.dark);
+B.box([0, -2.5, 2.5], [0.7, 0.5, 0.55], C.dark); B.cyl([0.18, -2.5, 2.82], [0, 0, 1], 0.1, 0.2, 10, C.black); B.box([-0.2, -2.5, 2.8], [0.25, 0.25, 0.1], C.white);
+B.strut([-1.15, -0.9, -1.15], [-2.4, -1.4, -2.4], 0.02, C.silver, 4); B.box([-2.45, -1.42, -2.45], [0.15, 0.15, 0.15], C.white);
+[[0.8, 0.8], [-0.8, 0.8], [0.8, -0.8], [-0.8, -0.8]].forEach(([x, z]) => B.nozzle([x, -1.38, z], [0, -1, 0], 0.08, 0.22));
 },
-marsexpress(B) {                                 // cuerpo de 1.5 × 1.8 × 1.4 m, alas de 12 m, antena de 1.6 m y antena del radar MARSIS (acortada)
+marsexpress(B) {                                 // cuerpo de 1.5 × 1.8 × 1.4 m, alas de 12 m, antena de 1.6 m, cámara HRSC hacia el planeta y antena del radar MARSIS (acortada)
 B.box([0, 0, 0], [1.5, 1.4, 1.8], C.gold);
-B.dish([0, 0.85, 0.3], [0, 1, 0.2], 0.8, 0.2, 20, C.white, C.silver);
-[-1, 1].forEach(s => { B.cyl([s * 1.0, 0, 0], [1, 0, 0], 0.04, 0.6, 4, C.silver); B.box([s * 3.65, 0, 0], [4.7, 0.05, 1.6], C.panel); });
-B.cyl([0, -0.75, 0], [0, 0, 1], 0.02, 12, 4, C.white);
+B.box([0.77, 0.1, 0], [0.04, 1.0, 1.4], C.radiator);
+B.hga([0, 0.85, 0.3], [0, 1, 0.2], 0.8, 0.2, null);
+[-1, 1].forEach(s => { B.strut([s * 0.75, 0, 0], [s * 1.3, 0, 0], 0.04, C.alu); B.cyl([s * 1.3, 0, 0], [1, 0, 0], 0.08, 0.12, 8, C.dark); B.box([s * 3.65, 0, 0], [4.6, 0.05, 1.6], C.panel); B.strut([s * 1.35, 0, 0], [s * 5.95, 0, 0], 0.03, C.alu); });
+B.box([0.3, -0.85, 0.2], [0.55, 0.3, 0.5], C.dark); B.cyl([0.3, -1.05, 0.2], [0, 1, 0], 0.12, 0.15, 10, C.black);
+B.box([-0.35, -0.8, -0.4], [0.35, 0.2, 0.35], C.white);
+B.strut([0, -0.75, -6.0], [0, -0.75, 6.0], 0.02, C.white, 4); B.box([0, -0.75, 0.9], [0.25, 0.12, 0.25], C.dark);
+B.nozzle([0, 0, -1.05], [0, 0, -1], 0.13, 0.3);
+B.tracker([-0.55, 0.55, 0.92], [0, 0.4, 1]);
 },
-tgo(B) {                                         // cuerpo de 3.2 × 2 × 2 m, alas de 17.5 m y antena de 2.2 m
+tgo(B) {                                         // cuerpo de 3.2 × 2 × 2 m, alas de 17.5 m, antena de 2.2 m e instrumentos CaSSIS, NOMAD y ACS hacia el planeta
 B.box([0, 0, 0], [3.2, 2.0, 2.0], C.gold);
-B.dish([0, 1.35, -0.2], [0, 1, -0.2], 1.1, 0.3, 20, C.white, C.silver);
-[-1, 1].forEach(s => { B.cyl([s * 2.0, 0, 0], [1, 0, 0], 0.05, 0.8, 4, C.silver); [0, 1].forEach(k => B.box([s * (3.9 + k * 3.3), 0, 0], [3.2, 0.06, 2.3], C.panel)); });
-B.cyl([0.6, -1.2, 0.4], [0, 1, 0], 0.3, 0.5, 10, C.dark);
+B.box([0, 0, 1.02], [2.4, 1.4, 0.04], C.radiator);
+B.hga([0, 1.35, -0.2], [0, 1, -0.2], 1.1, 0.3, null);
+[-1, 1].forEach(s => { B.strut([s * 1.6, 0, 0], [s * 2.2, 0, 0], 0.05, C.alu); B.cyl([s * 2.2, 0, 0], [1, 0, 0], 0.12, 0.15, 10, C.dark); [0, 1].forEach(k => B.box([s * (3.9 + k * 3.3), 0, 0], [3.2, 0.06, 2.3], C.panel)); B.strut([s * 2.3, 0, 0], [s * 8.8, 0, 0], 0.035, C.alu); });
+B.cyl([0.6, -1.2, 0.4], [0, 1, 0], 0.3, 0.5, 12, C.alu, C.black);
+B.box([-0.5, -1.15, 0.3], [0.7, 0.35, 0.6], C.dark); B.box([-0.5, -1.15, -0.45], [0.6, 0.3, 0.5], C.white);
+B.cyl([0.9, -1.15, -0.5], [0, 1, 0], 0.15, 0.3, 10, C.dark, C.black);
+B.nozzle([0, 0, -1.25], [0, 0, -1], 0.22, 0.5);
+[[1.4, 0.8], [-1.4, 0.8], [1.4, -0.8], [-1.4, -0.8]].forEach(([x, y]) => B.nozzle([x, y, -1.04], [0, 0, -1], 0.04, 0.1));
+B.tracker([1.2, 0.8, 1.05], [0.3, 0.3, 1]);
 },
-hope(B) {                                        // cuerpo hexagonal de 2.37 × 2.9 m, tres paneles solares y antena de 1.85 m
+hope(B) {                                        // cuerpo hexagonal de 2.37 × 2.9 m, tres paneles solares, antena de 1.85 m y cubierta de instrumentos hacia el planeta
 B.cyl([0, 0, 0], [0, 1, 0], 1.2, 2.9, 6, C.gold, C.silver);
-B.dish([0, 1.75, 0], [0, 1, 0], 0.93, 0.25, 24, C.white, C.silver);
-[0, 1, 2].forEach(k => { const a = k * TAU / 3, d = [Math.cos(a), 0, Math.sin(a)]; B.box(V.scale(d, 2.6), [2.8, 0.06, 1.7], C.panel, [d, [0, 1, 0], [-d[2], 0, d[0]]]); });
+B.cyl([0, 1.2, 0], [0, 1, 0], 1.22, 0.1, 6, C.silver);
+B.hga([0, 1.75, 0], [0, 1, 0], 0.93, 0.25, null);
+B.cyl([0, 1.52, 0], [0, 1, 0], 0.3, 0.2, 10, C.dark);
+[0, 1, 2].forEach(k => { const a = k * TAU / 3, d = [Math.cos(a), 0, Math.sin(a)]; B.strut(V.scale(d, 1.05), V.scale(d, 1.25), 0.05, C.alu); B.box(V.scale(d, 2.6), [2.8, 0.06, 1.7], C.panel, [d, [0, 1, 0], [-d[2], 0, d[0]]]); B.strut(V.scale(d, 1.2), V.scale(d, 4.0), 0.03, C.alu); });
 B.cyl([0, -1.6, 0], [0, 1, 0], 0.35, 0.4, 10, C.dark);
+B.box([0.55, -1.55, 0.3], [0.35, 0.25, 0.35], C.dark); B.cyl([0.55, -1.72, 0.3], [0, 1, 0], 0.1, 0.12, 10, C.black);
+B.box([-0.5, -1.55, 0.35], [0.4, 0.25, 0.3], C.white); B.box([0, -1.55, -0.6], [0.45, 0.25, 0.3], C.alu);
+for (let k = 0; k < 6; k++) { const a = TAU * k / 6 + 0.5; B.nozzle([Math.cos(a) * 0.85, -1.55, Math.sin(a) * 0.85], [0, -1, 0], 0.09, 0.24); }
+B.tracker([0.9, 0.9, -0.5], [0.6, 0.4, -0.6]);
 },
-tianwen1(B) {                                    // orbitador con dos alas solares y antena de alta ganancia
+tianwen1(B) {                                    // orbitador octogonal con dos alas de dos paneles, antena de 2.5 m y motor principal de 3,000 N
 B.cyl([0, 0, 0], [0, 1, 0], 1.4, 2.6, 8, C.gold, C.silver);
-B.dish([0, 1.75, 0.6], [0, 1, 0.3], 1.25, 0.3, 24, C.white, C.silver);
-[-1, 1].forEach(s => { B.cyl([s * 1.8, 0.3, 0], [1, 0, 0], 0.05, 0.8, 4, C.silver); [0, 1].forEach(k => B.box([s * (3.45 + k * 2.6), 0.3, 0], [2.5, 0.06, 2.0], C.panel)); });
+B.cyl([0, -1.25, 0], [0, 1, 0], 1.42, 0.12, 8, C.silver);
+B.box([1.3, 0, 0], [0.04, 1.6, 1.0], C.radiator);
+B.hga([0, 1.75, 0.6], [0, 1, 0.3], 1.25, 0.3, [0, 1.3, 0.2]);
+[-1, 1].forEach(s => { B.strut([s * 1.35, 0.3, 0], [s * 2.15, 0.3, 0], 0.05, C.alu); B.cyl([s * 2.15, 0.3, 0], [1, 0, 0], 0.11, 0.15, 10, C.dark); [0, 1].forEach(k => B.box([s * (3.45 + k * 2.6), 0.3, 0], [2.5, 0.06, 2.0], C.panel)); B.strut([s * 2.2, 0.3, 0], [s * 7.3, 0.3, 0], 0.035, C.alu); });
+B.nozzle([0, -1.75, 0], [0, -1, 0], 0.35, 0.8);
+[[0.95, 0.95], [-0.95, 0.95], [0.95, -0.95], [-0.95, -0.95]].forEach(([x, z]) => B.nozzle([x, -1.4, z], [0, -1, 0], 0.07, 0.18));
+B.box([0.4, -1.4, -0.9], [0.4, 0.25, 0.3], C.dark); B.cyl([0.4, -1.58, -0.9], [0, 1, 0], 0.09, 0.1, 8, C.black);
+B.tracker([-1.0, 0.8, -0.9], [-0.4, 0.4, -0.8]);
 },
-lro(B) {                                         // cuerpo de unos 2 × 2 × 3 m, un ala solar de tres paneles y antena en un mástil
+lro(B) {                                         // cuerpo de unos 2 × 2 × 3 m, ala solar de tres paneles, antena en un mástil y cámaras LROC hacia la Luna
 B.box([0, 0, 0], [1.9, 2.7, 1.9], C.gold);
 B.box([0, -1.15, 0], [1.6, 0.4, 1.6], C.silver);
-B.cyl([1.4, 0.6, 0], [1, 0, 0], 0.05, 1.0, 4, C.silver);
+B.box([0, 0.3, -0.97], [1.5, 1.6, 0.04], C.radiator);
+B.strut([0.95, 0.6, 0], [2.0, 0.6, 0], 0.05, C.alu); B.cyl([1.9, 0.6, 0], [1, 0, 0], 0.11, 0.15, 10, C.dark);
 [0, 1, 2].forEach(k => B.box([3.0, 0.6, (k - 1) * 1.45], [2.2, 0.06, 1.4], C.panel));
-B.cyl([-1.5, 1.15, 0], [-1, 0.5, 0], 0.04, 1.9, 4, C.silver);
-B.dish([-2.4, 1.65, 0], [-0.4, 1, 0], 0.4, 0.12, 16, C.white, C.silver);
+B.strut([1.95, 0.6, 0], [4.1, 0.6, 0], 0.035, C.alu); B.strut([3.0, 0.6, -2.15], [3.0, 0.6, 2.15], 0.03, C.alu);
+B.hga([-2.4, 1.65, 0], [-0.4, 1, 0], 0.4, 0.12, [-0.95, 1.0, 0]);
+[[-0.35, 0.3], [0.35, 0.3]].forEach(([x, z]) => { B.cyl([x, -1.75, z], [0, 1, 0], 0.27, 0.9, 14, C.white, C.black); B.cyl([x, -2.22, z], [0, 1, 0], 0.24, 0.03, 14, C.black); });
+B.box([0.1, -1.55, -0.5], [0.5, 0.3, 0.4], C.dark); B.cyl([0.1, -1.75, -0.5], [0, 1, 0], 0.1, 0.12, 8, C.black);
+B.box([-0.55, -1.5, -0.45], [0.3, 0.25, 0.3], C.alu);
+[[0.7, 0.7], [-0.7, 0.7], [0.7, -0.7], [-0.7, -0.7]].forEach(([x, z]) => B.nozzle([x, 1.42, z], [0, 1, 0], 0.06, 0.16));
+B.tracker([-0.75, -0.9, 0.98], [0, -0.3, 1]);
 },
-chandrayaan2(B) {                                // orbitador en forma de caja, un ala solar y antena de alta ganancia
+chandrayaan2(B) {                                // orbitador en forma de caja, un ala solar, antena de alta ganancia, cámaras TMC-2 y OHRC hacia la Luna y motor principal
 B.box([0, 0, 0], [2.2, 2.4, 2.4], C.gold);
-B.cyl([1.5, 0, 0], [1, 0, 0], 0.05, 0.8, 4, C.silver);
-B.box([3.6, 0, 0], [3.4, 0.06, 2.4], C.panel);
-B.dish([-1.4, 0.6, 0], [-1, 0.3, 0], 0.6, 0.18, 16, C.white, C.silver);
+B.box([0, 0.2, 1.22], [1.6, 1.6, 0.04], C.radiator);
+B.strut([1.1, 0, 0], [1.9, 0, 0], 0.05, C.alu); B.cyl([1.9, 0, 0], [1, 0, 0], 0.11, 0.15, 10, C.dark);
+B.box([3.65, 0, 0], [3.4, 0.06, 2.4], C.panel); B.strut([1.95, 0, 0], [5.35, 0, 0], 0.035, C.alu);
+B.hga([-1.4, 0.6, 0], [-1, 0.3, 0], 0.6, 0.18, [-1.15, 0.5, 0]);
 B.cyl([0, -1.35, 0], [0, 1, 0], 0.35, 0.3, 10, C.dark);
+B.cyl([0.55, -1.45, 0.5], [0, 1, 0], 0.22, 0.5, 12, C.alu, C.black); B.box([-0.5, -1.35, 0.5], [0.5, 0.3, 0.35], C.dark);
+B.nozzle([0, 1.5, 0], [0, 1, 0], 0.25, 0.6);
+B.tracker([-0.9, 1.0, -1.25], [-0.3, 0.3, -1]);
 },
-danuri(B) {                                      // cuerpo de 2.1 × 1.8 × 2.3 m, dos paneles solares, antena y la cámara ShadowCam
+danuri(B) {                                      // cuerpo de 2.1 × 1.8 × 2.3 m, dos paneles solares, antena, cámara ShadowCam de la NASA y cámara LUTI
 B.box([0, 0, 0], [1.8, 2.3, 2.1], C.gold);
-[-1, 1].forEach(s => { B.cyl([s * 1.2, 0.3, 0], [1, 0, 0], 0.04, 0.6, 4, C.silver); B.box([s * 2.7, 0.3, 0], [2.4, 0.06, 1.6], C.panel); });
-B.dish([0, 1.45, -0.6], [0, 1, -0.4], 0.5, 0.15, 16, C.white, C.silver);
-B.cyl([0, -1.35, 0.4], [0, 1, 0], 0.35, 0.4, 10, C.silver, C.dark);
+B.box([0, 0.2, -1.07], [1.3, 1.5, 0.04], C.radiator);
+[-1, 1].forEach(s => { B.strut([s * 0.9, 0.3, 0], [s * 1.4, 0.3, 0], 0.04, C.alu); B.box([s * 2.7, 0.3, 0], [2.4, 0.06, 1.6], C.panel); B.strut([s * 1.45, 0.3, 0], [s * 3.9, 0.3, 0], 0.03, C.alu); });
+B.hga([0, 1.45, -0.6], [0, 1, -0.4], 0.5, 0.15, [0, 1.15, -0.4]);
+B.cyl([0, -1.35, 0.4], [0, 1, 0], 0.35, 0.4, 12, C.silver, C.black);
+B.box([-0.45, -1.3, -0.4], [0.4, 0.3, 0.35], C.dark); B.cyl([-0.45, -1.5, -0.4], [0, 1, 0], 0.1, 0.1, 8, C.black);
+[[0.65, 0.75], [-0.65, 0.75], [0.65, -0.75], [-0.65, -0.75]].forEach(([x, z]) => B.nozzle([x, 1.2, z], [0, 1, 0], 0.05, 0.14));
+B.tracker([0.75, 0.9, 1.07], [0.3, 0.3, 1]);
 },
-queqiao2(B) {                                    // satélite repetidor: antena parabólica de 4.2 m y dos alas solares
+queqiao2(B) {                                    // satélite repetidor: antena desplegable de malla de 4.2 m con costillas, dos alas solares y cuerpo con aislamiento
 B.box([0, 0, 0], [1.6, 1.6, 1.6], C.gold);
+B.box([0.82, 0, 0], [0.04, 1.2, 1.2], C.radiator);
 B.cyl([0, 1.0, 0], [0, 1, 0], 0.08, 0.6, 6, C.silver);
-B.dish([0, 1.9, 0], [0, 1, 0], 2.1, 0.6, 28, C.white, C.silver);
-[-1, 1].forEach(s => { B.cyl([s * 1.1, 0, 0], [1, 0, 0], 0.04, 0.6, 4, C.silver); [0, 1].forEach(k => B.box([s * (2.4 + k * 2.1), 0, 0], [2.0, 0.06, 1.4], C.panel)); });
+B.dish([0, 1.9, 0], [0, 1, 0], 2.1, 0.6, 32, [0.78, 0.66, 0.38, 0.5, 1], C.dark);
+for (let k = 0; k < 16; k++) { const a = TAU * k / 16; B.strut([0, 1.32, 0], [Math.cos(a) * 2.1, 1.92, Math.sin(a) * 2.1], 0.02, C.silver, 4); }
+B.cyl([0, 1.4, 0], [0, 1, 0], 0.18, 0.2, 10, C.dark);
+[0, 1, 2].forEach(k => { const a = TAU * k / 3; B.strut([Math.cos(a) * 1.9, 1.9, Math.sin(a) * 1.9], [0, 3.0, 0], 0.02, C.alu, 4); });
+B.cyl([0, 3.05, 0], [0, 1, 0], 0.15, 0.15, 10, C.dark);
+[-1, 1].forEach(s => { B.strut([s * 0.8, 0, 0], [s * 1.35, 0, 0], 0.04, C.alu); [0, 1].forEach(k => B.box([s * (2.4 + k * 2.1), 0, 0], [2.0, 0.06, 1.4], C.panel)); B.strut([s * 1.4, 0, 0], [s * 5.45, 0, 0], 0.03, C.alu); });
+B.nozzle([0, -1.15, 0], [0, -1, 0], 0.18, 0.45);
+B.tracker([-0.6, 0.6, 0.85], [0, 0.3, 1]);
 },
 };
 const cache = {};
@@ -4559,7 +4741,7 @@ if (!MODELS[name]) return null;          // sin versión procedural (naves con m
 const B = new Builder(); MODELS[name](B, C);
 let R = 0; for (let i = 0; i < B.p.length; i += 3) R = Math.max(R, Math.hypot(B.p[i], B.p[i + 1], B.p[i + 2]));
 const pos = new Float32Array(B.p.map(v => v / R));
-const m = GLX.mesh({ a_pos: { data: pos, size: 3 }, a_nrm: { data: new Float32Array(B.n), size: 3 }, a_col: { data: new Float32Array(B.c), size: 4 } });
+const m = GLX.mesh({ a_pos: { data: pos, size: 3 }, a_nrm: { data: new Float32Array(B.n), size: 3 }, a_col: { data: new Float32Array(B.c), size: 4 }, a_mat: { data: new Float32Array(B.m), size: 1 } });
 m.R = R;
 return (cache[name] = m);
 },
@@ -4910,6 +5092,153 @@ const tex = GLOBE_TEX.has(d.id) ? `<b style="background-image:url(assets/images/
 return `<i class="globe${d.id === 'saturno' ? ' ringed' : ''}${d.type === 'star' ? ' star' : ''}${cls ? ' ' + cls : ''}" style="--s:${size}px;--c:${d.color || '#94a0b6'};${style || ''}" aria-hidden="true"><span>${tex}</span></i>`;
 },
 };
+// Fotografías reales (Wikimedia Commons): se enlazan, no se copian al sitio. [archivo, autoría, licencia, misión y fecha, nota]
+const PHOTOS = {
+sol: ["The_Sun_by_the_Atmospheric_Imaging_Assembly_of_NASA's_Solar_Dynamics_Observatory_-_20100819.jpg", 'NASA/SDO (instrumento AIA)', 'Dominio público', 'Solar Dynamics Observatory, 19 de agosto de 2010', 'Luz ultravioleta extrema (30.4 nm) en falso color: así se ven las capas altas de la atmósfera solar.'],
+mercurio: ['Mercury_in_true_color.jpg', 'NASA/JHUAPL/Carnegie Institution of Washington', 'Dominio público', 'Sonda MESSENGER, 6 de octubre de 2008'],
+venus: ['Venus-real_color.jpg', 'NASA (Mariner 10); procesamiento de imagen: R. Nunes', 'Uso libre citando a R. Nunes', 'Sonda Mariner 10, 5 de febrero de 1974', 'Las nubes de ácido sulfúrico ocultan por completo la superficie en luz visible.'],
+tierra: ['The_Earth_seen_from_Apollo_17.jpg', 'NASA (tripulación del Apolo 17)', 'Dominio público', 'Apolo 17, 7 de diciembre de 1972', '«La canica azul», tomada a unos 29,000 km de distancia camino de la Luna.'],
+luna: ['FullMoon2010.jpg', 'Gregory H. Revera', 'CC BY-SA 3.0', 'Fotografía con telescopio desde Alabama, 22 de octubre de 2010'],
+marte: ['OSIRIS_Mars_true_color.jpg', 'ESA y MPS para el equipo OSIRIS', 'CC BY-SA 3.0 IGO', 'Sonda Rosetta (cámara OSIRIS), 24 de febrero de 2007'],
+jupiter: ['Jupiter_and_its_shrunken_Great_Red_Spot.jpg', 'NASA, ESA y A. Simon (GSFC)', 'CC BY 3.0', 'Telescopio espacial Hubble, 21 de abril de 2014'],
+saturno: ['Saturn_during_Equinox.jpg', 'NASA/JPL/Space Science Institute', 'Dominio público', 'Sonda Cassini, 23 de julio de 2008'],
+urano: ['Uranus2.jpg', 'NASA/JPL-Caltech', 'Dominio público', 'Sonda Voyager 2, enero de 1986'],
+neptuno: ['Neptune_-_Voyager_2_(29347980845)_flatten_crop.jpg', 'NASA/JPL/Voyager-ISS; procesamiento: Justin Cowart', 'CC BY 2.0', 'Sonda Voyager 2, 20 de agosto de 1989'],
+pluton: ['Pluto_in_True_Color_-_High-Res.jpg', 'NASA/JHUAPL/SwRI; procesamiento: Alex Parker', 'Dominio público', 'Sonda New Horizons, 14 de julio de 2015'],
+ceres: ['Ceres_-_RC3_-_Haulani_Crater_(22381131691)_(cropped).jpg', 'NASA/JPL-Caltech/UCLA/MPS/DLR/IDA; procesamiento: Justin Cowart', 'CC BY 2.0', 'Sonda Dawn, mayo de 2015'],
+fobos: ['Phobos_colour_2008.jpg', 'NASA/JPL-Caltech/University of Arizona', 'Dominio público', 'Mars Reconnaissance Orbiter (cámara HiRISE), 23 de marzo de 2008'],
+deimos: ['Deimos-MRO.jpg', 'NASA/JPL-Caltech/University of Arizona', 'Dominio público', 'Mars Reconnaissance Orbiter (cámara HiRISE), 21 de febrero de 2009'],
+io: ['Io_highest_resolution_true_color.jpg', 'NASA/JPL/University of Arizona', 'Dominio público', 'Sonda Galileo, 3 de julio de 1999'],
+europa: ['Europa-moon-with-margins.jpg', 'NASA/JPL/DLR', 'Dominio público', 'Sonda Galileo, 7 de septiembre de 1996'],
+ganimedes: ['Ganymede_g1_true-edit1.jpg', 'NASA/JPL', 'Dominio público', 'Sonda Galileo, 26 de junio de 1996'],
+calisto: ['Callisto.jpg', 'NASA/JPL/DLR', 'Dominio público', 'Sonda Galileo, mayo de 2001'],
+encelado: ['PIA17202_-_Approaching_Enceladus.jpg', 'NASA/JPL-Caltech/Space Science Institute', 'Dominio público', 'Sonda Cassini, 28 de octubre de 2015'],
+dione: ['Dione_in_natural_light.jpg', 'NASA/JPL/Space Science Institute', 'Dominio público', 'Sonda Cassini, 8 de febrero de 2008'],
+rea: ['PIA07763_Rhea_full_globe5.jpg', 'NASA/JPL/Space Science Institute', 'Dominio público', 'Sonda Cassini, 26 de noviembre de 2005'],
+titan: ['Titan_in_true_color.jpg', 'NASA/JPL-Caltech/Space Science Institute', 'Dominio público', 'Sonda Cassini, 30 de enero de 2012', 'Su densa atmósfera de nitrógeno y neblina anaranjada oculta la superficie en luz visible.'],
+japeto: ['Iapetus_as_seen_by_the_Cassini_probe_-_20071008.jpg', 'NASA/JPL/Space Science Institute', 'Dominio público', 'Sonda Cassini, 10 de septiembre de 2007', 'Color realzado para destacar el contraste entre sus dos hemisferios.'],
+triton: ['Triton_moon_mosaic_Voyager_2_(large).jpg', 'NASA/JPL/USGS', 'Dominio público', 'Sonda Voyager 2, agosto de 1989'],
+caronte: ['Charon_in_True_Color_-_High-Res.jpg', 'NASA/JHUAPL/SwRI; procesamiento: Alex Parker', 'Dominio público', 'Sonda New Horizons, 14 de julio de 2015'],
+};
+const LICENSE_URL = { 'CC BY-SA 3.0': 'https://creativecommons.org/licenses/by-sa/3.0/', 'CC BY-SA 3.0 IGO': 'https://creativecommons.org/licenses/by-sa/3.0/igo/', 'CC BY 2.0': 'https://creativecommons.org/licenses/by/2.0/', 'CC BY 3.0': 'https://creativecommons.org/licenses/by/3.0/' };
+const Photo = {
+has(id) { return !!PHOTOS[id]; },
+url(id, w) { return 'https://commons.wikimedia.org/wiki/Special:FilePath/' + encodeURIComponent(PHOTOS[id][0]) + '?width=' + (w || 500); },
+page(id) { return 'https://commons.wikimedia.org/wiki/File:' + encodeURIComponent(PHOTOS[id][0]); },
+lic(id) { const l = PHOTOS[id][2]; return LICENSE_URL[l] ? `<a href="${LICENSE_URL[l]}" target="_blank" rel="noopener">${l}</a>` : esc(l); },
+credit(id) { const p = PHOTOS[id]; return `Imagen: ${esc(p[1])} · ${this.lic(id)} · <a href="${this.page(id)}" target="_blank" rel="noopener">Wikimedia Commons</a>`; },
+img(id, w, cls) { const n = BODY[id].name; return `<img class="${cls || ''}" data-photo="${id}" src="${this.url(id, w)}" alt="Fotografía real de ${esc(n)}" loading="lazy" decoding="async">`; },
+// pareja «modelo girando / foto real»: el modelo es una esfera dibujada con la textura de SOLARIS
+pair(id, size, big) {
+const d = BODY[id], g = GLOBE_TEX.has(id), px = Math.round(size);
+const model = g ? `<figure class="ph-fig"><span class="ph-frame"><canvas class="ph-globe" data-globe="${id}" width="${px}" height="${px}" role="img" aria-label="Modelo de ${esc(d.name)} girando"></canvas></span>
+<figcaption><b>Modelo de SOLARIS</b><small>Girando${(d.rotH || 0) < 0 ? ' en sentido retrógrado' : ''} · rotación acelerada</small></figcaption></figure>` : '';
+return `<div class="ph-pair${g ? '' : ' solo'}" style="--ph:${px}px">${model}<figure class="ph-fig"><${big ? 'span' : `button type="button" data-photo-open="${id}" aria-label="Ampliar la fotografía real de ${esc(d.name)}"`} class="ph-frame ph-photo">${this.img(id, big ? 960 : 500)}<i class="ph-fail" aria-hidden="true">Sin conexión con Wikimedia Commons</i></${big ? 'span' : 'button'}>
+<figcaption><b>Foto real</b><small>${esc(PHOTOS[id][3])}</small></figcaption></figure></div>`;
+},
+cardHTML(rb) {
+if (!this.has(rb.id)) return '';
+const p = PHOTOS[rb.id], g = GLOBE_TEX.has(rb.id);
+return `<section class="ph-cmp"><h3>Modelo y fotografía real</h3>${this.pair(rb.id, 136)}
+${p[4] ? `<p class="note">${esc(p[4])}</p>` : ''}${g ? '' : '<p class="note">En SOLARIS este cuerpo se dibuja con un sombreado procedimental: compáralo con la vista 3D, que gira en tiempo real.</p>'}
+<p class="ph-credit">${this.credit(rb.id)}</p></section>`;
+},
+open(id) {
+let b = $('#ph-box');
+if (!b) {
+b = document.createElement('div'); b.id = 'ph-box'; b.className = 'ui'; b.setAttribute('role', 'dialog'); b.setAttribute('aria-modal', 'true'); b.setAttribute('aria-labelledby', 'ph-title');
+$('#app').appendChild(b);
+b.addEventListener('click', e => { if (e.target === b || e.target.closest('[data-ph-close]')) this.close(); });
+addEventListener('keydown', e => { if (e.key === 'Escape' && b.classList.contains('open')) { e.stopImmediatePropagation(); this.close(); } }, true);
+}
+const d = BODY[id], p = PHOTOS[id], sz = Math.min(380, Math.floor((Math.min(innerWidth, 900) - 90) / (GLOBE_TEX.has(id) ? 2 : 1)));
+this._from = document.activeElement;
+b.innerHTML = `<div class="ph-card"><header><div><span class="tp-kicker">Comparar con la realidad</span><h2 id="ph-title">${esc(d.name)}</h2></div><button class="icon-btn" data-ph-close aria-label="Cerrar">&times;</button></header>
+${this.pair(id, sz, true)}${p[4] ? `<p class="note">${esc(p[4])}</p>` : ''}<p class="ph-credit">${this.credit(id)}</p></div>`;
+b.classList.add('open'); GlobeCanvas.scan(b);
+setTimeout(() => { const x = b.querySelector('[data-ph-close]'); if (x) x.focus({ preventScroll: true }); }, 30);
+},
+close() { const b = $('#ph-box'); if (!b) return; b.classList.remove('open'); b.innerHTML = ''; if (this._from && this._from.focus) this._from.focus({ preventScroll: true }); },
+};
+document.addEventListener('error', e => { const im = e.target; if (im && im.dataset && im.dataset.photo) { const f = im.closest('.ph-frame') || im.parentNode; if (f) f.classList.add('failed'); } }, true);
+document.addEventListener('click', e => { const o = e.target.closest && e.target.closest('[data-photo-open]'); if (o) Photo.open(o.dataset.photoOpen); });
+// Esfera girando en un canvas 2D: proyección ortográfica de la miniatura equirectangular con iluminación, atmósfera y anillos
+const GlobeCanvas = {
+tex: {}, live: new Set(), raf: 0, t0: 0,
+load(id, big) {                                   // miniatura de 512 px; en el visor ampliado, la textura completa del modelo 3D (reducida a 2048 px)
+const src = big && PLANET_TEX[id] ? PLANET_TEX[id].map : 'assets/images/globes/' + id + '.webp', key = src;
+if (this.tex[key]) return this.tex[key];
+return (this.tex[key] = new Promise((ok, ko) => {
+const im = new Image(); im.decoding = 'async';
+im.onload = () => { const w = Math.min(im.naturalWidth, 2048), h = Math.round(w * im.naturalHeight / im.naturalWidth), c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(im, 0, 0, w, h); ok({ w, h, d: x.getImageData(0, 0, w, h).data }); };
+im.onerror = () => { delete this.tex[key]; big ? this.load(id).then(ok, ko) : ko(); }; im.src = src;
+}));
+},
+scan(root) { (root || document).querySelectorAll('canvas[data-globe]:not([data-gl-on])').forEach(c => this.mount(c)); },
+mount(cv) {
+cv.dataset.glOn = '1';
+const id = cv.dataset.globe, d = BODY[id], star = d.type === 'star', ring = id === 'saturno';
+const dpr = Math.min(window.devicePixelRatio || 1, 2), css = cv.width, W = Math.round(css * dpr);
+cv.width = cv.height = W; cv.style.width = cv.style.height = css + 'px';
+const atm = { tierra: '120,170,255', venus: '255,226,170', titan: '240,170,90', marte: '255,170,130', neptuno: '110,150,255', urano: '150,220,230', jupiter: '255,225,190', saturno: '255,225,170' }[id];
+const R = ring ? W / 4.9 : star ? W / 2.5 : (W / 2 - 2 * dpr) / (atm ? 1.08 : 1), N = Math.ceil(R * 2), off = document.createElement('canvas'); off.width = off.height = N;
+const s = { cv, ctx: cv.getContext('2d'), off, octx: off.getContext('2d'), id, W, R, N, star, ring, atm, dir: (d.rotH || 1) < 0 ? -1 : 1 };
+this.load(id, css > 220).then(t => { s.t = t; this.prep(s); this.live.add(s); this.loop(); }).catch(() => { cv.classList.add('failed'); });
+},
+prep(s) {
+const { N, t } = s, img = s.octx.createImageData(N, N), n = N * N, u0 = new Float32Array(n), v = new Int32Array(n), sh = new Float32Array(n), on = new Uint8Array(n);
+const tilt = 0.2, ct = Math.cos(tilt), st = Math.sin(tilt), L = V.norm([-0.62, 0.38, 0.69]);
+for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+const k = j * N + i, x = (i + 0.5) / N * 2 - 1, y = 1 - (j + 0.5) / N * 2, r2 = x * x + y * y;
+if (r2 > 1) continue;
+const z = Math.sqrt(1 - r2), yy = y * ct + z * st, zz = -y * st + z * ct;
+on[k] = r2 > 0.985 ? 2 : 1;
+u0[k] = Math.atan2(x, zz) / TAU; v[k] = Math.min(t.h - 1, Math.max(0, Math.floor((0.5 - Math.asin(clamp(yy, -1, 1)) / Math.PI) * t.h)));
+const ndl = x * L[0] + y * L[1] + z * L[2];
+sh[k] = s.star ? 0.55 + 0.45 * Math.pow(z, 0.45) : 0.035 + 1.08 * smoothstep(-0.12, 0.75, ndl) * (0.82 + 0.18 * z);
+}
+Object.assign(s, { img, u0, v, sh, on });
+},
+draw(s, time) {
+const { t, N, img, u0, v, sh, on } = s, D = img.data, tw = t.w, td = t.d, rot = s.dir * time / 40 * (UI.reducedMotion ? 0 : 1);
+for (let k = 0, n = N * N; k < n; k++) {
+const o = k * 4;
+if (!on[k]) { D[o + 3] = 0; continue; }
+let u = (u0[k] - rot) % 1; if (u < 0) u += 1;
+const tx = u * tw, x0 = tx | 0, f = tx - x0, x1 = (x0 + 1) % tw, row = v[k] * tw, a = (row + x0) * 4, b = (row + x1) * 4, m = sh[k];
+D[o] = (td[a] + (td[b] - td[a]) * f) * m; D[o + 1] = (td[a + 1] + (td[b + 1] - td[a + 1]) * f) * m; D[o + 2] = (td[a + 2] + (td[b + 2] - td[a + 2]) * f) * m;
+D[o + 3] = on[k] === 2 ? 160 : 255;
+}
+s.octx.putImageData(img, 0, 0);
+const c = s.ctx, W = s.W, R = s.R, cx = W / 2, cy = W / 2;
+c.clearRect(0, 0, W, W);
+if (s.star) { const g = c.createRadialGradient(cx, cy, R * 0.9, cx, cy, W / 2); g.addColorStop(0, 'rgba(255,170,70,.45)'); g.addColorStop(1, 'rgba(255,150,40,0)'); c.fillStyle = g; c.fillRect(0, 0, W, W); }
+if (s.ring) this.rings(c, cx, cy, R, true);
+c.drawImage(s.off, cx - N / 2, cy - N / 2);
+if (s.atm) { const g = c.createRadialGradient(cx, cy, R * 0.93, cx, cy, R * 1.07); g.addColorStop(0, `rgba(${s.atm},0)`); g.addColorStop(0.5, `rgba(${s.atm},.32)`); g.addColorStop(1, `rgba(${s.atm},0)`); c.fillStyle = g; c.beginPath(); c.arc(cx, cy, R * 1.07, 0, TAU); c.fill(); }
+if (s.ring) this.rings(c, cx, cy, R, false);
+},
+rings(c, cx, cy, R, back) {
+const bands = [[1.24, 1.52, 'rgba(120,105,85,.45)'], [1.53, 1.95, 'rgba(225,205,165,.85)'], [2.03, 2.27, 'rgba(195,178,145,.7)']];
+c.save(); c.translate(cx, cy); c.rotate(-0.18);
+c.beginPath(); if (back) c.rect(-R * 3, -R * 3, R * 6, R * 3); else c.rect(-R * 3, 0, R * 6, R * 3); c.clip();
+for (const [a, b, col] of bands) { c.beginPath(); c.ellipse(0, 0, R * (a + b) / 2, R * (a + b) / 2 * 0.3, 0, 0, TAU); c.lineWidth = R * (b - a) * 0.62; c.strokeStyle = col; c.stroke(); }
+c.restore();
+},
+loop() {
+if (this.raf) return;
+this.t0 = this.t0 || performance.now();
+let last = 0;
+const tick = now => {
+this.raf = 0;
+for (const s of this.live) if (!s.cv.isConnected) this.live.delete(s);
+if (!this.live.size) return;
+if (now - last > 40 && !document.hidden) { last = now; const t = (now - this.t0) / 1000; for (const s of this.live) if (s.cv.getClientRects().length) this.draw(s, t); }
+this.raf = requestAnimationFrame(tick);
+};
+this.raf = requestAnimationFrame(tick);
+},
+};
 const Info = {
 orbitA(rb) { const o = rb.def.orbit; if (!o) return null; if (o.t === 'jpl') return o.el[0]; if (o.t === 'kep') return o.a; return null; },
 periodDays(rb) {
@@ -5180,7 +5509,7 @@ case 'explorar': {
 const feat = ['tierra', 'saturno', 'jupiter', 'marte', 'luna', 'jwst', 'pluton', 'halley'].map(i => W.byId[i]);
 return `<p class="lead">Elige un destino o recorre el Sistema Solar con un viaje guiado. Arrastra para girar, usa la rueda para acercarte y haz clic en cualquier objeto.</p>
 <button class="cta-row" id="tour-btn">${ICON.tour}<span><b>${this.tour ? 'Detener recorrido guiado' : 'Recorridos guiados'}</b><small>Planetas, lunas, exploración humana, asteroides y cometas</small></span></button>
-<button class="cta-row" data-act="fly">${ICON.tour}<span><b>Pilotar una nave</b><small>Vuelo espacial libre con física de inercia</small></span></button>
+<button class="cta-row" data-act="fly">${ICON.tour}<span><b>Pilotar una nave</b><small>Cabina, escáner, bitácora, logros y retos con medallas</small></span></button>
 <button class="cta-row" data-act="home">${ICON.overview}<span><b>Volver a la pantalla inicial</b><small>Ver de nuevo la presentación de SOLARIS</small></span></button>
 <h3>Destinos destacados</h3><div class="list">${feat.map(rb => this.bodyRow(rb, rb.def.info.desc.split(':')[0].split('.')[0])).join('')}</div>
 <h3>Controles</h3><dl class="keys"><dt>Arrastrar</dt><dd>Girar la cámara</dd><dt>Clic derecho o Mayús + arrastrar</dt><dd>Desplazar</dd><dt>Rueda o pellizco</dt><dd>Acercar y alejar</dd><dt>Doble clic</dt><dd>Viajar muy cerca</dd><dt>?</dt><dd>Todos los atajos</dd></dl>`;
@@ -5456,6 +5785,7 @@ ${rb.isCraft && rb.def.orbit.t === 'lpoint' ? `<p class="rel">En el punto L${rb.
 ${rb.parent && !rb.parent.isSun && !(rb.isCraft && rb.def.orbit.t === 'lpoint') ? `<p class="rel">Orbita a <button class="link" data-go="${rb.parent.id}" style="--c:${rb.parent.def.color || '#94a0b6'}">${esc(rb.parent.def.name)}</button></p>` : ''}
 ${moons.length ? `<p class="rel">Lunas incluidas: ${moons.map(m => `<button class="link" data-go="${m.id}" style="--c:${m.def.color || '#94a0b6'}">${esc(m.def.name)}</button>`).join('')}</p>` : ''}
 </header>
+${Photo.cardHTML(rb)}
 <section class="live"><h3>Ahora mismo <em class="tag sim" data-tip="Calculado por la simulación para la fecha mostrada; no es una efeméride de alta precisión">sim.</em></h3><div id="live-rows"></div></section>
 ${this.earthCmpHTML(rb)}
 ${rb.isCraft ? `<section><h3>Misión</h3><dl>${craftF.map(row).join('')}</dl></section><p class="note">${Info.craftNote(rb)}</p>` : `<section><h3>Datos físicos</h3><dl>${F.phys.map(row).join('')}</dl></section>
@@ -5465,7 +5795,7 @@ ${basic ? '<p class="note">Vista básica: activa la información científica ava
 ${d.info.feats && d.info.feats.length ? `<section><h3>Características principales</h3><ul class="facts">${d.info.feats.map(x => `<li>${esc(x)}</li>`).join('')}</ul></section>` : ''}
 ${d.info.facts && d.info.facts.length ? `<section><h3>Curiosidades</h3><ul class="facts">${d.info.facts.map(x => `<li>${esc(x)}</li>`).join('')}</ul></section>` : ''}
 <footer class="src"><p><b>Fuente:</b> ${esc(d.src)}</p>${d.credit && World.hd[d.model || d.id] ? `<p><b>Modelo 3D:</b> ${UI.creditHTML(d.credit)}</p>` : ''}<p class="legend"><em class="tag calc">calc.</em> derivado de otros datos <em class="tag sim">sim.</em> aproximación de la simulación</p>${this.scaleWarn(rb)}</footer>`;
-P.scrollTop = 0; this.hudScan();
+P.scrollTop = 0; this.hudScan(); GlobeCanvas.scan(P);
 $('#info-travel').addEventListener('click', () => { this.userActed(); Cam.travel(rb); });
 $('#info-follow').addEventListener('click', () => { this.userActed(); if (Cam.focus === rb && Cam.follow) Cam.follow = false; else { if (Cam.focus !== rb) Cam.travel(rb, { keepAngles: true, dist: clamp(Cam.dist, rb.rS * 1.3, Cam.maxDist()) }); Cam.follow = true; } this.refreshCamButtons(); });
 $('#info-close2').addEventListener('click', () => { this.userActed(); Cam.travel(rb, { close: true }); });
@@ -5996,6 +6326,7 @@ const groups = [
 ['Telescopios, estaciones y sondas', [['Telescopio espacial James Webb', 'jwst'], ['Telescopio espacial Hubble', 'hubble'], ['Voyager 1 y Voyager 2', 'voyager'], ['Estación Espacial Internacional', 'iss'], ['Estación espacial Tiangong', 'tiangong'], ['Sonda solar Parker', 'parker'], ['Sonda New Horizons', 'newhorizons']]
 .filter(([, k]) => MODEL_CREDITS[k]).map(([u, k]) => fromCredit(u, MODEL_CREDITS[k]))],
 ['El Sol, planetas y lunas', Object.keys(PLANET_TEX).map(id => { const a = fromCredit(BODY[id].name, BODY[id].credit); if (GLOBE_TEX.has(id)) a.note = (a.note ? a.note + '; ' : '') + 'también se muestra reducida como miniatura en las fichas y los recorridos'; return a; })],
+['Fotografías reales (fichas y comparador)', Object.keys(PHOTOS).map(id => ({ use: 'Foto real de ' + BODY[id].name, name: PHOTOS[id][0].replace(/_/g, ' ').replace(/\.\w+$/, ''), author: PHOTOS[id][1], source: 'Wikimedia Commons', license: PHOTOS[id][2], licenseUrl: LICENSE_URL[PHOTOS[id][2]], url: Photo.page(id), note: PHOTOS[id][3] + '; la imagen se enlaza desde Wikimedia Commons, no se copia al sitio' }))],
 ['Naves del modo de vuelo', SHIPS.filter(sh => MODEL_CREDITS[sh.id]).map(sh => fromCredit('Nave ' + sh.name, MODEL_CREDITS[sh.id]))],
 ['Recursos utilizados en versiones anteriores', PREV_CREDITS.map(p => fromCredit(BODY[p.id].name + ' (versión anterior)', p.credit))],
 ['Música', [{ use: 'Tema musical principal de SOLARIS', name: MUSIC_INFO.title, author: MUSIC_INFO.artist, source: 'YouTube', license: MUSIC_INFO.license, licenseUrl: MUSIC_INFO.licenseUrl, url: MUSIC_INFO.url }]],
@@ -6874,16 +7205,16 @@ return { log, k: v => v == null || v <= 0 ? 0 : log ? Math.max(0.03, (Math.log10
 render() {
 const p = $('#cmp'); if (!p) return;
 const rbs = this.list.map(id => World.byId[id]).filter(Boolean); rbs.forEach(rb => { rb._cmpF = null; });
-const tabs = [['tabla', 'Datos'], ['tamano', 'Comparar tamaño'], ['gravedad', 'Gravedad']];
+const tabs = [['tabla', 'Datos'], ['tamano', 'Comparar tamaño'], ['gravedad', 'Gravedad'], ['fotos', 'Fotos reales']];
 p.innerHTML = `
 <header class="tp-head"><div><span class="tp-kicker">Herramienta</span><h2 id="cmp-title">Comparar cuerpos celestes</h2></div><button class="icon-btn" data-c="close" aria-label="Cerrar">&times;</button></header>
-<div class="cmp-cards">${rbs.map(rb => `<div class="cmp-card"><i class="dot" style="--c:${rb.def.color}"></i><b>${esc(rb.def.name)}</b><small>${esc(TYPE_LABEL[rb.def.type])}${rb.def.type === 'moon' && rb.parent ? ' de ' + esc(rb.parent.def.name) : ''}</small>
+<div class="cmp-cards">${rbs.map(rb => `<div class="cmp-card">${Photo.has(rb.id) ? `<span class="cmp-thumb">${Photo.img(rb.id, 120)}</span>` : ''}<i class="dot" style="--c:${rb.def.color}"></i><b>${esc(rb.def.name)}</b><small>${esc(TYPE_LABEL[rb.def.type])}${rb.def.type === 'moon' && rb.parent ? ' de ' + esc(rb.parent.def.name) : ''}</small>
 <span class="cmp-card-act"><button class="txt-btn" data-c="locate" data-id="${rb.id}">Localizar</button><button class="txt-btn" data-c="remove" data-id="${rb.id}" aria-label="Quitar ${esc(rb.def.name)}">Quitar</button></span></div>`).join('')}
 ${rbs.length < this.MAX ? `<div class="cmp-card cmp-add"><input id="cmp-q" type="search" placeholder="Añadir un objeto…" autocomplete="off" aria-label="Buscar un objeto para comparar"><ul id="cmp-hits" role="listbox"></ul></div>` : ''}</div>
 ${rbs.length < 2 ? `<p class="note cmp-empty">Elige al menos dos objetos para compararlos. Puedes añadirlos aquí o con «+ Comparar» en la ficha de cada objeto.</p>` : `
 <div class="seg tp-tabs" role="tablist">${tabs.map(([v, t]) => `<button role="tab" aria-selected="${this.view === v}" class="${this.view === v ? 'on' : ''}" data-c="view" data-v="${v}">${t}</button>`).join('')}</div>
-<div class="tp-body">${this.view === 'tamano' ? this.sizeHTML(rbs) : this.view === 'gravedad' ? this.gravHTML(rbs) : this.tableHTML(rbs)}</div>`}`;
-this.renderHits();
+<div class="tp-body">${this.view === 'tamano' ? this.sizeHTML(rbs) : this.view === 'gravedad' ? this.gravHTML(rbs) : this.view === 'fotos' ? this.photosHTML(rbs) : this.tableHTML(rbs)}</div>`}`;
+this.renderHits(); GlobeCanvas.scan(p);
 },
 renderHits() {
 const q = $('#cmp-q'), ul = $('#cmp-hits'); if (!q || !ul) return;
@@ -6922,6 +7253,12 @@ const big = rbs[D.indexOf(Math.max(...D))], small = rbs[D.indexOf(Math.min(...D)
 return `<svg class="cmp-size" viewBox="0 0 ${vbW} ${H}" role="img" aria-label="Comparación de tamaños a escala relativa">${circ}<line x1="${pad}" y1="${base}" x2="${vbW - pad}" y2="${base}" class="sz-base"/></svg>
 <p class="cmp-ratio">El diámetro de <b>${esc(big.def.name)}</b> es <b>${fmt(ratio, ratio < 10 ? 1 : 0)} veces</b> el de <b>${esc(small.def.name)}</b>.</p>
 <p class="note">Escala relativa basada en diámetro real. No usa la escala visual ampliada del Sistema Solar.</p>`;
+},
+photosHTML(rbs) {
+const n = rbs.length, sz = innerWidth < 760 ? 118 : n > 3 ? 112 : n > 2 ? 138 : 168;
+return `<div class="cmp-photos" style="--n:${n}">${rbs.map(rb => `<div class="cp-col"><h4><i class="dot" style="--c:${rb.def.color}"></i>${esc(rb.def.name)}</h4>
+${Photo.has(rb.id) ? Photo.pair(rb.id, sz) + `<p class="ph-credit">${Photo.credit(rb.id)}</p>` : `<p class="note">Aún no hay una fotografía real de ${esc(rb.def.name)} en SOLARIS${['asteroid', 'comet', 'tno'].includes(rb.def.type) ? ': muchos de estos objetos solo se conocen como puntos de luz o por imágenes de sobrevuelos parciales' : ''}.</p>`}</div>`).join('')}</div>
+<p class="note">Las fotografías no están a la misma escala: cada una muestra el objeto completo. Pulsa una foto para verla en grande junto al modelo girando. Las imágenes se cargan desde Wikimedia Commons.</p>`;
 },
 gravHTML(rbs) {
 const G = rbs.map(rb => this.grav(rb)), B = this.bars(G);
@@ -7602,7 +7939,7 @@ const tex = !!sh.mesh.groups, pr = useP(tex ? P.craftTex : P.craft), rel = V.sub
 GLX.state({ depthTest: true, depthWrite: true, cull: 'back', blend: 'none' });
 const ep = V.add(rel, V.scale(F, -sh.size * 1.1));
 GLX.setAll(pr, { u_model: M4.fromBasis(X, U, F, sh.size, rel), u_occ: this.occ0 || (this.occ0 = new Float32Array(16)), u_occN: 0, u_sunR: World.shadowSunR, u_ambient: S.ambient + 0.02, u_hover: 0,
-u_eng: [...ep, sh.thr * 1.3], u_engCol: [0.55, 0.75, 1.0], u_engR: sh.size * 0.5 });
+u_eng: [...ep, sh.thr * 1.3], u_engCol: [0.55, 0.75, 1.0], u_engR: sh.size * 0.5, u_mR: 0 });
 if (tex) World.drawGroups(sh.mesh, pr); else GLX.draw(sh.mesh, pr);
 }
 }
@@ -7958,7 +8295,7 @@ const sf = $('#start-fly'); sf.disabled = false; sf.addEventListener('click', ()
 const explore = Settings.state.general.startup === 'explore' && location.hash !== '#creditos';
 const go = () => { if (explore) this.begin(); else st.focus({ preventScroll: true }); };
 Splash.finish(explore, go).catch(e => { console.error(e); Splash.reveal(true, go); });   // la carga se retira cuando todo está listo
-window.Solaris = { World, Cam, UI, Time, S, select: id => UI.select(World.byId[id], { fly: true }), App, Flight, Music, SFX, Settings, Keys, Gfx, GLX, I18N, BODY, PackedModels, Assets, Compare, TL, Sci, ScaleState, Planner, Flight, Systems, Dilation, Missions, Cam: Cam, MillerFX, Music };
+window.Solaris = { World, Cam, UI, Time, S, select: id => UI.select(World.byId[id], { fly: true }), App, Flight, Music, SFX, Settings, Keys, Gfx, GLX, I18N, BODY, PackedModels, Assets, Compare, TL, Sci, ScaleState, Planner, Systems, Dilation, Missions, MillerFX, FlightGame, FlightAudio, Cockpit, HUD, Voice, Photo, GlobeCanvas, V };
 requestAnimationFrame(t => this.loop(t));
 },
 home() {
@@ -8152,58 +8489,897 @@ B.dish([0, 0, -70], [0, 0, -1], 7, 10, 24, C.silver, NZ);
 });
 })();
 const SHIP_NOZZLES = { colibri: [[0, 0, -9.6, 1.0]], ranger: [[-1, 0.3, -12.6, 0.6], [0, -1.2, -12.6, 0.6], [1, 0.3, -12.6, 0.6]], atlas: [[0, 1.2, -17, 0.9], [1.4, -0.8, -17, 0.9], [-1.4, -0.8, -17, 0.9]], odisea: [[0, 0, -71, 6.5]] };
+const SHIP_SND = {                                // carácter sonoro de cada propulsión: zumbido, retumbo, rugido, chisporroteo y pulsación
+colibri: { whine: 520, wType: 'sine', rumble: 0.7, roar: 0.55, crackle: 0, pulse: 0, hum: 62 },
+ranger: { whine: 300, wType: 'triangle', rumble: 0.9, roar: 0.8, crackle: 0.1, pulse: 0, hum: 50 },
+rocinante: { whine: 140, wType: 'sawtooth', rumble: 1.25, roar: 0.9, crackle: 0, pulse: 0.25, hum: 38 },
+orville: { whine: 220, wType: 'sine', rumble: 0.6, roar: 0.4, crackle: 0, pulse: 0.12, hum: 44 },
+atlas: { whine: 0, wType: 'sine', rumble: 1.3, roar: 1.2, crackle: 0.8, pulse: 0, hum: 40 },
+odisea: { whine: 95, wType: 'sawtooth', rumble: 1.1, roar: 0.5, crackle: 0, pulse: 0.5, hum: 34 },
+};
 const FlightAudio = {
-ctx: null, on: true,
+ctx: null, on: true, prof: SHIP_SND.colibri,
 init() {
 if (this.ctx) { SFX.unlock(); this.active = true; this.setMute(!this.on); return; }
 const ctx = SFX.ensure(); if (!ctx) return;
 this.ctx = ctx; this.active = true;
-const master = this.master = ctx.createGain(); master.gain.value = 0.7; master.connect(SFX.bus.spacecraft);
-this.alertOut = ctx.createGain(); this.alertOut.gain.value = 0.7; this.alertOut.connect(SFX.bus.alerts);
-const len = ctx.sampleRate * 2, buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0);
-let last = 0; for (let i = 0; i < len; i++) { const w = Math.random() * 2 - 1; last = (last + 0.02 * w) / 1.02; d[i] = last * 3.5; }
-this.brown = buf;
-const wbuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate), wd = wbuf.getChannelData(0); for (let i = 0; i < wd.length; i++) wd[i] = Math.random() * 2 - 1;   // ruido blanco: aire de cabina y propulsores RCS
-const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
-this.engF = ctx.createBiquadFilter(); this.engF.type = 'lowpass'; this.engF.frequency.value = 90;
-this.engG = ctx.createGain(); this.engG.gain.value = 0;
-src.connect(this.engF); this.engF.connect(this.engG); this.engG.connect(master); src.start();
-const hum = ctx.createOscillator(); hum.type = 'sine'; hum.frequency.value = 46; this.humO = hum;
-this.humG = ctx.createGain(); this.humG.gain.value = 0; hum.connect(this.humG); this.humG.connect(master); hum.start();
-const cab = ctx.createOscillator(); cab.type = 'triangle'; cab.frequency.value = 118;
-const cabG = ctx.createGain(); cabG.gain.value = 0.012; cab.connect(cabG); cabG.connect(master); cab.start();
-const air = ctx.createBufferSource(); air.buffer = wbuf; air.loop = true;
-const airF = ctx.createBiquadFilter(); airF.type = 'bandpass'; airF.frequency.value = 600; airF.Q.value = 0.6;
-const airG = ctx.createGain(); airG.gain.value = 0.006; air.connect(airF); airF.connect(airG); airG.connect(master); air.start();
-const rcs = ctx.createBufferSource(); rcs.buffer = wbuf; rcs.loop = true;
-const rcsF = ctx.createBiquadFilter(); rcsF.type = 'bandpass'; rcsF.frequency.value = 1400; rcsF.Q.value = 1.2;
-this.rcsG = ctx.createGain(); this.rcsG.gain.value = 0; rcs.connect(rcsF); rcsF.connect(this.rcsG); this.rcsG.connect(master); rcs.start();
+const G = (v, to) => { const g = ctx.createGain(); g.gain.value = v; if (to) g.connect(to); return g; };
+const F = (type, f, q, to) => { const b = ctx.createBiquadFilter(); b.type = type; b.frequency.value = f; if (q != null) b.Q.value = q; if (to) b.connect(to); return b; };
+const loop = (buf, to) => { const s = ctx.createBufferSource(); s.buffer = buf; s.loop = true; s.connect(to); s.start(); return s; };
+const master = this.master = G(0.7, SFX.bus.spacecraft);
+this.alertOut = G(0.7, SFX.bus.alerts);
+const ir = ctx.createBuffer(2, ctx.sampleRate * 0.45, ctx.sampleRate);   // reverberación breve de cabina para los eventos
+for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 3.2) * 0.6; }
+const rev = ctx.createConvolver(); rev.buffer = ir; rev.connect(G(0.22, master));
+this.fxOut = G(1, master); this.fxOut.connect(rev); this.alertOut.connect(rev);
+const len = ctx.sampleRate * 2, brown = ctx.createBuffer(1, len, ctx.sampleRate), bd = brown.getChannelData(0);
+let last = 0; for (let i = 0; i < len; i++) { const w = Math.random() * 2 - 1; last = (last + 0.02 * w) / 1.02; bd[i] = last * 3.5; }
+this.brown = brown;
+const wbuf = this.white = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate), wd = wbuf.getChannelData(0); for (let i = 0; i < wd.length; i++) wd[i] = Math.random() * 2 - 1;
+const cbuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate), cd = cbuf.getChannelData(0);   // chisporroteo: impulsos dispersos (motores químicos)
+for (let i = 0; i < cd.length; i++) cd[i] = Math.random() < 0.0018 ? (Math.random() * 2 - 1) : cd[i - 1] * 0.82 || 0;
+const eng = this.engBus = G(1, master);
+this.rumF = F('lowpass', 90, 0.7); this.rumG = G(0, eng); this.rumF.connect(this.rumG); loop(brown, this.rumF);
+this.roarF = F('bandpass', 500, 0.7); this.roarG = G(0, eng); this.roarF.connect(this.roarG); loop(wbuf, this.roarF);
+this.whF = F('lowpass', 1800, 0.8); this.whG = G(0, eng); this.whF.connect(this.whG);
+this.whO = ctx.createOscillator(); this.whO.type = 'sine'; this.whO.connect(this.whF); this.whO.start();
+this.whO2 = ctx.createOscillator(); this.whO2.type = 'sine'; this.whO2.detune.value = 7; this.whO2.connect(G(0.6, this.whF)); this.whO2.start();
+this.crF = F('highpass', 900, 0.7); this.crG = G(0, eng); this.crF.connect(this.crG); loop(cbuf, this.crF);
+this.lfo = ctx.createOscillator(); this.lfo.frequency.value = 8; this.lfoG = G(0); this.lfo.connect(this.lfoG); this.lfoG.connect(eng.gain); this.lfo.start();
+this.humO = ctx.createOscillator(); this.humO.type = 'sine'; this.humO.frequency.value = 46; this.humG = G(0, master); this.humO.connect(this.humG); this.humO.start();
+const cab = ctx.createOscillator(); cab.type = 'triangle'; cab.frequency.value = 118; cab.connect(G(0.01, master)); cab.start();
+const airF = F('bandpass', 600, 0.6, G(0.006, master)); loop(wbuf, airF);
+this.rcsF = F('bandpass', 1400, 1.2); this.rcsG = G(0); this.rcsP = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+this.rcsF.connect(this.rcsG); if (this.rcsP) { this.rcsG.connect(this.rcsP); this.rcsP.connect(master); } else this.rcsG.connect(master);
+loop(wbuf, this.rcsF);
+this.setShip(Flight.ship ? Flight.ship.id : 'colibri');
 this.setMute(!this.on);
+},
+setShip(id) {
+this.prof = SHIP_SND[id] || SHIP_SND.colibri;
+if (!this.ctx) return;
+const P = this.prof; this.whO.type = P.wType; this.whO2.type = P.wType === 'sawtooth' ? 'triangle' : 'sine';
 },
 setMute(m) {
 this.on = !m; if (!this.master) return;
 const v = m || !this.active ? 0 : 0.7, t = this.ctx.currentTime;
 this.master.gain.setTargetAtTime(v, t, 0.05); this.alertOut.gain.setTargetAtTime(v, t, 0.05);
+if (m) Voice.stop();
 },
-update(thr, rcs) {
+update(thr, rcs, pan) {
 if (!this.ctx) return;
-const t = this.ctx.currentTime;
-this.engG.gain.setTargetAtTime(0.02 + thr * 0.5, t, 0.08);
-this.engF.frequency.setTargetAtTime(80 + thr * 380, t, 0.1);
-this.humG.gain.setTargetAtTime(thr * 0.12, t, 0.1);
-this.humO.frequency.setTargetAtTime(42 + thr * 18, t, 0.2);
-this.rcsG.gain.setTargetAtTime(rcs * 0.09, t, 0.03);
+const t = this.ctx.currentTime, P = this.prof, k = 0.08, a = Math.max(0, thr);
+const set = (p, v, tc) => p.setTargetAtTime(v, t, tc || k);
+set(this.rumG.gain, (0.025 + a * 0.5) * P.rumble); set(this.rumF.frequency, 70 + a * 330, 0.12);
+set(this.roarG.gain, Math.pow(a, 1.5) * 0.2 * P.roar); set(this.roarF.frequency, 350 + a * 1300, 0.12);
+set(this.whG.gain, P.whine ? 0.006 + a * 0.045 : 0, 0.15); if (P.whine) { set(this.whO.frequency, P.whine * (0.55 + 0.6 * a), 0.35); set(this.whO2.frequency, P.whine * 1.5 * (0.55 + 0.6 * a), 0.35); }
+set(this.crG.gain, P.crackle * a * a * 0.3);
+set(this.lfoG.gain, P.pulse * a * 0.35, 0.2); set(this.lfo.frequency, 6 + a * 6, 0.3);
+set(this.humG.gain, 0.02 + a * 0.08, 0.1); set(this.humO.frequency, P.hum * (1 + a * 0.4), 0.2);
+set(this.rcsG.gain, rcs * 0.09, 0.03); if (this.rcsP) set(this.rcsP.pan, clamp(pan || 0, -1, 1), 0.05);
 },
-beep(freq, dur, type, vol) {
-if (!this.ctx || !this.on) return;
-const t = this.ctx.currentTime, o = this.ctx.createOscillator(), g = this.ctx.createGain();
-o.type = type || 'square'; o.frequency.value = freq; g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol || 0.06, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-o.connect(g); g.connect(this.alertOut); o.start(t); o.stop(t + dur + 0.02);
+// fuentes breves para los eventos
+osc(f, dur, o) {
+o = o || {}; const c = this.ctx, t = c.currentTime + (o.delay || 0), g = c.createGain(), s = c.createOscillator();
+s.type = o.type || 'sine'; s.frequency.setValueAtTime(f, t); if (o.f2) s.frequency.exponentialRampToValueAtTime(o.f2, t + dur * (o.glide || 0.9));
+g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(o.vol || 0.05, t + (o.a || 0.01)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+s.connect(g); g.connect(o.out || this.fxOut); s.start(t); s.stop(t + dur + 0.05);
 },
-ping() { if (!this.ctx) return; const t = this.ctx.currentTime, o = this.ctx.createOscillator(), g = this.ctx.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(660, t); o.frequency.exponentialRampToValueAtTime(990, t + 0.18); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.08, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.35); o.connect(g); g.connect(this.alertOut); o.start(t); o.stop(t + 0.4); },
-thud() { if (!this.ctx) return; const t = this.ctx.currentTime, s = this.ctx.createBufferSource(), f = this.ctx.createBiquadFilter(), g = this.ctx.createGain(); s.buffer = this.brown; f.type = 'lowpass'; f.frequency.value = 160; g.gain.setValueAtTime(0.8, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9); s.connect(f); f.connect(g); g.connect(this.master); s.start(t); s.stop(t + 1); },
-stop() { this.active = false; if (this.master) this.setMute(!this.on); },
+noise(dur, o) {
+o = o || {}; const c = this.ctx, t = c.currentTime + (o.delay || 0), s = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
+s.buffer = o.brown ? this.brown : this.white; s.loop = true; f.type = o.type || 'bandpass'; f.Q.value = o.q || 1; f.frequency.setValueAtTime(o.f || 1000, t);
+if (o.f2) f.frequency.exponentialRampToValueAtTime(o.f2, t + dur * 0.9);
+g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(o.vol || 0.1, t + dur * (o.peak || 0.08)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+let last = g; if (o.pan && c.createStereoPanner) { const p = c.createStereoPanner(); p.pan.value = clamp(o.pan, -1, 1); g.connect(p); last = p; }
+s.connect(f); f.connect(g); last.connect(o.out || this.fxOut); s.start(t); s.stop(t + dur + 0.05);
+},
+event(name, x) {
+if (!this.ctx || !this.on || !this.active) return;
+const P = this.prof, A = { out: this.alertOut };
+switch (name) {
+case 'ignite': this.osc(52, 0.45, { f2: 120, vol: 0.18, a: 0.02 }); this.noise(0.5, { brown: true, type: 'lowpass', f: 380, vol: 0.5, peak: 0.1 }); if (P.whine) this.osc(P.whine * 0.3, 0.9, { f2: P.whine * 0.6, vol: 0.025, type: P.wType }); break;
+case 'cutoff': if (P.whine) this.osc(P.whine * 0.6, 0.8, { f2: P.whine * 0.22, vol: 0.03, type: P.wType }); this.noise(0.25, { f: 2400, vol: 0.03, q: 2 }); break;
+case 'puff': this.noise(0.11, { f: 2300 + Math.random() * 900, q: 0.9, vol: 0.09, pan: x, peak: 0.12 }); break;
+case 'warpUp': this.noise(0.7, { f: 260, f2: 3200, q: 0.8, vol: 0.06, peak: 0.6 }); this.osc(220, 0.6, { f2: 660, vol: 0.02, type: 'triangle' }); break;
+case 'warpDown': this.noise(0.6, { f: 3000, f2: 280, q: 0.8, vol: 0.05, peak: 0.2 }); this.osc(600, 0.5, { f2: 200, vol: 0.02, type: 'triangle' }); break;
+case 'lock': this.osc(880, 0.07, Object.assign({ type: 'square', vol: 0.022 }, A)); this.osc(1320, 0.1, Object.assign({ type: 'square', vol: 0.022, delay: 0.09 }, A)); break;
+case 'apOn': [523, 659, 784].forEach((f, i) => this.osc(f, 0.32, Object.assign({ vol: 0.035, delay: i * 0.07, type: 'triangle' }, A))); break;
+case 'apOff': [784, 659, 523].forEach((f, i) => this.osc(f, 0.28, Object.assign({ vol: 0.03, delay: i * 0.07, type: 'triangle' }, A))); break;
+case 'orbit': [392, 494, 587, 784].forEach((f, i) => this.osc(f, 1.6, Object.assign({ vol: 0.025, delay: i * 0.05, a: 0.25 }, A))); break;
+case 'scanPing': { const f = 520 + (x || 0) * 700; this.osc(f, 0.35, Object.assign({ vol: 0.04, f2: f * 1.04 }, A)); this.osc(f, 0.3, Object.assign({ vol: 0.012, delay: 0.16 }, A)); break; }
+case 'scanDone': [660, 880, 1100, 1320, 1760].forEach((f, i) => this.osc(f, 0.5, Object.assign({ vol: 0.032, delay: i * 0.06, type: 'triangle' }, A))); this.noise(0.9, { f: 7000, q: 0.5, vol: 0.015, peak: 0.3 }); break;
+case 'achieve': [523, 659, 784, 1046].forEach((f, i) => this.osc(f, i === 3 ? 1.4 : 0.22, Object.assign({ vol: 0.04, delay: i * 0.12, type: 'triangle' }, A))); this.osc(131, 1.5, Object.assign({ vol: 0.05, delay: 0.36, a: 0.05 }, A)); this.noise(1.2, { f: 8000, q: 0.4, vol: 0.012, delay: 0.36, peak: 0.2 }); break;
+case 'fail': [440, 370, 311].forEach((f, i) => this.osc(f, 0.4, Object.assign({ vol: 0.04, delay: i * 0.16, type: 'square' }, A))); break;
+case 'flyby': this.noise(1.6, { f: 2600, f2: 180, q: 0.7, vol: 0.12, peak: 0.35 }); this.noise(1.4, { brown: true, type: 'lowpass', f: 160, vol: 0.4, peak: 0.4 }); break;
+case 'creak': { const f0 = 300 + Math.random() * 300; [1, 2.76, 5.4].forEach((r, i) => this.osc(f0 * r, 0.28 - i * 0.06, { vol: 0.012 / (i + 1), a: 0.003 })); break; }
+case 'caution': this.osc(1000, 0.14, Object.assign({ type: 'square', vol: 0.03 }, A)); this.osc(800, 0.16, Object.assign({ type: 'square', vol: 0.03, delay: 0.17 }, A)); break;
+case 'clang': this.noise(0.6, { f: 900, q: 0.6, vol: 0.25 }); [180, 470, 1210, 2130].forEach((f, i) => this.osc(f, 1.4 - i * 0.25, { vol: 0.05 / (i + 1), a: 0.002 })); break;
+case 'click': this.noise(0.03, { f: 3500, q: 2, vol: 0.05 }); break;
+}
+},
+beep(freq, dur, type, vol) { if (!this.ctx || !this.on) return; this.osc(freq, dur, { type: type || 'square', vol: vol || 0.06, out: this.alertOut, a: 0.01 }); },
+ping() { if (!this.ctx) return; this.osc(660, 0.35, { f2: 990, glide: 0.5, vol: 0.08, out: this.alertOut, a: 0.02 }); },
+thud() { if (!this.ctx) return; this.noise(0.9, { brown: true, type: 'lowpass', f: 160, vol: 0.8, peak: 0.01, out: this.master }); this.event('clang'); },
+stop() { this.active = false; if (this.master) this.setMute(!this.on); Voice.stop(); },
 };
+// voz de la computadora de a bordo (síntesis de voz del navegador, solo si hay una voz en español)
+const Voice = {
+on: true, last: {}, voice: undefined,
+pick() {
+const S = window.speechSynthesis; if (!S) return null;
+const vs = S.getVoices(); if (!vs.length) return null;
+this.voice = vs.find(v => /es[-_](MX|US|419)/i.test(v.lang)) || vs.find(v => /^es/i.test(v.lang)) || null;
+return this.voice;
+},
+say(txt, key, gap) {
+const S = window.speechSynthesis;
+if (!this.on || !S || !FlightAudio.on || !FlightAudio.active || Settings.state.audio.muted) return;
+const now = performance.now(); key = key || txt;
+if (this.last[key] && now - this.last[key] < (gap || 9000)) return;
+const v = this.voice || this.pick(); if (!v) return;
+this.last[key] = now;
+const u = new SpeechSynthesisUtterance(txt); u.voice = v; u.lang = v.lang; u.rate = 1.04; u.pitch = 0.82;
+u.volume = clamp(Settings.state.audio.master * Settings.state.audio.ship * 1.1, 0, 1);
+if (S.speaking && S.pending) S.cancel();
+S.speak(u);
+},
+stop() { if (window.speechSynthesis) speechSynthesis.cancel(); },
+};
+if (window.speechSynthesis) { speechSynthesis.addEventListener && speechSynthesis.addEventListener('voiceschanged', () => Voice.pick()); }
+// Cabina 2D: marco y tablero con texturas, pantallas multifunción (MFD) interactivas, testigos, luz del Sol y del motor, y suciedad del cristal
+const MFD_PAGES = [['nav', 'NAV'], ['orb', 'ÓRBITA'], ['rad', 'RADAR'], ['tgt', 'OBJETIVO'], ['sys', 'SISTEMAS']];
+const CK_TINT = { colibri: [1, 1.02, 1.06], ranger: [1.04, 1.04, 1.04], rocinante: [0.92, 1.02, 0.94], orville: [0.96, 1, 1.1], atlas: [1.08, 1.02, 0.94], odisea: [1.04, 1, 0.97] };
+const Cockpit = {
+W: 0, H: 0, dpr: 1, L: null, shipId: null, pages: null, mfdT: 0, glassK: 0, sunK: 0, tex: null,
+load() {
+if (this._load) return this._load;
+const L = n => new Promise(ok => { const i = new Image(); i.decoding = 'async'; i.onload = () => ok(i); i.onerror = () => ok(null); i.src = 'assets/textures/cockpit/' + n + '.webp'; });
+return (this._load = Promise.all(['metal', 'panel', 'glass'].map(L)).then(([metal, panel, glass]) => { this.tex = { metal, panel, glass }; this.W = 0; }));
+},
+E() { return this._E || (this._E = { root: $('#cockpit'), base: $('#ck-base'), light: $('#ck-light'), mfd: $('#ck-mfd'), glass: $('#ck-glass'), hits: $('#ck-hits') }); },
+layout(W, H) {
+const port = W < H * 0.9, bar = this.barH + 12;
+const small = H < 560, dashH = port ? clamp(H * 0.24, 140, 240) : small ? clamp(H * 0.26, 80, 140) : clamp(H * 0.29, 180, 320);
+const yC = H - dashH, yE = H - dashH * 0.84, n = port || small ? 0 : W >= 1000 ? 3 : W >= 700 ? 2 : 0;
+const top = yC + 30, bot = H - bar, gap = 18, side = 212;
+let mh = clamp(bot - top, 70, 230), mw = Math.round(mh * 1.32);
+const avail = W - 2 * side;
+if (n && n * mw + (n - 1) * gap > avail) { mw = Math.floor((avail - (n - 1) * gap) / n); mh = Math.round(mw / 1.32); }
+const x0 = W / 2 - (n * mw + (n - 1) * gap) / 2;
+const mfds = [...Array(n)].map((_, i) => ({ x: Math.round(x0 + i * (mw + gap)), y: Math.round(top + (bot - top - mh) / 2), w: mw, h: mh }));
+return { W, H, port, dashH, yC, yE, mfds, pw: port ? W * 0.07 : W * 0.05, th: port ? H * 0.045 : H * 0.06, cx: port ? W * 0.2 : W * 0.15 };
+},
+dashPath(c, L, up) { const { W, H, yC, yE } = L, u = up || 0; c.beginPath(); c.moveTo(0, yE - u); c.quadraticCurveTo(W / 2, 2 * yC - yE - u, W, yE - u); c.lineTo(W, H); c.lineTo(0, H); c.closePath(); },
+framePath(c, L) {
+const { W, yE, pw, th, cx } = L;
+c.beginPath(); c.moveTo(0, 0); c.lineTo(W, 0); c.lineTo(W, yE + 30); c.lineTo(W - pw, yE - 2); c.lineTo(W - cx, th);
+c.quadraticCurveTo(W / 2, th * 0.35, cx, th); c.lineTo(pw, yE - 2); c.lineTo(0, yE + 30); c.closePath();
+},
+// borde interior del marco (el contorno de la ventana), para biseles, juntas y remaches
+edge(L) { const { W, yE, pw, th, cx } = L; return [[pw, yE - 2], [cx, th], 'arc', [W - cx, th], [W - pw, yE - 2]]; },
+pattern(c, img, tint, k) {
+if (!img) return '#2b2f36';
+const t = document.createElement('canvas'); t.width = img.width; t.height = img.height; const x = t.getContext('2d');
+x.drawImage(img, 0, 0); x.globalCompositeOperation = 'multiply'; x.fillStyle = `rgb(${tint.map(v => Math.min(255, Math.round(v * 255 * k))).join(',')})`; x.fillRect(0, 0, t.width, t.height);
+return c.createPattern(t, 'repeat');
+},
+rrect(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); },
+screw(c, x, y, r) {
+const g = c.createRadialGradient(x - r * 0.35, y - r * 0.35, r * 0.1, x, y, r); g.addColorStop(0, '#9aa1ab'); g.addColorStop(0.55, '#4a4f57'); g.addColorStop(1, '#16181c');
+c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill();
+c.strokeStyle = 'rgba(10,11,13,.85)'; c.lineWidth = Math.max(0.8, r * 0.28); c.beginPath(); c.moveTo(x - r * 0.6, y - r * 0.2); c.lineTo(x + r * 0.6, y + r * 0.2); c.stroke();
+},
+resize(force) {
+const E = this.E(), dpr = Math.min(window.devicePixelRatio || 1, 2), W = innerWidth, H = innerHeight, id = Flight.ship ? Flight.ship.id : '', now = performance.now();
+if (force || !this._bhT || now - this._bhT > 500) { const bar = $('#fl-bar'); this._bh = bar && bar.offsetHeight ? Math.round(bar.offsetHeight) : 40; this._bhT = now; }   // medir la barra a lo sumo dos veces por segundo
+const bh = this._bh;
+if (!force && W === this.W && H === this.H && dpr === this.dpr && id === this.shipId && bh === this.barH) return;
+this.W = W; this.H = H; this.dpr = dpr; this.shipId = id; this.barH = bh; $('#app').style.setProperty('--ckbar', bh + 'px');
+for (const cv of [E.base, E.mfd, E.glass]) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+const L = this.L = this.layout(W, H);
+const def = L.mfds.length === 3 ? ['nav', 'rad', 'tgt'] : ['orb', 'tgt'];
+if (!this.pages || this.pages.length !== L.mfds.length) this.pages = def.slice(0, L.mfds.length);
+this.drawBase(); this.drawGlass(); this.buildMask(); this.buildHits();
+$('#app').classList.toggle('ck-nomfd', !L.mfds.length);
+},
+drawBase() {
+const E = this.E(), L = this.L, c = E.base.getContext('2d'), { W, H, yC, yE, mfds } = L, T = this.tex || {}, tint = CK_TINT[this.shipId] || [1, 1, 1];
+c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0); c.clearRect(0, 0, W, H);
+// tablero: recubrimiento en polvo con luz cenital, costuras y tornillos
+this.dashPath(c, L); c.fillStyle = this.pattern(c, T.panel, tint, 1); c.fill();
+let g = c.createLinearGradient(0, yC, 0, H); g.addColorStop(0, 'rgba(255,255,255,.07)'); g.addColorStop(0.25, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,.55)');
+this.dashPath(c, L); c.fillStyle = g; c.fill();
+c.save(); this.dashPath(c, L); c.clip();
+c.lineWidth = 26; c.strokeStyle = '#090a0d'; this.dashPath(c, L, -4); c.stroke();
+c.lineWidth = 1; c.strokeStyle = 'rgba(255,255,255,.13)'; this.dashPath(c, L, -1); c.stroke();
+c.strokeStyle = 'rgba(0,0,0,.6)'; c.lineWidth = 2; this.dashPath(c, L, -16); c.stroke();
+c.strokeStyle = 'rgba(255,255,255,.05)'; c.lineWidth = 1; this.dashPath(c, L, -18); c.stroke();
+const seamY = H - 40;
+c.strokeStyle = 'rgba(0,0,0,.55)'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(0, seamY); c.lineTo(W, seamY); c.stroke();
+c.strokeStyle = 'rgba(255,255,255,.05)'; c.beginPath(); c.moveTo(0, seamY + 1.5); c.lineTo(W, seamY + 1.5); c.stroke();
+[W * 0.22, W * 0.78].forEach(x => { c.strokeStyle = 'rgba(0,0,0,.5)'; c.beginPath(); c.moveTo(x, yE + 30); c.lineTo(x, H); c.stroke(); c.strokeStyle = 'rgba(255,255,255,.04)'; c.beginPath(); c.moveTo(x + 1.5, yE + 30); c.lineTo(x + 1.5, H); c.stroke(); this.screw(c, x - 10, yE + 46, 3.2); this.screw(c, x + 12, yE + 46, 3.2); });
+// franja de advertencia y rótulos estarcidos
+if (!L.port) {
+c.save(); c.translate(W * 0.22 + 14, H - 30); c.beginPath(); c.rect(0, 0, 70, 9); c.clip(); for (let x = -12; x < 80; x += 12) { c.fillStyle = '#c99a2e'; c.beginPath(); c.moveTo(x, 9); c.lineTo(x + 6, 0); c.lineTo(x + 12, 0); c.lineTo(x + 6, 9); c.fill(); } c.restore();
+c.font = '600 9px "JetBrains Mono", ui-monospace, monospace'; c.fillStyle = 'rgba(214,220,230,.38)'; c.textAlign = 'left';
+c.fillText('PRESIÓN DE CABINA · O₂ 21 %', W * 0.22 + 92, H - 22);
+c.textAlign = 'right'; c.fillText('SOLARIS · ' + (Flight.ship ? Flight.ship.name.toUpperCase() : ''), W * 0.78 - 14, H - 22);
+}
+c.restore();
+// pantallas: bisel metálico, botones laterales y cristal apagado
+const metalDark = this.pattern(c, T.metal, tint, 0.75);
+mfds.forEach(m => {
+c.save(); c.shadowColor = 'rgba(0,0,0,.7)'; c.shadowBlur = 14; c.shadowOffsetY = 4;
+this.rrect(c, m.x - 12, m.y - 12, m.w + 24, m.h + 30, 12); c.fillStyle = metalDark; c.fill(); c.restore();
+g = c.createLinearGradient(0, m.y - 12, 0, m.y + m.h + 18); g.addColorStop(0, 'rgba(255,255,255,.12)'); g.addColorStop(0.1, 'rgba(255,255,255,0)'); g.addColorStop(1, 'rgba(0,0,0,.35)');
+this.rrect(c, m.x - 12, m.y - 12, m.w + 24, m.h + 30, 12); c.fillStyle = g; c.fill();
+c.strokeStyle = 'rgba(0,0,0,.8)'; c.lineWidth = 1.5; this.rrect(c, m.x - 12, m.y - 12, m.w + 24, m.h + 30, 12); c.stroke();
+this.rrect(c, m.x - 2, m.y - 2, m.w + 4, m.h + 4, 5); c.fillStyle = '#000'; c.fill();
+this.rrect(c, m.x, m.y, m.w, m.h, 4); c.fillStyle = '#020806'; c.fill();
+for (let i = 0; i < 5; i++) { const bx = m.x + (i + 0.5) * m.w / 5 - 11; this.rrect(c, bx, m.y + m.h + 6, 22, 9, 3); c.fillStyle = '#1b1e23'; c.fill(); c.strokeStyle = 'rgba(255,255,255,.1)'; c.lineWidth = 1; c.stroke(); }
+[[m.x - 6, m.y - 6], [m.x + m.w + 6, m.y - 6], [m.x - 6, m.y + m.h + 12], [m.x + m.w + 6, m.y + m.h + 12]].forEach(([x, y]) => this.screw(c, x, y, 2.6));
+});
+// alojamientos de los testigos luminosos sobre el tablero
+this.lamps = [];
+if (!L.port) {
+const names = ['ASIST', 'ESTAB', 'FRENO', 'PILOTO', 'ÓRBITA', 'RCS', 'ESCÁNER', 'ALERTA'], lw = 46, lh = 15, n = names.length, x0 = W / 2 - (n * lw + (n - 1) * 5) / 2, y = yC + 9;
+names.forEach((t, i) => { const x = x0 + i * (lw + 5); this.rrect(c, x, y, lw, lh, 3); c.fillStyle = '#07080a'; c.fill(); c.strokeStyle = 'rgba(255,255,255,.09)'; c.lineWidth = 1; c.stroke(); this.lamps.push({ t, x, y, w: lw, h: lh }); });
+}
+// marco de la cabina: metal pintado, bisel interior, junta de goma y remaches
+c.save(); c.shadowColor = 'rgba(0,0,0,.85)'; c.shadowBlur = 18; this.framePath(c, L); c.fillStyle = this.pattern(c, T.metal, tint, 0.78); c.fill(); c.restore();
+g = c.createLinearGradient(0, 0, 0, yE); g.addColorStop(0, 'rgba(0,0,0,.55)'); g.addColorStop(0.4, 'rgba(0,0,0,.15)'); g.addColorStop(1, 'rgba(0,0,0,.35)');
+this.framePath(c, L); c.fillStyle = g; c.fill();
+const ed = this.edge(L), line = (w, s, off) => {
+c.lineWidth = w; c.strokeStyle = s; c.beginPath();
+c.moveTo(ed[0][0] + off, ed[0][1]); c.lineTo(ed[1][0] + off, ed[1][1] + off * 0.6); c.quadraticCurveTo(W / 2, L.th * 0.35 + off * 0.6, ed[3][0] - off, ed[3][1] + off * 0.6); c.lineTo(ed[4][0] - off, ed[4][1]); c.stroke();
+};
+c.save(); this.framePath(c, L); c.clip();
+line(18, 'rgba(0,0,0,.35)', 9); line(7, 'rgba(0,0,0,.55)', 3); line(1.2, 'rgba(220,228,240,.22)', 9.5); line(1, 'rgba(255,255,255,.08)', 16);
+c.restore();
+line(3.5, '#050506', -1.2);
+const riv = (a, b, step, off) => { const dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy), nx = -dy / len, ny = dx / len; for (let s = step * 0.7; s < len - step * 0.4; s += step) this.screw(c, a[0] + dx * s / len + nx * off, a[1] + dy * s / len + ny * off, 2.2); };
+riv(ed[1], ed[0], 46, -15); riv(ed[3], ed[4], 46, 15);
+for (let k = 1; k < 12; k++) { const t = k / 12, x = (1 - t) * (1 - t) * ed[1][0] + 2 * (1 - t) * t * W / 2 + t * t * ed[3][0], y = (1 - t) * (1 - t) * ed[1][1] + 2 * (1 - t) * t * L.th * 0.35 + t * t * ed[3][1]; this.screw(c, x, y - 13, 2.2); }
+c.font = '600 8.5px "JetBrains Mono", ui-monospace, monospace'; c.fillStyle = 'rgba(214,220,230,.3)'; c.textAlign = 'center';
+if (!L.port) { c.save(); c.translate(L.pw * 0.5 + 6, L.yE - 70); c.rotate(-Math.atan2(L.yE - L.th, L.cx - L.pw)); c.fillText('NO APOYAR', 0, 0); c.restore(); }
+},
+drawGlass() {
+const E = this.E(), c = E.glass.getContext('2d'), { W, H } = this.L, img = this.tex && this.tex.glass;
+c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0); c.clearRect(0, 0, W, H);
+if (img) c.drawImage(img, 0, 0, W, H);
+const g = c.createLinearGradient(0, 0, W, H); g.addColorStop(0.15, 'rgba(255,255,255,0)'); g.addColorStop(0.32, 'rgba(255,255,255,.05)'); g.addColorStop(0.36, 'rgba(255,255,255,0)'); g.addColorStop(0.6, 'rgba(255,255,255,0)'); g.addColorStop(0.66, 'rgba(255,255,255,.035)'); g.addColorStop(0.7, 'rgba(255,255,255,0)');
+c.fillStyle = g; c.fillRect(0, 0, W, H);
+},
+buildMask() {
+const L = this.L, k = 0.5, m = document.createElement('canvas'); m.width = Math.round(L.W * k); m.height = Math.round(L.H * k);
+const c = m.getContext('2d'); c.setTransform(k, 0, 0, k, 0, 0); c.fillStyle = '#fff'; this.framePath(c, L); c.fill(); this.dashPath(c, L); c.fill();
+const url = 'url(' + m.toDataURL('image/png') + ')', s = this.E().light.style; s.maskImage = s.webkitMaskImage = url;
+},
+buildHits() {
+const box = this.E().hits; box.innerHTML = '';
+this.L.mfds.forEach((m, i) => {
+const b = document.createElement('button'); b.className = 'ck-hit'; b.type = 'button';
+Object.assign(b.style, { left: m.x + 'px', top: m.y + 'px', width: m.w + 'px', height: m.h + 'px' });
+b.setAttribute('aria-label', 'Cambiar la página de la pantalla ' + (i + 1)); b.dataset.tip = 'Clic: cambiar de página';
+b.addEventListener('click', () => { const k = MFD_PAGES.findIndex(p => p[0] === this.pages[i]); this.pages[i] = MFD_PAGES[(k + 1) % MFD_PAGES.length][0]; FlightAudio.event('click'); this.mfdT = 0; $('#gl').focus({ preventScroll: true }); });
+box.appendChild(b);
+});
+},
+// cada fotograma: sacudida, luz del Sol y del motor, alerta y brillo del cristal
+frame(dt) {
+const F = Flight, E = this.E();
+if (!this.tex) { this.load(); return; }
+this.resize();
+const fx = F.cfx, still = UI.reducedMotion ? 0 : 1, t = performance.now() / 1000;
+const amp = fx ? (fx.env * 7 + Math.max(F.thrAct, 0) * 1.4) * still : 0;
+const sx = Math.sin(t * 37.1) * 0.6 + Math.sin(t * 61.7) * 0.4, sy = Math.sin(t * 43.3 + 1.3) * 0.6 + Math.sin(t * 71.9) * 0.4;
+E.root.style.transform = amp > 0.05 ? `translate(${(sx * amp).toFixed(2)}px, ${(sy * amp).toFixed(2)}px)` : '';
+const sun = World.sun, sd = V.norm(V.sub(sun.km || [0, 0, 0], F.pos)), dot = V.dot(F.F, sd), au = V.len(F.pos) / AU_KM;
+const I = clamp(1 / Math.sqrt(Math.max(au, 0.05)), 0.12, 1.3);
+const v = World.view, vx = v[0] * sd[0] + v[4] * sd[1] + v[8] * sd[2], vy = v[1] * sd[0] + v[5] * sd[1] + v[9] * sd[2];
+const ang = Math.atan2(-vx, vy) * RAD + 180;
+const k = 1 - Math.exp(-dt * 3);
+this.sunK += (clamp((1 - dot) * 0.45, 0, 0.8) * I - this.sunK) * k;
+this.glassK += (clamp((dot - 0.55) / 0.45, 0, 1) * I - this.glassK) * k;
+const s = E.light.style, e = F.ship.eng, alert = F.alert ? (Math.sin(t * 9) * 0.5 + 0.5) : 0, imp = F.impactT ? clamp(1 - (performance.now() - F.impactT) / 900, 0, 1) : 0;
+s.setProperty('--sa', ang.toFixed(1) + 'deg'); s.setProperty('--si', this.sunK.toFixed(3));
+s.setProperty('--ec', e.map(x => Math.round(Math.min(1, x) * 255)).join(',')); s.setProperty('--ei', (Math.max(F.thr, 0) * 0.9).toFixed(3));
+s.setProperty('--ai', Math.max(alert * 0.8, imp).toFixed(3));
+E.glass.style.opacity = (0.16 + this.glassK * 0.7).toFixed(3);
+this.mfdT -= dt;
+if (this.mfdT <= 0) { this.mfdT = 1 / 14; this.drawMFD(); }
+},
+// pantallas multifunción y testigos
+drawMFD() {
+const c = this.E().mfd.getContext('2d'), L = this.L, F = Flight, t = performance.now() / 1000;
+c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0); c.clearRect(0, 0, L.W, L.H);
+const on = { ASIST: F.assisted, ESTAB: F.stab, FRENO: F.braking || F.autoBrake, PILOTO: F.intercept || F.match || !!F.hold, 'ÓRBITA': !!F.orbit, RCS: F.rcs > 0.05, 'ESCÁNER': !!(FlightGame.scan), ALERTA: !!F.alert };
+const colOf = { ALERTA: [255, 90, 70], FRENO: F.braking ? [255, 190, 80] : [120, 255, 196], 'ESCÁNER': [140, 200, 255] };
+(this.lamps || []).forEach(l => {
+let a = on[l.t] ? 1 : 0; if (l.t === 'ALERTA' && a) a = Math.sin(t * 10) > 0 ? 1 : 0.25; if (l.t === 'ESCÁNER' && a) a = 0.55 + 0.45 * Math.sin(t * 8);
+const col = colOf[l.t] || [120, 255, 196];
+c.font = '600 8.5px "JetBrains Mono", ui-monospace, monospace'; c.textAlign = 'center'; c.textBaseline = 'middle';
+if (a) { c.fillStyle = `rgba(${col},${0.16 * a})`; this.rrect(c, l.x + 1, l.y + 1, l.w - 2, l.h - 2, 2); c.fill(); c.shadowColor = `rgba(${col},${0.9 * a})`; c.shadowBlur = 8; }
+c.fillStyle = a ? `rgba(${col},${0.55 + 0.45 * a})` : 'rgba(150,160,170,.22)'; c.fillText(l.t, l.x + l.w / 2, l.y + l.h / 2 + 0.5); c.shadowBlur = 0;
+});
+L.mfds.forEach((m, i) => this.screen(c, m, this.pages[i]));
+},
+screen(c, m, page) {
+const F = Flight, G = '120,255,196', A = a => `rgba(${G},${a})`, amber = 'rgba(255,196,90,.95)', red = 'rgba(255,110,90,.95)';
+c.save(); this.rrect(c, m.x, m.y, m.w, m.h, 4); c.clip();
+let g = c.createRadialGradient(m.x + m.w / 2, m.y + m.h / 2, m.h * 0.1, m.x + m.w / 2, m.y + m.h / 2, m.w * 0.75); g.addColorStop(0, 'rgba(6,26,20,.95)'); g.addColorStop(1, 'rgba(1,6,5,.98)');
+c.fillStyle = g; c.fillRect(m.x, m.y, m.w, m.h);
+const fs = clamp(m.h / 13, 9, 13), sm = fs * 0.82, P = 8, mono = '"JetBrains Mono", ui-monospace, monospace';
+c.textBaseline = 'alphabetic'; c.shadowColor = A(0.6); c.shadowBlur = 4;
+const title = (MFD_PAGES.find(p => p[0] === page) || ['', ''])[1];
+c.fillStyle = A(0.14); c.fillRect(m.x, m.y, m.w, fs + 8);
+c.font = `600 ${sm}px ${mono}`; c.fillStyle = A(0.95); c.textAlign = 'left'; c.fillText(title, m.x + P, m.y + fs + 1);
+c.textAlign = 'right'; c.fillStyle = A(0.5); c.fillText(MFD_PAGES.map(p => p[0] === page ? '■' : '□').join(''), m.x + m.w - P, m.y + fs + 1);
+const row = (y, k, v, col) => { c.font = `400 ${sm}px ${mono}`; c.textAlign = 'left'; c.fillStyle = A(0.55); c.fillText(k, m.x + P, y); c.font = `600 ${fs}px ${mono}`; c.textAlign = 'right'; c.fillStyle = col || A(0.95); c.fillText(v, m.x + m.w - P, y); };
+const ref = F.ref, T = F.target, vrel = V.sub(F.vel, ref.vel), sp = V.len(vrel), y0 = m.y + fs * 2 + 12, lh = (m.h - fs * 2 - 18) / 6;
+const short = s => (s || '').length > 14 ? s.slice(0, 13) + '…' : s;
+if (page === 'nav') {
+const rr = V.sub(F.pos, ref.km), d = V.len(rr), vr = V.dot(vrel, rr) / Math.max(d, 1e-9), hdg = (() => { const e = Astro.sceneToEcl(F.F); return wrap360(Math.atan2(e[1], e[0]) * RAD); })();
+row(y0, 'VEL', F.fmtSpeed(sp).replace(/ \(.*/, ''));
+row(y0 + lh, 'REF', short(ref.def.short || ref.def.name).toUpperCase());
+row(y0 + lh * 2, 'ALT', fmtKm(Math.max(d - ref.R, 0)));
+row(y0 + lh * 3, 'V. RADIAL', (vr >= 0 ? '+' : '−') + F.fmtSpeed(Math.abs(vr)).replace(/ \(.*/, ''), vr < -0.5 && d - ref.R < ref.R * 2 ? amber : null);
+row(y0 + lh * 4, 'RUMBO', fmt(hdg, 0).padStart(3, '0') + '°');
+row(y0 + lh * 5, 'SOL', fmtAU(V.len(F.pos) / AU_KM));
+} else if (page === 'orb') {
+const O = F.orbitEl();
+const cx = m.x + m.w * 0.36, cy = m.y + (m.h + fs + 8) / 2 + 2, R0 = Math.min(m.w * 0.3, (m.h - fs - 16) * 0.42);
+if (O && O.bound && !F.assisted) {
+const s = R0 / Math.max(O.ra, ref.R * 1.5), rb = ref.R * s;
+c.fillStyle = A(0.12); c.beginPath(); c.arc(cx, cy, Math.max(rb, 2), 0, TAU); c.fill(); c.strokeStyle = A(0.6); c.lineWidth = 1; c.stroke();
+const a = O.a * s, b = a * Math.sqrt(1 - O.e * O.e), off = O.a * O.e * s;
+c.strokeStyle = O.rp < ref.R ? red : A(0.9); c.lineWidth = 1.4; c.beginPath(); c.ellipse(cx - off * Math.cos(O.w), cy - off * Math.sin(O.w), a, b, O.w, 0, TAU); c.stroke();
+c.fillStyle = amber; c.beginPath(); c.arc(cx + Math.cos(O.nuA) * O.r * s, cy + Math.sin(O.nuA) * O.r * s, 3, 0, TAU); c.fill();
+const tx = m.x + m.w * 0.66; c.font = `400 ${sm}px ${mono}`; c.textAlign = 'left';
+[['AP', fmtKm(O.ra - ref.R)], ['PE', fmtKm(O.rp - ref.R)], ['T', fmtDur(O.T / 86400)], ['e', fmt(O.e, 3)]].forEach(([k, v], j) => { c.fillStyle = A(0.55); c.fillText(k, tx, y0 + lh * j * 1.2); c.fillStyle = k === 'PE' && O.rp < ref.R ? red : A(0.95); c.font = `600 ${sm}px ${mono}`; c.fillText(v, tx + sm * 2.2, y0 + lh * j * 1.2); c.font = `400 ${sm}px ${mono}`; });
+c.fillStyle = A(0.5); c.fillText(short(ref.def.short || ref.def.name).toUpperCase(), tx, m.y + m.h - 8);
+} else {
+c.font = `400 ${sm}px ${mono}`; c.textAlign = 'center'; c.fillStyle = A(0.75);
+const msg = F.assisted ? ['MODO ASISTIDO', 'SIN GRAVEDAD', 'Pulsa ' + Keys.label(Keys.code('flight', 'mode')).toUpperCase() + ' para simular'] : O ? ['TRAYECTORIA ABIERTA', 'ESCAPE DE ' + short(ref.def.short || ref.def.name).toUpperCase(), 'e = ' + fmt(O.e, 2)] : ['SIN DATOS'];
+msg.forEach((t, j) => c.fillText(t, m.x + m.w / 2, cy - lh + j * lh));
+}
+} else if (page === 'rad') {
+const cx = m.x + m.w / 2, cy = m.y + (m.h + fs + 8) / 2 + 2, R0 = Math.min(m.w, m.h - fs - 14) * 0.44;
+const Fw = F.F, U = F.U, Lf = F.L();
+let range = T ? V.dist(F.pos, T.km) * 1.25 : 1e6; range = Math.pow(10, Math.ceil(Math.log10(Math.max(range, 50))));
+c.strokeStyle = A(0.25); c.lineWidth = 1; [1, 0.5].forEach(k => { c.beginPath(); c.arc(cx, cy, R0 * k, 0, TAU); c.stroke(); });
+c.beginPath(); c.moveTo(cx - R0, cy); c.lineTo(cx + R0, cy); c.moveTo(cx, cy - R0); c.lineTo(cx, cy + R0); c.stroke();
+const sw = (t => t % TAU)(performance.now() / 1000 * 2.2); g = c.createConicGradient ? c.createConicGradient(sw - 0.6, cx, cy) : null;
+if (g) { g.addColorStop(0, A(0)); g.addColorStop(0.09, A(0.22)); g.addColorStop(0.1, A(0)); c.fillStyle = g; c.beginPath(); c.arc(cx, cy, R0, 0, TAU); c.fill(); }
+const pts = [];
+for (const rb of World.rb) {
+if (rb.hidden || (rb.isCraft && rb !== T)) continue;
+const r = V.sub(rb.km, F.pos), d = V.len(r); if (d > range * 1.02 && rb !== T) continue;
+const x = V.dot(r, Lf) * -1, z = V.dot(r, Fw), k = Math.min(d, range) / Math.max(d, 1e-9) * R0 / range;
+pts.push([cx + x * k, cy - z * k, rb, d > range]);
+}
+pts.forEach(([x, y, rb, out]) => { const tg = rb === T; c.fillStyle = tg ? amber : A(out ? 0.4 : 0.9); c.beginPath(); c.arc(x, y, tg ? 3.5 : 2.4, 0, TAU); c.fill(); if (tg || rb === F.ref) { c.font = `400 ${sm * 0.9}px ${mono}`; c.textAlign = 'left'; c.fillText(short(rb.def.short || rb.def.name), x + 5, y - 4); } });
+c.fillStyle = A(0.95); c.beginPath(); c.moveTo(cx, cy - 6); c.lineTo(cx + 4, cy + 4); c.lineTo(cx - 4, cy + 4); c.closePath(); c.fill();
+c.font = `400 ${sm * 0.9}px ${mono}`; c.textAlign = 'right'; c.fillStyle = A(0.6); c.fillText('R ' + fmtKm(range), m.x + m.w - P, m.y + m.h - 7);
+} else if (page === 'tgt') {
+if (!T) { c.font = `400 ${sm}px ${mono}`; c.textAlign = 'center'; c.fillStyle = A(0.75); c.fillText('SIN OBJETIVO', m.x + m.w / 2, m.y + m.h / 2); c.fillText('Pulsa ' + Keys.label(Keys.code('flight', 'target')).toUpperCase(), m.x + m.w / 2, m.y + m.h / 2 + lh); }
+else {
+const d = V.dist(F.pos, T.km), rv = V.sub(F.vel, T.vel), rh = V.scale(V.sub(T.km, F.pos), 1 / Math.max(d, 1e-9)), clos = V.dot(rv, rh), alt = d - T.R, eta = clos > 1e-6 ? alt / clos : null;
+c.font = `600 ${fs * 1.05}px ${mono}`; c.textAlign = 'left'; c.fillStyle = amber; c.fillText(short(T.def.name).toUpperCase(), m.x + P, y0);
+row(y0 + lh, 'DIST', fmtKm(d));
+row(y0 + lh * 2, 'V. REL', F.fmtSpeed(V.len(rv)).replace(/ \(.*/, ''));
+row(y0 + lh * 3, clos >= 0 ? 'ACERC.' : 'ALEJ.', F.fmtSpeed(Math.abs(clos)).replace(/ \(.*/, ''));
+row(y0 + lh * 4, 'ETA', eta != null ? fmtDur(eta / 86400) : '—');
+const S = FlightGame.scanState(T), sc = FlightGame.scan;
+const st = sc && sc.T === T ? Math.round(sc.p * 100) + ' %' : S.done ? 'REGISTRADO' : S.inRange ? 'LISTO (' + Keys.label(Keys.code('flight', 'scan')).toUpperCase() + ')' : 'LEJOS';
+row(y0 + lh * 5, 'ESC', st, S.done ? A(0.95) : S.inRange ? amber : A(0.5));
+}
+} else if (page === 'sys') {
+row(y0, 'EMPUJE', Math.round(Math.max(F.thrAct, 0) * 100) + ' %');
+row(y0 + lh, 'ACEL', fmt(F.accNow / 9.81, 2) + ' g');
+row(y0 + lh * 2, 'TIEMPO', '×' + fmt(WARPS[F.warpIdx], 0));
+row(y0 + lh * 3, 'VUELO', fmtClock(FlightGame.sess ? FlightGame.sess.time : 0));
+row(y0 + lh * 4, 'RECORRIDO', fmtKm(FlightGame.sess ? FlightGame.sess.dist : 0));
+row(y0 + lh * 5, 'PUNTOS', fmt(FlightGame.data ? FlightGame.data.stats.points : 0, 0));
+}
+c.shadowBlur = 0;
+c.fillStyle = 'rgba(0,0,0,.18)'; for (let y = m.y; y < m.y + m.h; y += 3) c.fillRect(m.x, y, m.w, 1);
+g = c.createLinearGradient(m.x, m.y, m.x + m.w, m.y + m.h); g.addColorStop(0, 'rgba(255,255,255,.07)'); g.addColorStop(0.35, 'rgba(255,255,255,0)'); c.fillStyle = g; c.fillRect(m.x, m.y, m.w, m.h);
+c.restore();
+},
+};
+const fmtClock = s => { s = Math.max(0, Math.floor(s)); const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, x = s % 60; return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(x).padStart(2, '0'); };
+// HUD vectorial: retícula, vector de velocidad, objetivo, escalera de cabeceo, cintas de velocidad, altitud y rumbo, y efectos de pantalla
+const HUD = {
+W: 0, H: 0, dpr: 1, cv: null, c: null, streaks: [], o: {}, flash: 0,
+resize() {
+const cv = this.cv || (this.cv = $('#fl-hud')), dpr = Math.min(window.devicePixelRatio || 1, 2), W = innerWidth, H = innerHeight;
+if (W === this.W && H === this.H && dpr === this.dpr && this.c) return;
+this.W = W; this.H = H; this.dpr = dpr; cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); this.c = cv.getContext('2d');
+},
+proj(p) { const o = this.o; World.project(p, o); return o.on && isFinite(o.x) && isFinite(o.y) ? [o.x, o.y] : null; },
+dir(d) { return this.proj(V.add(World.cam, d)); },
+txt(t, x, y, al, col, font) { const c = this.c; c.font = font || this.f1; c.textAlign = al || 'center'; c.lineWidth = 3; c.strokeStyle = 'rgba(0,0,0,.55)'; c.strokeText(t, x, y); c.fillStyle = col; c.fillText(t, x, y); },
+draw(F, dt) {
+this.resize();
+const c = this.c, W = this.W, H = this.H, mode = F.camMode, cock = mode === 'cockpit', full = (cock || mode === 'chase') && W >= 600;
+c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0); c.clearRect(0, 0, W, H);
+if (F.state !== 'fly' && F.state !== 'pause') return;
+const G = cock ? '120,255,196' : '160,226,255', A = a => `rgba(${G},${a})`, amber = 'rgba(255,200,100,.95)', red = 'rgba(255,110,90,.95)';
+const mono = '"JetBrains Mono", ui-monospace, monospace'; this.f1 = `500 12px ${mono}`; this.f2 = `600 13px ${mono}`;
+const dash = cock && Cockpit.L ? Cockpit.L.yC : H, cx = W / 2, cy = cock ? Math.min(H / 2, dash - 150) : H / 2, R = Math.min(W * 0.26, (dash - 40) * 0.42, 300);
+const ref = F.ref, T = F.target, vrel = V.sub(F.vel, ref.vel), sp = V.len(vrel), warp = WARPS[F.warpIdx];
+c.lineCap = 'round'; c.lineJoin = 'round';
+const stroke = (w, col, fn) => { c.lineWidth = w + 2.2; c.strokeStyle = 'rgba(0,0,0,.45)'; c.beginPath(); fn(); c.stroke(); c.lineWidth = w; c.strokeStyle = col; c.beginPath(); fn(); c.stroke(); };
+this.effects(F, dt, cx, cy);
+// escalera de cabeceo respecto al horizonte local del cuerpo de referencia (o a la eclíptica cerca del Sol)
+if (cock && full) {
+const up = ref.isSun ? [0, 1, 0] : V.norm(V.sub(F.pos, ref.km));
+let h = V.sub(F.F, V.scale(up, V.dot(F.F, up)));
+if (V.len(h) > 1e-4) {
+h = V.norm(h); const rt = V.norm(V.cross(h, up)), pitch = Math.asin(clamp(V.dot(F.F, up), -1, 1)) * RAD;
+c.save(); c.beginPath(); c.arc(cx, cy, R * 1.02, 0, TAU); c.clip();
+for (let a = -80; a <= 80; a += 10) {
+if (Math.abs(a - pitch) > 25) continue;
+const d = V.add(V.scale(h, Math.cos(a * DEG)), V.scale(up, Math.sin(a * DEG))), p = this.dir(d), q = this.dir(V.add(d, V.scale(rt, 0.02)));
+if (!p || !q) continue;
+const ux = q[0] - p[0], uy = q[1] - p[1], ul = Math.hypot(ux, uy) || 1, ex = ux / ul, ey = uy / ul, half = a === 0 ? R * 1.1 : R * 0.32, gap = a === 0 ? 0 : R * 0.1;
+stroke(a === 0 ? 1.5 : 1.1, A(a === 0 ? 0.6 : 0.38), () => {
+if (a < 0) { for (let s = gap; s < half; s += 12) { c.moveTo(p[0] + ex * s, p[1] + ey * s); c.lineTo(p[0] + ex * Math.min(s + 6, half), p[1] + ey * Math.min(s + 6, half)); c.moveTo(p[0] - ex * s, p[1] - ey * s); c.lineTo(p[0] - ex * Math.min(s + 6, half), p[1] - ey * Math.min(s + 6, half)); } }
+else { c.moveTo(p[0] - ex * half, p[1] - ey * half); c.lineTo(p[0] - ex * gap, p[1] - ey * gap); c.moveTo(p[0] + ex * gap, p[1] + ey * gap); c.lineTo(p[0] + ex * half, p[1] + ey * half); }
+});
+if (a) { this.txt(String(Math.abs(a)), p[0] + ex * (half + 16), p[1] + ey * (half + 16) + 4, 'center', A(0.6)); }
+}
+c.restore();
+this.txt(ref.isSun ? 'ECLÍPTICA' : 'HORIZONTE · ' + (ref.def.short || ref.def.name).toUpperCase(), cx, cy + R + 22, 'center', A(0.45), `500 10px ${mono}`);
+}
+}
+// retícula de la proa
+const bore = this.dir(F.F);
+if (bore && mode !== 'free') stroke(1.6, A(0.95), () => { const [x, y] = bore; c.moveTo(x - 22, y); c.lineTo(x - 9, y); c.lineTo(x - 5, y + 6); c.lineTo(x, y); c.lineTo(x + 5, y + 6); c.lineTo(x + 9, y); c.lineTo(x + 22, y); c.moveTo(x, y - 4); c.lineTo(x, y - 9); });
+// vector de velocidad (progrado y retrógrado) respecto al cuerpo de referencia
+if (sp > 1e-5) {
+const vd = V.scale(vrel, 1 / sp), p = this.dir(vd), q = this.dir(V.scale(vd, -1));
+if (p) stroke(1.5, A(0.95), () => { const [x, y] = p; c.moveTo(x + 7, y); c.arc(x, y, 7, 0, TAU); c.moveTo(x - 7, y); c.lineTo(x - 16, y); c.moveTo(x + 7, y); c.lineTo(x + 16, y); c.moveTo(x, y - 7); c.lineTo(x, y - 13); });
+if (q) stroke(1.3, A(0.7), () => { const [x, y] = q; c.moveTo(x + 7, y); c.arc(x, y, 7, 0, TAU); c.moveTo(x - 5, y - 5); c.lineTo(x + 5, y + 5); c.moveTo(x + 5, y - 5); c.lineTo(x - 5, y + 5); });
+}
+if (F.plan && F.plan.dir && (F.intercept || F.match || F.hold)) { const p = this.dir(F.plan.dir); if (p) stroke(1.4, amber, () => { const [x, y] = p; c.moveTo(x, y - 9); c.lineTo(x + 9, y); c.lineTo(x, y + 9); c.lineTo(x - 9, y); c.closePath(); }); }
+// objetivo: corchetes, datos, anillo del escáner o flecha fuera de pantalla
+if (T) {
+const d = V.dist(F.pos, T.km), rv = V.sub(F.vel, T.vel), rh = V.scale(V.sub(T.km, F.pos), 1 / Math.max(d, 1e-9)), clos = V.dot(rv, rh);
+const p = this.proj(T.posS), sc = FlightGame.scan, S = FlightGame.scanState(T);
+const inView = p && p[0] > 30 && p[0] < W - 30 && p[1] > 30 && p[1] < (cock ? dash - 10 : H - 30);
+if (inView) {
+const s = Math.max(30, Math.min((T.proj ? T.proj.rpx : 0) * 2 + 22, 280)) / 2, [x, y] = p, k = s * 0.42;
+stroke(1.6, amber, () => { [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([a, b]) => { c.moveTo(x + a * s, y + b * (s - k)); c.lineTo(x + a * s, y + b * s); c.lineTo(x + a * (s - k), y + b * s); }); });
+this.txt((T.def.short || T.def.name).toUpperCase(), x, y + s + 16, 'center', amber, this.f2);
+this.txt(fmtKm(d) + '   ' + (clos >= 0 ? '▼ ' : '▲ ') + F.fmtSpeed(Math.abs(clos)).replace(/ \(.*/, ''), x, y + s + 31, 'center', 'rgba(255,214,150,.85)');
+if (sc && sc.T === T) {
+c.lineWidth = 3; c.strokeStyle = 'rgba(140,200,255,.25)'; c.beginPath(); c.arc(x, y, s + 9, 0, TAU); c.stroke();
+c.strokeStyle = 'rgba(160,215,255,.95)'; c.beginPath(); c.arc(x, y, s + 9, -Math.PI / 2, -Math.PI / 2 + TAU * sc.p); c.stroke();
+const sw = performance.now() / 300; c.strokeStyle = 'rgba(160,215,255,.35)'; c.lineWidth = 1; c.beginPath(); c.moveTo(x, y); c.lineTo(x + Math.cos(sw) * (s + 9), y + Math.sin(sw) * (s + 9)); c.stroke();
+this.txt('ESCANEANDO ' + Math.round(sc.p * 100) + ' %', x, y - s - 14, 'center', 'rgba(170,220,255,.95)', this.f2);
+} else if (S.inRange && !S.done && Math.sin(performance.now() / 260) > -0.3) this.txt('PULSA ' + Keys.label(Keys.code('flight', 'scan')).toUpperCase() + ' PARA ESCANEAR', x, y - s - 12, 'center', 'rgba(170,220,255,.9)');
+else if (S.done) this.txt('✓ EN BITÁCORA', x, y - s - 12, 'center', A(0.7));
+} else {
+const v = World.view, dir = V.sub(T.posS, World.cam), vx = v[0] * dir[0] + v[4] * dir[1] + v[8] * dir[2], vy = v[1] * dir[0] + v[5] * dir[1] + v[9] * dir[2];
+const ang = Math.atan2(-vy, vx), rx = W / 2 - 70, ry = (cock ? dash : H) / 2 - 70, ccy = (cock ? dash : H) / 2;
+const k = Math.min(rx / Math.abs(Math.cos(ang) || 1e-9), ry / Math.abs(Math.sin(ang) || 1e-9)), x = W / 2 + Math.cos(ang) * k, y = ccy + Math.sin(ang) * k;
+c.save(); c.translate(x, y); c.rotate(ang); c.fillStyle = amber; c.beginPath(); c.moveTo(14, 0); c.lineTo(-6, -9); c.lineTo(-2, 0); c.lineTo(-6, 9); c.closePath(); c.fill(); c.restore();
+this.txt((T.def.short || T.def.name) + ' · ' + fmtKm(d), x - Math.cos(ang) * 34, y - Math.sin(ang) * 34 + 4, 'center', amber);
+}
+}
+if (!full) return this.overlays(F, cx, cy, W, H);
+// cinta de rumbo (eclíptico)
+const e = Astro.sceneToEcl(F.F), hdg = wrap360(Math.atan2(e[1], e[0]) * RAD), ty = Math.max(cy - R - 26, 120), pxd = 5.5, span = 32;
+c.save(); c.beginPath(); c.rect(cx - span * pxd, ty - 22, span * pxd * 2, 40); c.clip();
+for (let a = Math.floor(hdg - span); a <= hdg + span; a++) {
+if (a % 5) continue; const x = cx + (a - hdg) * pxd, big = a % 10 === 0;
+stroke(1, A(0.55), () => { c.moveTo(x, ty); c.lineTo(x, ty - (big ? 9 : 5)); });
+if (big) this.txt(String(wrap360(a)).padStart(3, '0'), x, ty - 13, 'center', A(0.6), `500 10px ${mono}`);
+}
+c.restore();
+stroke(1.2, A(0.9), () => { c.rect(cx - 22, ty + 3, 44, 17); }); this.txt(String(Math.round(hdg) % 360).padStart(3, '0') + '°', cx, ty + 16, 'center', A(0.95), this.f2);
+// cintas de velocidad (izquierda) y altitud (derecha)
+const tape = (x, side, val, label, unit, warn) => {
+const hgt = Math.min(R * 0.9, 120), mag = Math.max(Math.abs(val), 1e-6), step = Math.pow(10, Math.floor(Math.log10(mag))), px = hgt / 2.2;
+c.save(); c.beginPath(); c.rect(x - 60, cy - hgt, 120, hgt * 2); c.clip();
+for (let k = Math.floor((val - step * 2.4) / (step / 2)); k <= Math.ceil((val + step * 2.4) / (step / 2)); k++) {
+const vv = k * step / 2, y = cy - (vv - val) / step * px, big = k % 2 === 0;
+stroke(1, A(0.5), () => { c.moveTo(x, y); c.lineTo(x + side * (big ? 10 : 5), y); });
+if (big && vv >= 0) this.txt(fmtTape(vv), x + side * 14, y + 4, side > 0 ? 'left' : 'right', A(0.55), `500 10px ${mono}`);
+}
+c.restore();
+stroke(1, A(0.4), () => { c.moveTo(x, cy - hgt); c.lineTo(x, cy + hgt); });
+const bw = 92, bx = side > 0 ? x : x - bw;
+c.fillStyle = 'rgba(0,10,8,.55)'; c.fillRect(bx, cy - 11, bw, 22); stroke(1.3, warn || A(0.95), () => c.rect(bx, cy - 11, bw, 22));
+this.txt(fmtTape(val), bx + bw / 2, cy + 5, 'center', warn || A(1), this.f2);
+this.txt(label, x + side * 46, cy - hgt - 10, 'center', A(0.6), `500 10px ${mono}`);
+this.txt(unit, bx + bw / 2, cy + 26, 'center', A(0.5), `500 10px ${mono}`);
+};
+const kms = sp >= 1, sv = kms ? sp : sp * 1000;
+tape(cx - R - 8, -1, sv, 'VEL · ' + (ref.def.short || ref.def.name).toUpperCase(), kms ? 'km/s' : 'm/s');
+const rr = V.sub(F.pos, ref.km), alt = Math.max(V.len(rr) - ref.R, 0), vr = V.dot(vrel, rr) / Math.max(V.len(rr), 1e-9);
+const danger = !ref.isSun && vr < 0 && alt / Math.max(-vr, 1e-9) < 60 * Math.max(1, warp);
+tape(cx + R + 8, 1, alt, 'ALTITUD', 'km · ' + (vr >= 0 ? '▲ ' : '▼ ') + F.fmtSpeed(Math.abs(vr)).replace(/ \(.*/, ''), danger ? red : null);
+// empuje, aceleración, tiempo y modos
+const by = cock ? dash - 34 : H - 150;
+const tw = 150, tx = cx - R - 8 - tw / 2 - 30, thrV = Math.max(-0.25, Math.min(1, F.intercept || F.match || F.hold || F.orbit ? F.thrAuto : F.thrAct));
+c.fillStyle = 'rgba(0,10,8,.4)'; c.fillRect(tx, by - 6, tw, 8);
+c.fillStyle = thrV < 0 ? 'rgba(255,150,120,.9)' : A(0.85); c.fillRect(tx, by - 6, tw * Math.abs(thrV), 8);
+stroke(1, A(0.6), () => c.rect(tx, by - 6, tw, 8));
+this.txt('EMP ' + Math.round(thrV * 100) + ' %   ' + fmt(F.accNow / 9.81, F.accNow < 98 ? 2 : 1) + ' g', tx, by - 12, 'left', A(0.85));
+const tags = [F.assisted ? 'ASIST' : 'SIM', F.stab ? 'ESTAB' : '', F.autoBrake ? 'FRENO' : '', F.intercept ? 'PILOTO' : F.match ? 'IGUALAR' : F.hold ? 'MANTENER' : '', F.orbit ? 'ÓRBITA' : '', '×' + fmt(warp, 0)].filter(Boolean).join('  ·  ');
+this.txt(tags, cx + R + 8 + 30 + 75, by, 'center', A(0.8));
+this.overlays(F, cx, cy, W, H);
+},
+// destellos, rayas de velocidad, viñeta de alerta e impacto
+effects(F, dt, cx, cy) {
+const c = this.c, W = this.W, H = this.H, still = !UI.reducedMotion, warp = WARPS[F.warpIdx];
+const sp = V.len(V.sub(F.vel, F.ref.vel)), app = sp * warp, k = still ? clamp((Math.log10(Math.max(app, 1e-3)) - 1.4) / 2.6, 0, 1) : 0;
+let ox = cx, oy = cy;
+if (sp > 1e-5) { const p = this.dir(V.scale(V.sub(F.vel, F.ref.vel), 1 / sp)); if (p) { ox = p[0]; oy = p[1]; } }
+const N = Math.round(70 * k);
+while (this.streaks.length < N) this.streaks.push({ a: Math.random() * TAU, r: 30 + Math.random() * Math.max(W, H) * 0.6, s: 0.6 + Math.random() * 0.8 });
+if (this.streaks.length > N) this.streaks.length = N;
+if (N) {
+c.lineCap = 'round';
+for (const s of this.streaks) {
+s.r *= Math.exp(dt * (1.2 + 3 * k) * s.s); if (s.r > Math.max(W, H)) { s.r = 20 + Math.random() * 120; s.a = Math.random() * TAU; }
+const L = s.r * (0.05 + 0.25 * k), x = ox + Math.cos(s.a) * s.r, y = oy + Math.sin(s.a) * s.r;
+c.strokeStyle = `rgba(200,225,255,${(0.08 + 0.3 * k) * Math.min(1, s.r / 200)})`; c.lineWidth = 1 + k;
+c.beginPath(); c.moveTo(x, y); c.lineTo(x + Math.cos(s.a) * L, y + Math.sin(s.a) * L); c.stroke();
+}
+}
+if (F.camMode === 'cockpit' && World.sun) {
+const p = this.proj(World.sun.posS);
+if (p) {
+const I = clamp(1.2 / Math.sqrt(Math.max(V.len(F.pos) / AU_KM, 0.05)), 0.15, 1.4) * (still ? 1 : 0.6);
+c.save(); c.globalCompositeOperation = 'lighter';
+let g = c.createRadialGradient(p[0], p[1], 0, p[0], p[1], 220 * I); g.addColorStop(0, `rgba(255,240,215,${0.35 * I})`); g.addColorStop(1, 'rgba(255,200,150,0)'); c.fillStyle = g; c.fillRect(p[0] - 260, p[1] - 260, 520, 520);
+g = c.createLinearGradient(p[0] - W * 0.4, 0, p[0] + W * 0.4, 0); g.addColorStop(0, 'rgba(150,190,255,0)'); g.addColorStop(0.5, `rgba(190,215,255,${0.22 * I})`); g.addColorStop(1, 'rgba(150,190,255,0)'); c.fillStyle = g; c.fillRect(p[0] - W * 0.4, p[1] - 1.5, W * 0.8, 3);
+[[0.45, 26, '255,190,120'], [0.8, 14, '140,200,255'], [1.25, 40, '180,140,255'], [1.6, 9, '255,230,170']].forEach(([t, r, col]) => { const x = p[0] + (cx - p[0]) * t * 2, y = p[1] + (cy - p[1]) * t * 2; g = c.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, `rgba(${col},${0.12 * I})`); g.addColorStop(0.7, `rgba(${col},${0.05 * I})`); g.addColorStop(1, `rgba(${col},0)`); c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill(); });
+c.restore();
+}
+}
+},
+overlays(F, cx, cy, W, H) {
+const c = this.c, now = performance.now();
+if (F.alert) { const a = (Math.sin(now / 160) * 0.5 + 0.5) * 0.28; const g = c.createRadialGradient(cx, cy, Math.min(W, H) * 0.35, cx, cy, Math.max(W, H) * 0.75); g.addColorStop(0, 'rgba(255,40,30,0)'); g.addColorStop(1, `rgba(255,40,30,${a})`); c.fillStyle = g; c.fillRect(0, 0, W, H); }
+if (F.impactT) { const a = clamp(1 - (now - F.impactT) / 900, 0, 1); if (a > 0) { c.fillStyle = `rgba(255,${Math.round(200 * a)},${Math.round(170 * a)},${a * 0.55})`; c.fillRect(0, 0, W, H); } }
+if (FlightGame.flashT) { const a = clamp(1 - (now - FlightGame.flashT) / 700, 0, 1); if (a > 0) { const g = c.createRadialGradient(cx, cy, 0, cx, cy, Math.max(W, H) * 0.7); g.addColorStop(0, `rgba(170,220,255,${a * 0.25})`); g.addColorStop(1, 'rgba(170,220,255,0)'); c.fillStyle = g; c.fillRect(0, 0, W, H); } }
+},
+};
+const fmtTape = v => { const a = Math.abs(v); return a >= 1e9 ? fmt(v / 1e9, 2) + ' G' : a >= 1e6 ? fmt(v / 1e6, a >= 1e8 ? 0 : 2) + ' M' : a >= 1e4 ? fmt(v / 1e3, a >= 1e5 ? 0 : 1) + ' k' : fmt(v, a < 10 ? 2 : a < 100 ? 1 : 0); };
+// Jugabilidad del vuelo: escáner y bitácora de descubrimientos, logros, retos con medallas, rangos y escuela de vuelo (progreso en localStorage)
+const FG_KEY = 'solaris.vuelo';
+const RANKS = [[0, 'Cadete'], [1000, 'Piloto'], [3000, 'Capitana o capitán'], [7000, 'Comandante'], [15000, 'Almirante'], [30000, 'Leyenda del Sistema Solar']];
+const SCAN_PTS = { star: 1000, planet: 500, dwarf: 400, tno: 400, moon: 300, asteroid: 250, comet: 300, craft: 150 };
+const MEDALS = { oro: ['Oro', 1500], plata: ['Plata', 1000], bronce: ['Bronce', 600], hecho: ['Completado', 300] };
+const ACHS = [
+['despegue', 'Primer despegue', 'Despega por primera vez.'],
+['escaneo', 'Primer escaneo', 'Escanea un objeto y regístralo en la bitácora.'],
+['cientifico', 'Científico de campo', 'Escanea 10 objetos distintos.'],
+['enciclopedia', 'Enciclopedia viviente', 'Escanea 30 objetos distintos.'],
+['planetas', 'Gran tour planetario', 'Escanea los ocho planetas.'],
+['galileo', 'Mensajero sideral', 'Escanea las cuatro lunas que Galileo descubrió en 1610.'],
+['orbita', 'En órbita', 'Entra en órbita alrededor de un planeta o una luna.'],
+['kepler', 'Kepler estaría orgulloso', 'Mantén una órbita estable 20 segundos en modo simulación y sin piloto automático.'],
+['contacto', 'Toma de contacto', 'Posa la nave sobre cualquier superficie.'],
+['alunizaje', 'El Águila ha alunizado', 'Toca la Luna a menos de 10 m/s.'],
+['parker', 'Más cerca que Parker', 'Acércate al Sol a menos de 9.86 radios solares (unos 6.9 millones de km).'],
+['cassini', 'La Gran Final', 'Cruza el plano de los anillos de Saturno entre el planeta y el anillo D.'],
+['luz', 'Una centésima de luz', 'Supera el 1 % de la velocidad de la luz.'],
+['kuiper', 'Más allá de Neptuno', 'Aléjate más de 30 UA del Sol.'],
+['eei', 'Visita a la EEI', 'Llega a menos de 1 km de la Estación Espacial Internacional a menos de 5 m/s.'],
+['director', 'Director de fotografía', 'Usa las seis cámaras en un mismo vuelo.'],
+['paciencia', 'Paciencia cósmica', 'Usa la aceleración temporal máxima (×100,000).'],
+['oro', 'Medalla de oro', 'Consigue un oro en cualquier reto.'],
+['piloto', 'Piloto de pruebas', 'Completa todos los retos.'],
+];
+const RETOS = [
+{ id: 'luna', name: 'Salto a la Luna', ship: 'colibri', start: 'tierra', medals: [75, 150, 300],
+desc: 'Despega desde la órbita terrestre y detente a menos de 5,000 km de la superficie de la Luna, a menos de 1 km/s respecto a ella.',
+tip: 'Fija la Luna como objetivo, oriéntate hacia ella y activa el piloto automático. Acelera el tiempo para llegar antes.',
+goal: () => FlightGame.near('luna', 5000, 1) },
+{ id: 'eei', name: 'Acoplamiento con la EEI', ship: 'colibri', start: 'eei', assisted: true, medals: [60, 100, 180],
+desc: 'Empiezas a 25 km de la Estación Espacial Internacional. Acércate a menos de 200 m de ella con una velocidad relativa menor de 2 m/s.',
+tip: 'El piloto automático te deja a unos 500 m: el tramo final es tuyo. Cerca de una estación, la velocidad y el freno se miden respecto a ella.',
+goal: () => FlightGame.near('iss', 0.2, 0.002, true) },
+{ id: 'orbita', name: 'Órbita a mano', ship: 'colibri', start: 'caida', assisted: false, medals: [40, 80, 160],
+desc: 'En modo simulación empiezas en reposo a 30,000 km de altura sobre la Tierra, y cayendo. Consigue una órbita estable sin piloto automático y mantenla 15 segundos.',
+tip: 'Ya apuntas de lado, en perpendicular a la Tierra: acelera hasta unos 3.3 km/s y vigila la pantalla ÓRBITA. El periapsis debe quedar fuera de la atmósfera.',
+goal: () => FlightGame.sess.stableT >= 15 },
+{ id: 'marte', name: 'Carrera a Marte', ship: 'odisea', start: 'tierra', medals: [120, 240, 480],
+desc: 'Viaja de la Tierra a Marte y llega a menos de 20,000 km de su superficie a menos de 5 km/s respecto al planeta.',
+tip: 'La Odisea gira despacio, pero es rapidísima en línea recta. Usa el piloto automático y la aceleración temporal.',
+goal: () => FlightGame.near('marte', 20000, 5) },
+{ id: 'galileo', name: 'Las lunas de Galileo', ship: 'colibri', start: 'jupiter', medals: [240, 420, 720],
+desc: 'Escanea Ío, Europa, Ganímedes y Calisto, las cuatro lunas que Galileo descubrió en 1610.',
+tip: 'Elige cada luna como objetivo, acércate y escanéala con la nave apuntando hacia ella.',
+goal: () => ['io', 'europa', 'ganimedes', 'calisto'].every(id => FlightGame.sess.scanned.has(id)),
+progress: () => ['io', 'europa', 'ganimedes', 'calisto'].filter(id => FlightGame.sess.scanned.has(id)).length + ' de 4 lunas' },
+{ id: 'cassini', name: 'La Gran Final de Cassini', ship: 'colibri', start: 'saturno', medals: [60, 150, 300],
+desc: 'Cruza el plano de los anillos de Saturno por el hueco entre el planeta y el anillo D, como hizo la sonda Cassini en 2017. ¡Sin atravesar los anillos!',
+tip: 'Acércate a Saturno desde arriba o desde abajo de los anillos y cruza su plano a menos de 6,000 km sobre las nubes.',
+goal: () => FlightGame.sess.cassini === 'ok', fail: () => FlightGame.sess.cassini === 'rings' && 'Atravesaste los anillos: a esa velocidad, sus partículas de hielo habrían destrozado la nave.' },
+{ id: 'sol', name: 'Rozar el Sol', ship: 'odisea', start: 'tierra', medals: [120, 240, 480],
+desc: 'Acércate al Sol a menos de 10 radios solares, más cerca que la sonda Parker, sin chocar contra él.',
+tip: 'El piloto automático se detiene a una distancia prudente del Sol: el último tramo tendrás que volarlo a mano.',
+goal: () => V.len(Flight.pos) < World.sun.R * 10 },
+];
+const TUTORIAL = [
+['thr', 'Sube el empuje con {thrUp} o arrastrando la palanca de empuje.', F => F.thrCmd > 0],
+['rot', 'Gira la nave con las flechas del teclado o arrastrando sobre la vista.', F => FlightGame.sess.rotated],
+['cam', 'Cambia de cámara con {cam}. Prueba la vista de cabina.', F => FlightGame.sess.cams.size > 1],
+['tgt', 'Elige un objetivo con {target} o haciendo clic sobre un planeta o una luna.', F => FlightGame.sess.targeted],
+['aim', 'Pulsa {aim} para orientar la nave hacia el objetivo.', F => F.aim || F.intercept],
+['ap', 'Pulsa {intercept}: el piloto automático te llevará hasta él.', F => F.intercept || F.hold],
+['warp', 'Acelera el tiempo con {warpUp} para llegar antes.', F => F.warpIdx > 0 || F.hold],
+['scan', 'Cuando estés cerca, pulsa {scan} con la nave apuntando al objetivo para escanearlo.', F => FlightGame.sess.scanned.size > 0],
+];
+const FlightGame = {
+data: null, sess: null, scan: null, flashT: 0,
+load() {
+const d = { v: 1, scans: {}, ach: {}, best: {}, stats: { flights: 0, time: 0, dist: 0, maxV: 0, landings: 0, orbits: 0, points: 0 }, tut: false, voice: true };
+try { const s = JSON.parse(localStorage.getItem(FG_KEY) || 'null'); if (s && s.v === 1) { for (const k of ['scans', 'ach', 'best']) if (s[k] && typeof s[k] === 'object') d[k] = s[k]; if (s.stats) for (const k in d.stats) if (typeof s.stats[k] === 'number' && isFinite(s.stats[k])) d.stats[k] = s.stats[k]; d.tut = !!s.tut; d.voice = s.voice !== false; } } catch (e) { }
+this.data = d; Voice.on = d.voice;
+},
+save() { try { localStorage.setItem(FG_KEY, JSON.stringify(this.data)); } catch (e) { } this._saveT = performance.now(); },
+rank(p) { p = p == null ? this.data.stats.points : p; let r = RANKS[0], next = null; for (let i = 0; i < RANKS.length; i++) if (p >= RANKS[i][0]) { r = RANKS[i]; next = RANKS[i + 1] || null; } return { name: r[1], at: r[0], next }; },
+points(n) { this.data.stats.points += n; },
+// sesión de vuelo
+begin(ch) {
+if (!this.data) this.load();
+this.sess = { t0: performance.now(), time: 0, dist: 0, scanned: new Set(), cams: new Set([CAMS[Flight.camIdx][0]]), rotated: false, targeted: false, stableT: 0, cassini: null, prevH: null, ign: false, prevD: {}, creakT: 8 + Math.random() * 10, lastI: {}, ch: ch ? { R: ch, t: 0, done: false } : null, tut: this.data.tut || ch ? null : { i: 0, t: 0 } };
+this.scan = null; Flight._p0 = null;
+this.data.stats.flights++; this.unlock('despegue'); this.save();
+this.renderChal(); this.renderCoach();
+},
+end() { if (this.sess) { this.save(); } this.sess = null; this.scan = null; ['#fl-chal', '#fl-coach', '#fl-disc', '#fl-result'].forEach(s => { const e = $(s); if (e) e.classList.remove('on'); }); },
+near(id, km, kms, center) { const rb = World.byId[id]; if (!rb) return false; const d = V.dist(Flight.pos, rb.km) - (center ? 0 : rb.R); return d < km && V.len(V.sub(Flight.vel, rb.vel)) < kms; },
+scanRange(T) { return T.isCraft ? 300 : Math.max(T.R * 60, 5e4); },
+scanState(T) { if (!T || !this.data) return {}; const d = V.dist(Flight.pos, T.km); return { done: !!this.data.scans[T.id], inRange: d < this.scanRange(T), d }; },
+startScan() {
+const F = Flight, T = F.target;
+if (!T) { F.msg('Elige primero un objetivo para escanear.', 'warn'); return; }
+if (this.scan && this.scan.T === T) return;
+const S = this.scanState(T);
+if (!S.inRange) { F.msg('Fuera del alcance del escáner: acércate a menos de ' + fmtKm(this.scanRange(T)) + ' de ' + T.def.name + '.', 'warn', 4500); FlightAudio.event('caution'); return; }
+this.scan = { T, p: 0, bad: 0, ping: 0 }; FlightAudio.event('scanPing', 0);
+F.msg((S.done ? 'Nuevo escaneo de ' : 'Escaneando ') + T.def.name + '… mantén la nave apuntando hacia el objetivo.', 'quiet', 3200);
+},
+update(dt) {
+const F = Flight, S = this.sess; if (!S || F.state !== 'fly') return;
+S.time += dt; this.data.stats.time += dt;
+const vrel = V.sub(F.vel, F.ref.vel), sp = V.len(vrel), step = F._p0 ? V.dist(F.pos, F._p0) : 0; F._p0 = F.pos.slice();
+if (step < 1e9) { S.dist += step; this.data.stats.dist += step; }
+if (sp > this.data.stats.maxV) this.data.stats.maxV = sp;
+// sonidos ligados al estado: encendido y apagado del motor, propulsores, crujidos y sobrevuelos
+const a = F.thrAct;
+if (!S.ign && a > 0.03) { S.ign = true; FlightAudio.event('ignite'); FlightGame.flashT = 0; } else if (S.ign && a < 0.008) { S.ign = false; FlightAudio.event('cutoff'); }
+const I = F.lastInput || {}, L = S.lastI;
+[['l', -1], ['u', 0], ['pitch', 0], ['yaw', 1], ['roll', 0]].forEach(([k, pan]) => { const v = I[k] || 0; if (v && !L[k]) FlightAudio.event('puff', k === 'l' ? -v : pan * v * 0.6); L[k] = v; });
+if (I.pitch || I.yaw || I.roll) S.rotated = true;
+S.creakT -= dt; if (S.creakT <= 0) { S.creakT = 7 + Math.random() * 14; if (a > 0.3 || Math.hypot(...F.w) > 0.05) FlightAudio.event('creak'); }
+for (const rb of [F.target, F.ref].filter(Boolean)) {
+if (rb.isSun) continue;
+const r = V.sub(rb.km, F.pos), d = V.len(r), clos = V.dot(V.sub(F.vel, rb.vel), r) / Math.max(d, 1e-9), P = S.prevD[rb.id];
+if (P && P.c > 0 && clos <= 0 && d - rb.R < rb.R * 3 && V.len(V.sub(F.vel, rb.vel)) > 1) { FlightAudio.event('flyby'); F.msg('Sobrevuelo de ' + rb.def.name + ' a ' + fmtKm(Math.max(d - rb.R, 0)) + ' de altitud', 'quiet', 3500); }
+S.prevD[rb.id] = { c: clos };
+}
+// escáner
+const sc = this.scan;
+if (sc) {
+const T = sc.T, d = V.dist(F.pos, T.km), ang = Math.acos(clamp(V.dot(F.F, V.norm(V.sub(T.km, F.pos))), -1, 1)) * RAD, ok = T === F.target && d < this.scanRange(T) && ang < 25;
+if (ok) { sc.bad = 0; sc.p = Math.min(1, sc.p + dt / 3.2); } else { sc.bad += dt; if (sc.bad > 0.8) { this.scan = null; F.msg(T !== F.target ? 'Escaneo cancelado: cambiaste de objetivo.' : ang >= 25 ? 'Escaneo interrumpido: apunta la nave hacia ' + T.def.name + ' (tecla ' + Keys.label(Keys.code('flight', 'aim')) + ').' : 'Escaneo interrumpido: el objetivo salió del alcance.', 'warn', 4000); FlightAudio.event('caution'); } }
+if (this.scan) { sc.ping -= dt; if (sc.ping <= 0) { sc.ping = 0.42; FlightAudio.event('scanPing', sc.p); } if (sc.p >= 1) { this.scan = null; this.discover(T); } }
+}
+// órbita estable (modo simulación, sin asistencias): logro de Kepler y reto «Órbita a mano»
+const O = F.orbitEl(), auto = F.orbit || F.intercept || F.match || F.hold;
+const stable = !F.assisted && !auto && O && O.bound && !F.ref.isSun && O.rp > F.ref.R + (['venus', 'tierra', 'marte', 'titan', 'jupiter', 'saturno', 'urano', 'neptuno'].includes(F.ref.id) ? 100 : 5) && (!F.ref.soi || O.ra < F.ref.soi);
+S.stableT = stable ? S.stableT + dt : 0;
+if (S.stableT >= 5) this.unlock('orbita'); if (S.stableT >= 20) this.unlock('kepler');
+// cruce del plano de los anillos de Saturno
+const Sa = World.byId.saturno;
+if (Sa && Sa.basis) {
+const p = V.sub(F.pos, Sa.km), h = V.dot(p, Sa.basis[1]), dS = V.len(p);
+if (S.prevH != null && dS < Sa.R * 3 && Math.sign(h) !== Math.sign(S.prevH)) {
+const rho = V.len(V.sub(p, V.scale(Sa.basis[1], h))) / Sa.R;
+if (rho > 1.0 && rho < 1.11) { S.cassini = 'ok'; this.unlock('cassini'); F.msg('¡Cruzaste el hueco entre Saturno y sus anillos, como Cassini!', 'info', 5000); }
+else if (rho >= 1.11 && rho < 2.36) { S.cassini = S.cassini === 'ok' ? 'ok' : 'rings'; F.msg('¡Atravesaste los anillos de Saturno! Una nave real no habría sobrevivido a los impactos de hielo.', 'alert', 5000); FlightAudio.event('clang'); F.impactT = performance.now(); }
+}
+S.prevH = h;
+}
+// logros por posición y velocidad
+const ds = V.len(F.pos);
+if (ds < World.sun.R * 9.86) this.unlock('parker');
+if (ds > 30 * AU_KM) this.unlock('kuiper');
+if (sp > C_KMS * 0.01) this.unlock('luz');
+if (F.warpIdx === WARPS.length - 1) this.unlock('paciencia');
+if (S.cams.size >= CAMS.length) this.unlock('director');
+if (this.near('iss', 1, 0.005, true)) this.unlock('eei');
+// reto activo y escuela de vuelo
+const C = S.ch;
+if (C && !C.done) {
+C.t += dt;
+const why = C.R.fail && C.R.fail();
+if (why) this.finish(false, why); else if (C.R.goal()) this.finish(true);
+if (!C.done) this.renderChal();
+}
+if (S.tut) this.coach(dt);
+if (performance.now() - (this._saveT || 0) > 6000) this.save();
+},
+contact(rb, v) {
+const F = Flight;
+this.data.stats.landings++; this.unlock('contacto');
+if (rb.id === 'luna' && v < 0.01) this.unlock('alunizaje');
+if (v > 0.05) { F.impactT = performance.now(); Voice.say('Impacto contra ' + rb.def.name + '.', 'impact', 4000); }
+else Voice.say('Contacto con la superficie.', 'contact', 6000);
+},
+orbitIn(B) { this.data.stats.orbits++; this.unlock('orbita'); FlightAudio.event('orbit'); Voice.say('Órbita establecida alrededor de ' + B.def.name + '.', 'orbit', 4000); },
+unlock(id) {
+if (!this.data || this.data.ach[id]) return;
+const A = ACHS.find(a => a[0] === id); if (!A) return;
+this.data.ach[id] = Date.now(); this.points(250); this.save();
+const el = $('#fl-ach'); if (!el) return;
+el.innerHTML = `<i class="fa-ico" aria-hidden="true">${ACH_ICON}</i><span><small>Logro desbloqueado · +250 puntos</small><b>${esc(A[1])}</b><em>${esc(A[2])}</em></span>`;
+el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
+clearTimeout(this._achT); this._achT = setTimeout(() => el.classList.remove('on'), 5200);
+FlightAudio.event('achieve'); Voice.say('Logro desbloqueado: ' + A[1] + '.', 'ach', 2500);
+},
+discover(T) {
+const first = !this.data.scans[T.id], pts = first ? (SCAN_PTS[T.def.type] || (T.isCraft ? 150 : 200)) : 0;
+this.data.scans[T.id] = { t: Date.now(), jd: Time.jd, ship: Flight.ship.id };
+if (pts) this.points(pts);
+this.sess.scanned.add(T.id); this.flashT = performance.now();
+const n = Object.keys(this.data.scans).length;
+this.unlock('escaneo'); if (n >= 10) this.unlock('cientifico'); if (n >= 30) this.unlock('enciclopedia');
+if (['mercurio', 'venus', 'tierra', 'marte', 'jupiter', 'saturno', 'urano', 'neptuno'].every(id => this.data.scans[id])) this.unlock('planetas');
+if (['io', 'europa', 'ganimedes', 'calisto'].every(id => this.data.scans[id])) this.unlock('galileo');
+this.save();
+FlightAudio.event('scanDone'); Voice.say('Escaneo completo. ' + T.def.name + (first ? ' registrado en la bitácora.' : ' actualizado.'), 'scan', 2000);
+this.card(T, first, pts);
+},
+card(T, first, pts) {
+const el = $('#fl-disc'); if (!el) return;
+const d = T.def, F = T.isCraft ? null : Info.fields(T), all = F ? [...F.phys, ...F.orb] : Info.craftFields(T);
+const pick = re => { const f = all.find(x => re.test(x.label) && x.val != null); return f ? `<div><dt>${esc(f.label.replace(/ \(.*\)$/, ''))}</dt><dd>${esc(String(f.val))}</dd></div>` : ''; };
+const rows = T.isCraft ? [/^Agencia/, /^Lanzamiento/, /^Objetivo/].map(pick).join('') : [/^Diámetro medio|^Tamaño/, /^Gravedad superficial/, /^Temperatura aproximada/, /^Duración de un día/].map(pick).join('');
+const fact = (d.info.facts && d.info.facts[0]) || (d.info.feats && d.info.feats[0]) || d.info.desc;
+const media = Photo.has(T.id) ? `<span class="fd-media">${Photo.img(T.id, 330)}</span>` : GLOBE_TEX.has(T.id) ? `<span class="fd-media"><canvas data-globe="${T.id}" width="96" height="96"></canvas></span>` : `<span class="fd-media fd-dot" style="--c:${d.color || '#94a0b6'}"></span>`;
+el.innerHTML = `${media}<div class="fd-body"><span class="fd-kick">${first ? 'Nuevo descubrimiento · +' + fmt(pts, 0) + ' puntos' : 'Escaneo actualizado'}</span>
+<h3>${esc(d.name)}</h3><p class="fd-sub">${esc(d.type === 'moon' && T.parent ? 'Luna de ' + T.parent.def.name : T.isCraft ? d.sub || 'Nave espacial' : TYPE_LABEL[d.type])}</p>
+${rows ? `<dl>${rows}</dl>` : ''}<p class="fd-fact">${esc(fact)}</p>
+<div class="fd-act"><span>${(n => n === 1 ? '1 objeto' : fmt(n, 0) + ' objetos')(Object.keys(this.data.scans).length)} en tu bitácora</span><button class="txt-btn" data-fd-close>Cerrar</button></div></div>`;
+el.classList.remove('on'); void el.offsetWidth; el.classList.add('on'); GlobeCanvas.scan(el);
+clearTimeout(this._discT); this._discT = setTimeout(() => el.classList.remove('on'), 11000);
+},
+finish(ok, why) {
+const C = this.sess.ch, R = C.R; C.done = true;
+const el = $('#fl-result'); $('#fl-chal').classList.remove('on');
+if (ok) {
+const m = C.t <= R.medals[0] ? 'oro' : C.t <= R.medals[1] ? 'plata' : C.t <= R.medals[2] ? 'bronce' : 'hecho';
+const prev = this.data.best[R.id], better = !prev || C.t < prev.t, order = ['hecho', 'bronce', 'plata', 'oro'];
+const gain = !prev ? MEDALS[m][1] : order.indexOf(m) > order.indexOf(prev.m) ? MEDALS[m][1] - MEDALS[prev.m][1] : 0;
+if (better) this.data.best[R.id] = { t: C.t, m: order.indexOf(m) >= order.indexOf(prev ? prev.m : 'hecho') ? m : prev.m, d: Date.now() };
+if (gain > 0) this.points(gain);
+if (m === 'oro') this.unlock('oro');
+if (RETOS.every(r => this.data.best[r.id])) this.unlock('piloto');
+this.save();
+el.innerHTML = `<div class="fr-card"><span class="fr-medal m-${m}" aria-hidden="true">${MEDAL_ICON}</span><span class="tp-kicker">Reto completado</span><h2>${esc(R.name)}</h2>
+<p class="fr-time">${fmtClock(C.t)} <small>${MEDALS[m][0]}${better && prev ? ' · ¡nuevo récord!' : ''}</small></p>
+<p class="note">Oro ≤ ${fmtClock(R.medals[0])} · Plata ≤ ${fmtClock(R.medals[1])} · Bronce ≤ ${fmtClock(R.medals[2])}${gain > 0 ? ' · +' + fmt(gain, 0) + ' puntos' : ''}</p>
+<div class="fr-act"><button class="cta" data-fr="retry">Repetir</button><button class="txt-btn" data-fr="free">Seguir volando</button><button class="txt-btn" data-fr="retos">Más retos</button></div></div>`;
+FlightAudio.event('achieve'); Voice.say('Reto completado. Medalla de ' + MEDALS[m][0].toLowerCase() + '.', 'ch', 1000);
+} else {
+el.innerHTML = `<div class="fr-card fail"><span class="tp-kicker">Reto fallido</span><h2>${esc(R.name)}</h2><p>${esc(why)}</p>
+<div class="fr-act"><button class="cta" data-fr="retry">Intentarlo otra vez</button><button class="txt-btn" data-fr="free">Seguir volando</button><button class="txt-btn" data-fr="retos">Otros retos</button></div></div>`;
+FlightAudio.event('fail'); Voice.say('Reto fallido.', 'ch', 1000);
+}
+el.classList.add('on');
+setTimeout(() => { const b = el.querySelector('[data-fr="retry"]'); if (b) b.focus({ preventScroll: true }); }, 60);
+},
+renderChal() {
+const el = $('#fl-chal'); if (!el) return;
+const C = this.sess && this.sess.ch;
+if (!C || C.done) { el.classList.remove('on'); return; }
+const R = C.R, m = C.t <= R.medals[0] ? 'oro' : C.t <= R.medals[1] ? 'plata' : C.t <= R.medals[2] ? 'bronce' : 'hecho';
+const html = `<b>${esc(R.name)}</b><span class="fc-t m-${m}">${fmtClock(C.t)}</span><small>${esc(R.progress ? R.progress() : R.desc)}</small>`;
+if (html !== this._chalH) { el.innerHTML = html; this._chalH = html; }
+el.classList.add('on');
+},
+// escuela de vuelo
+coach(dt) {
+const S = this.sess, T = S.tut, F = Flight; if (!T) return;
+const st = TUTORIAL[T.i];
+if (!st) { T.t += dt; if (T.t > 7) { S.tut = null; this.data.tut = true; this.save(); this.renderCoach(); } return; }
+if (st[2](F)) { T.i++; T.t = 0; FlightAudio.event('apOn'); this.renderCoach(); }
+},
+renderCoach() {
+const el = $('#fl-coach'); if (!el) return;
+const T = this.sess && this.sess.tut;
+if (!T) { el.classList.remove('on'); return; }
+const st = TUTORIAL[T.i], K = a => `<kbd>${esc(Keys.label(Keys.code('flight', a)))}</kbd>`;
+el.innerHTML = st ? `<span class="fco-k">Escuela de vuelo · ${T.i + 1} de ${TUTORIAL.length}</span><p>${esc(st[1]).replace(/\{(\w+)\}/g, (_, a) => K(a))}</p><div class="fco-bar"><i style="transform:scaleX(${T.i / TUTORIAL.length})"></i></div><button class="txt-btn" data-coach-skip>Saltar tutorial</button>`
+: `<span class="fco-k">Escuela de vuelo completada</span><p>¡Listo, piloto! Prueba los <b>retos</b> y revisa tu <b>bitácora</b> desde el menú de pausa o el hangar.</p>`;
+el.classList.add('on');
+},
+startTutorial() { this.data.tut = false; this.save(); if (Flight.state === 'hangar') Flight.launch(); else if (this.sess) { this.sess.tut = { i: 0, t: 0 }; this.renderCoach(); } },
+// retos
+startChallenge(id) {
+const R = RETOS.find(r => r.id === id); if (!R) return;
+this.closeLog(true);
+const i = SHIPS.findIndex(s => s.id === R.ship); if (i >= 0) Flight.setShip(i);
+if (STARTS.some(s => s[0] === R.start)) Flight.startId = R.start;
+if (R.assisted != null) Flight.assisted = R.assisted;
+Flight.pendingChallenge = R;
+if (Flight.state !== 'hangar') { Flight.pause(false); }
+Flight.launch();
+},
+// bitácora
+openLog(tab) {
+const el = $('#fl-log'); if (!el) return;
+this._logFrom = document.activeElement; this.logTab = tab || this.logTab || 'retos';
+if (Flight.state === 'fly') { Flight.pause(true); this._logPaused = true; }
+$('#app').classList.add('fl-log'); el.classList.add('on'); this.renderLog();
+setTimeout(() => { const b = el.querySelector('[data-log-close]'); if (b) b.focus({ preventScroll: true }); }, 40);
+},
+closeLog(silent) {
+const el = $('#fl-log'); if (!el || !el.classList.contains('on')) return;
+el.classList.remove('on'); $('#app').classList.remove('fl-log');
+if (this._logPaused && !silent) Flight.pause(false); this._logPaused = false;
+if (!silent && this._logFrom && this._logFrom.focus) this._logFrom.focus({ preventScroll: true });
+},
+renderLog() {
+const el = $('#fl-log'), D = this.data, R = this.rank(), tab = this.logTab;
+const tabs = [['retos', 'Retos'], ['desc', 'Descubrimientos'], ['logros', 'Logros'], ['stats', 'Estadísticas']];
+const pct = R.next ? (D.stats.points - R.at) / (R.next[0] - R.at) : 1;
+let body = '';
+if (tab === 'retos') body = `<div class="lg-retos">${RETOS.map(r => { const b = D.best[r.id], sh = SHIPS.find(s => s.id === r.ship); return `<article class="lg-reto${b ? ' done' : ''}"><span class="fr-medal sm m-${b ? b.m : 'none'}" aria-hidden="true">${MEDAL_ICON}</span>
+<div><h4>${esc(r.name)}</h4><p>${esc(r.desc)}</p><p class="note">${esc(r.tip)}</p><p class="lg-meta">${sh ? 'Nave: ' + esc(sh.name) + ' · ' : ''}Oro ≤ ${fmtClock(r.medals[0])} · Plata ≤ ${fmtClock(r.medals[1])} · Bronce ≤ ${fmtClock(r.medals[2])}${b ? ` · <b>Récord ${fmtClock(b.t)} (${MEDALS[b.m][0].toLowerCase()})</b>` : ''}</p></div>
+<button class="cta sm" data-ch="${r.id}">${b ? 'Repetir' : 'Iniciar'}</button></article>`; }).join('')}</div>`;
+else if (tab === 'desc') {
+const ids = Object.keys(D.scans).filter(id => World.byId[id]).sort((a, b) => D.scans[b].t - D.scans[a].t), total = World.rb.filter(rb => !rb.hidden && !rb.def.system).length;
+const cats = [['Planetas', r => r.def.type === 'planet'], ['Lunas', r => r.def.type === 'moon'], ['Planetas enanos y transneptunianos', r => ['dwarf', 'tno'].includes(r.def.type)], ['Asteroides y cometas', r => ['asteroid', 'comet'].includes(r.def.type)], ['Naves y estaciones', r => r.isCraft]];
+body = `<p class="lg-sum">${ids.length} de ${total} objetos escaneados.</p><div class="lg-cats">${cats.map(([t, f]) => { const all = World.rb.filter(r => f(r) && !r.hidden), n = all.filter(r => D.scans[r.id]).length; return `<span>${t} <b>${n}/${all.length}</b></span>`; }).join('')}</div>
+${ids.length ? `<ul class="lg-list">${ids.map(id => { const rb = World.byId[id], s = D.scans[id], sh = SHIPS.find(x => x.id === s.ship); return `<li><i class="dot" style="--c:${rb.def.color || '#94a0b6'}"></i><b>${esc(rb.def.name)}</b><small>${esc(TYPE_LABEL[rb.def.type] || '')} · ${new Date(s.t).toLocaleDateString(I18N.loc(), { day: 'numeric', month: 'short', year: 'numeric' })}${sh ? ' · ' + esc(sh.name) : ''}</small></li>`; }).join('')}</ul>` : '<p class="note">Aún no has escaneado nada. En vuelo, fija un objetivo, acércate y pulsa ' + esc(Keys.label(Keys.code('flight', 'scan'))) + '.</p>'}`;
+} else if (tab === 'logros') body = `<p class="lg-sum">${Object.keys(D.ach).length} de ${ACHS.length} logros.</p><div class="lg-achs">${ACHS.map(([id, t, d]) => `<div class="lg-ach${D.ach[id] ? ' on' : ''}"><i class="fa-ico" aria-hidden="true">${ACH_ICON}</i><span><b>${esc(t)}</b><small>${esc(d)}</small>${D.ach[id] ? `<em>${new Date(D.ach[id]).toLocaleDateString(I18N.loc(), { day: 'numeric', month: 'short', year: 'numeric' })}</em>` : ''}</span></div>`).join('')}</div>`;
+else {
+const S = D.stats, row = (k, v) => `<div><dt>${k}</dt><dd>${v}</dd></div>`;
+body = `<dl class="lg-stats">${row('Vuelos', fmt(S.flights, 0))}${row('Tiempo de vuelo', fmtClock(S.time))}${row('Distancia recorrida', fmtKm(S.dist) + (S.dist > 1e6 ? ' (' + fmtAU(S.dist / AU_KM) + ')' : ''))}${row('Velocidad máxima', Flight.fmtSpeed(S.maxV))}${row('Aterrizajes y contactos', fmt(S.landings, 0))}${row('Órbitas', fmt(S.orbits, 0))}${row('Objetos escaneados', fmt(Object.keys(D.scans).length, 0))}${row('Retos completados', fmt(Object.keys(D.best).length, 0) + ' de ' + RETOS.length)}${row('Puntos de exploración', fmt(S.points, 0))}</dl>
+<p class="note">El progreso se guarda solo en este navegador.</p><button class="txt-btn danger" data-log-reset>Borrar todo el progreso</button>`;
+}
+el.innerHTML = `<div class="lg-card"><header><div><span class="tp-kicker">Bitácora de vuelo</span><h2 id="fl-log-title">${esc(R.name)}</h2>
+<div class="lg-rank"><span>${fmt(D.stats.points, 0)} puntos</span><span class="lg-bar"><i style="transform:scaleX(${clamp(pct, 0, 1)})"></i></span><span>${R.next ? 'Siguiente rango: ' + esc(R.next[1]) + ' (' + fmt(R.next[0], 0) + ')' : 'Rango máximo'}</span></div></div>
+<button class="icon-btn" data-log-close aria-label="Cerrar">&times;</button></header>
+<div class="seg" role="tablist">${tabs.map(([k, t]) => `<button role="tab" aria-selected="${k === tab}" class="${k === tab ? 'on' : ''}" data-log-tab="${k}">${t}</button>`).join('')}</div>
+<div class="lg-body">${body}</div></div>`;
+},
+async resetAll() {
+const ok = await UI.confirmDialog('¿Borrar todo el progreso de vuelo?', 'Se perderán los descubrimientos, logros, récords y puntos guardados en este navegador.', 'Borrar', 'Cancelar');
+if (!ok) return;
+try { localStorage.removeItem(FG_KEY); } catch (e) { }
+this.load(); this.renderLog(); if (Flight.state === 'hangar') Flight.renderHangar();
+},
+bind() {
+document.addEventListener('click', e => {
+const t = e.target;
+if (t.closest('[data-fd-close]')) $('#fl-disc').classList.remove('on');
+const fr = t.closest('[data-fr]');
+if (fr) { const a = fr.dataset.fr, C = this.sess && this.sess.ch; $('#fl-result').classList.remove('on'); if (a === 'retry' && C) this.startChallenge(C.R.id); else if (a === 'retos') this.openLog('retos'); else $('#gl').focus({ preventScroll: true }); }
+if (t.closest('[data-coach-skip]')) { if (this.sess) this.sess.tut = null; this.data.tut = true; this.save(); this.renderCoach(); $('#gl').focus({ preventScroll: true }); }
+const lt = t.closest('[data-log-tab]'); if (lt) { this.logTab = lt.dataset.logTab; this.renderLog(); }
+if (t.closest('[data-log-close]') || t.id === 'fl-log') this.closeLog();
+const ch = t.closest('[data-ch]'); if (ch) this.startChallenge(ch.dataset.ch);
+if (t.closest('[data-log-reset]')) this.resetAll();
+const lo = t.closest('[data-log]'); if (lo) this.openLog(lo.dataset.log);
+});
+addEventListener('keydown', e => { if (e.key === 'Escape' && $('#fl-log') && $('#fl-log').classList.contains('on')) { e.stopImmediatePropagation(); e.preventDefault(); this.closeLog(); } }, true);
+},
+};
+const ACH_ICON = '<svg viewBox="0 0 24 24" width="22" height="22"><path d="M12 2l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 15.6 6.6 18.5l1.2-6-4.5-4.2 6.1-.7z" fill="currentColor"/></svg>';
+const MEDAL_ICON = '<svg viewBox="0 0 32 40" width="32" height="40"><path d="M9 1h5l3 9-5 2zM23 1h-5l-3 9 5 2z" fill="currentColor" opacity=".55"/><circle cx="16" cy="25" r="12" fill="currentColor"/><circle cx="16" cy="25" r="8.5" fill="none" stroke="rgba(0,0,0,.28)" stroke-width="1.5"/><path d="M16 19l1.8 3.7 4 .6-2.9 2.8.7 4L16 28.2l-3.6 1.9.7-4-2.9-2.8 4-.6z" fill="rgba(0,0,0,.25)"/></svg>';
 const Flight = {
 on: false, state: null, shipIdx: 0, ship: null, startId: 'tierra', assisted: true,
 pos: [0, 0, 0], vel: [0, 0, 0], F: [0, 0, 1], U: [0, 1, 0], w: [0, 0, 0],
@@ -8237,8 +9413,10 @@ if (a && M) rb.soi = Math.max(a * Math.pow(rb.def.mass / M, 0.4), rb.R * 3);
 World.update(Time.jd - 2 / 86400, 0, 1); this.syncBodies(0);
 World.update(Time.jd, 0, 1); this.syncBodies(2);
 },
-safeDist(rb) { return rb.isCraft ? 1.5 : rb.isSun ? rb.R * 8 : rb.def.mass && rb.R > 100 ? rb.R * 2.2 : Math.max(rb.R * 6, 25); },
+safeDist(rb) { return rb.isCraft ? 0.5 : rb.isSun ? rb.R * 8 : rb.def.mass && rb.R > 100 ? rb.R * 2.2 : Math.max(rb.R * 6, 25); },
 refBody() {
+const T = this.target;                             // operaciones de proximidad con una nave o estación: las velocidades, el freno y la asistencia se refieren a ella
+if (T && T.isCraft && !T.hidden && T.vel && V.dist(this.pos, T.km) < 50) return T;
 let ref = World.sun;
 for (const rb of World.rb) if (rb.soi && rb.parent === World.sun && V.dist(this.pos, rb.km) < rb.soi) ref = rb;
 if (ref !== World.sun) for (const m of ref.children) if (m.soi && V.dist(this.pos, m.km) < m.soi) ref = m;
@@ -8255,17 +9433,21 @@ S.scale = 'real'; ScaleState.set('real', false); World.remapOrbits(); UI.updateS
 Time.idx = 0; Time.paused = false;
 this.initBodies();
 }
+if (!FlightGame.data) FlightGame.load();
+FlightGame.end(); this.challenge = null;
 this.on = true; this.state = 'hangar';
 this.setShip(this.shipIdx); this.placeAtStart();
 this.free = { az: 0.9, el: 0.22, dist: 2.2 };
 const app = $('#app'); app.classList.add('flying', 'hangar'); app.classList.remove('fl-fly', 'fl-pause', 'fl-cockpit'); $('#fl-targets').classList.remove('open');
-this.renderHangar();
+this.renderHangar(); HUD.resize(); HUD.c && HUD.c.clearRect(0, 0, HUD.cv.width, HUD.cv.height);
 setTimeout(() => { const b = document.querySelector('#fl-launch'); if (b) b.focus({ preventScroll: true }); }, 60);
 PackedModels.preloadShips(this.ship.id);     // modelos del hangar: primero la nave elegida
 },
-setShip(i) { this.shipIdx = i; this.ship = SHIPS[i]; this.syncModel(); if (this.state === 'hangar') PackedModels.request(this.ship.id, true); },
+setShip(i) { this.shipIdx = i; this.ship = SHIPS[i]; this.syncModel(); FlightAudio.setShip(this.ship.id); if (this.state === 'hangar') PackedModels.request(this.ship.id, true); },
 syncModel() { this.mesh = CraftModels.mesh(this.ship.id) || null; this.nozzles = SHIP_NOZZLES[this.ship.id] || [[0, 0, -this.ship.len / 2, this.ship.len * 0.03]]; },   // provisional mientras se descarga el modelo
 placeAtStart() {
+const CH = this.challenge;
+if (CH && (CH.start === 'eei' || CH.start === 'caida')) return this.placeSpecial(CH.start);
 const B = World.byId[this.startId], r0 = B.R * (B.id === 'luna' ? 3.5 : 3.2);
 const s = V.norm(V.scale(B.km, -1)), dir = V.norm(V.rot(s, [0, 1, 0], 0.65));
 this.pos = V.add(B.km, V.scale(dir, r0));
@@ -8280,18 +9462,37 @@ this.vel = V.add(this.vel, V.scale(t, vc));
 this.sF = this.F.slice(); this.sU = this.U.slice();
 this.ref = this.refBody();
 },
+placeSpecial(k) {                                  // salidas de los retos: detrás de la EEI o en caída libre sobre la Tierra
+const E = World.byId.tierra;
+if (k === 'eei') {
+const I = World.byId.iss, vr = V.sub(I.vel, E.vel), t = V.norm(V.len(vr) > 1e-6 ? vr : [1, 0, 0]);
+this.pos = V.add(I.km, V.scale(t, -25)); this.vel = I.vel.slice(); this.F = t;
+this.startB = I; this.startDir = V.norm(V.sub(this.pos, E.km)); this.startR = V.dist(this.pos, E.km);
+this.target = I;
+} else {
+const s = V.norm(V.scale(E.km, -1)), dir = V.norm(V.rot(s, [0, 1, 0], 0.65)), r0 = E.R + 30000;
+this.pos = V.add(E.km, V.scale(dir, r0)); this.vel = E.vel.slice(); this.F = V.norm(V.cross([0, 1, 0], dir));
+this.startB = E; this.startDir = dir; this.startR = r0; this.target = E;
+}
+this.U = V.norm(V.sub([0, 1, 0], V.scale(this.F, this.F[1]))); this.w = [0, 0, 0];
+this.sF = this.F.slice(); this.sU = this.U.slice(); this.ref = this.refBody();
+},
 launch() {
 FlightAudio.init();
+this.challenge = this.pendingChallenge || null; this.pendingChallenge = null;
+if (this.challenge && this.challenge.assisted != null) this.assisted = this.challenge.assisted;
 this.state = 'fly'; this.placeAtStart();
 this.aim = this.match = this.intercept = false; this.hold = null; this.orbit = null; this.warpIdx = 0; this.particles = [];
 this.autoBrake = this.assisted; this.stab = true;
 this.thrCmd = 0; this.thrAct = 0; this.thrRef = { v: 0 }; this.rcsL = this.rcsU = 0; this.cfx = null;
 this.zoomK = 1; this.trajT = 0; this.trajPts = null; this.landed = null; this.refreshKeyTips();
-if (!this.target) this.target = this.startB;
+if (!this.target || this.challenge) this.target = this.challenge && this.challenge.start === 'eei' ? World.byId.iss : this.challenge && this.challenge.start === 'caida' ? World.byId.tierra : this.startB;
 UI.sel = this.target;
 const app = $('#app'); app.classList.remove('hangar', 'fl-pause'); app.classList.add('fl-fly');
-this.msg('Sistemas en línea. ' + this.ship.name + ' lista para maniobrar.', 'info', 4000);
-if (!this.assisted) this.msg('Modo simulación: la gravedad está activa. Partes en una órbita circular.', 'quiet', 6000);
+FlightGame.begin(this.challenge); Cockpit.load(); this.impactT = 0;
+this.msg(this.challenge ? 'Reto: ' + this.challenge.name + '. ' + this.challenge.desc : 'Sistemas en línea. ' + this.ship.name + ' lista para maniobrar.', 'info', this.challenge ? 7000 : 4000);
+if (!this.assisted && !this.challenge) this.msg('Modo simulación: la gravedad está activa. Partes en una órbita circular.', 'quiet', 6000);
+Voice.say(this.challenge ? 'Reto iniciado: ' + this.challenge.name + '.' : 'Sistemas en línea. Buen vuelo.', 'launch', 3000);
 this.refreshBar(); this.updateCockpit();
 $('#gl').focus({ preventScroll: true });
 },
@@ -8309,6 +9510,7 @@ if (!ok) return;
 this.exit();
 },
 exit() {
+FlightGame.end(); FlightGame.closeLog(true); this.challenge = null;
 this.on = false; this.state = null; FlightAudio.update(0, 0); FlightAudio.stop(); Music.setDuck(1);
 const app = $('#app'); app.classList.remove('flying', 'hangar', 'fl-fly', 'fl-pause', 'fl-cockpit'); $('#fl-targets').classList.remove('open');
 const ref = this.ref || World.byId.tierra;
@@ -8381,6 +9583,8 @@ case 'intercept': this.toggle('intercept'); break;
 case 'warpUp': this.setWarp(this.warpIdx + 1); break;
 case 'warpDown': this.setWarp(this.warpIdx - 1); break;
 case 'sound': this.toggleSound(); break;
+case 'scan': FlightGame.startScan(); break;
+case 'logbook': FlightGame.openLog('desc'); break;
 }
 },
 setThrottle(v, src) {
@@ -8400,15 +9604,17 @@ const c = this.thrCmd + 1e-6 * dir;
 const next = dir > 0 ? DETENTS.find(d => d > c + 1e-4) : [...DETENTS].reverse().find(d => d < c - 1e-4);
 if (next != null) this.setThrottle(next);
 },
-setCam(i) { this.camIdx = (i + CAMS.length) % CAMS.length; this.cineT = 0; this.updateCockpit(); this.refreshBar(); },
+setCam(i) { this.camIdx = (i + CAMS.length) % CAMS.length; this.cineT = 0; if (FlightGame.sess) FlightGame.sess.cams.add(CAMS[this.camIdx][0]); FlightAudio.event('click'); this.updateCockpit(); this.refreshBar(); },
 cycleCam(d) { this.setCam(this.camIdx + d); },
 updateCockpit() { $('#app').classList.toggle('fl-cockpit', this.state !== 'hangar' && CAMS[this.camIdx][0] === 'cockpit'); },
 toggleAssisted() {
+if (this.challenge && this.challenge.assisted != null) { this.msg('Este reto se vuela en modo ' + (this.challenge.assisted ? 'asistido' : 'simulación') + '.', 'warn'); return; }
 this.assisted = !this.assisted; this.autoBrake = this.assisted;
 this.msg(this.assisted ? 'Modo asistido: estabilización, freno asistido y sin gravedad.' : 'Modo simulación: inercia y gravedad reales. Mantén la velocidad orbital o caerás.', 'info', 5000);
 this.refreshBar();
 },
 toggleSound() { FlightAudio.setMute(FlightAudio.on); this.refreshBar(); },
+toggleVoice() { Voice.on = !Voice.on; FlightGame.data.voice = Voice.on; FlightGame.save(); if (!Voice.on) Voice.stop(); else Voice.say('Voz de a bordo activada.', 'v', 500); this.msg(Voice.on ? (window.speechSynthesis && Voice.pick() ? 'Voz de la computadora de a bordo activada.' : 'Este navegador no tiene una voz en español: la computadora de a bordo seguirá en silencio.') : 'Voz de la computadora de a bordo desactivada.', 'quiet'); this.refreshBar(); },
 toggle(k) {
 const T = this.target;
 const needT = ['aim', 'match', 'hold', 'intercept'];
@@ -8418,9 +9624,9 @@ else if (k === 'autoBrake') { this.autoBrake = !this.autoBrake; this.msg('Freno 
 else if (k === 'aim') { this.aim = !this.aim; if (this.aim) this.msg('Orientando la nave hacia ' + T.def.name); }
 else if (k === 'match') { this.cancelAuto('match'); this.match = !this.match; if (this.match) this.msg('Igualando velocidad con ' + T.def.name); if (this.match || this.hold || this.intercept) this.autoEngaged(); }
 else if (k === 'hold') { const was = !!this.hold; this.cancelAuto('hold'); this.hold = was ? null : { t: T, d: Math.max(V.dist(this.pos, T.km), this.safeDist(T)) }; if (this.hold) this.msg('Manteniendo distancia con ' + T.def.name); if (this.match || this.hold || this.intercept) this.autoEngaged(); }
-else if (k === 'intercept') { const was = this.intercept; this.cancelAuto('intercept'); this.intercept = !was; if (this.intercept) { this.aim = false; this.msg('Piloto automático: rumbo de intercepción a ' + T.def.name); } if (this.match || this.hold || this.intercept) this.autoEngaged(); }
+else if (k === 'intercept') { const was = this.intercept; this.cancelAuto('intercept'); this.intercept = !was; if (this.intercept) { this.aim = false; this.msg('Piloto automático: rumbo de intercepción a ' + T.def.name); Voice.say('Piloto automático activado. Rumbo a ' + T.def.name + '.', 'ap', 3000); } FlightAudio.event(this.intercept ? 'apOn' : 'apOff'); if (this.match || this.hold || this.intercept) this.autoEngaged(); }
 else if (k === 'orbit') {
-if (this.orbit) { this.orbit = null; this.msg('Saliendo de órbita'); }
+if (this.orbit) { this.orbit = null; this.msg('Saliendo de órbita'); FlightAudio.event('apOff'); }
 else {
 const B = T && T.def.mass && !T.isCraft ? T : this.ref;
 const rel = V.sub(this.pos, B.km), r = V.len(rel);
@@ -8429,7 +9635,7 @@ if (r > B.R * 40 && !(B.soi && r < B.soi)) { this.msg('Demasiado lejos de ' + B.
 this.cancelAuto('orbit');
 const e1 = V.norm(rel); let n = V.cross(e1, V.sub(this.vel, B.vel)); if (V.len(n) < 1e-9) n = [0, 1, 0]; n = V.norm(n);
 const e2 = V.cross(n, e1), GM = G_CONST * B.def.mass * 1e-9, rr = Math.max(r, B.R * 1.15);
-this.orbit = { B, r: rr, e1, e2, th: 0, om: Math.sqrt(GM / (rr * rr * rr)) }; this.autoEngaged();
+this.orbit = { B, r: rr, e1, e2, th: 0, om: Math.sqrt(GM / (rr * rr * rr)) }; this.autoEngaged(); FlightGame.orbitIn(B);
 this.msg('Órbita circular asistida alrededor de ' + B.def.name + ': periodo de ' + fmtDur(TAU / this.orbit.om / 86400) + '.', 'info', 5000);
 }
 }
@@ -8440,12 +9646,15 @@ cancelAuto(keep) { if (keep !== 'match') this.match = false; if (keep !== 'hold'
 setTarget(rb) {
 if (!rb || rb === this.target) return;
 this.target = rb; UI.sel = rb; this.cancelAuto(); this.aim = false;
+if (FlightGame.sess) FlightGame.sess.targeted = true;
+FlightAudio.event('lock'); Voice.say('Objetivo: ' + rb.def.name + '.', 'tgt', 1500);
 this.msg('Objetivo: ' + rb.def.name + ' a ' + fmtKm(V.dist(this.pos, rb.km)));
 this.refreshBar();
 },
 setWarp(i) {
 const n = clamp(i, 0, WARPS.length - 1);
 if (n > this.warpIdx && n > this.maxWarpIdx) { this.msg('Aceleración temporal limitada: hay un cuerpo cerca en tu trayectoria.', 'warn'); return; }
+if (n !== this.warpIdx) FlightAudio.event(n > this.warpIdx ? 'warpUp' : 'warpDown');
 this.warpIdx = n; this.refreshBar();
 },
 input() {
@@ -8465,7 +9674,7 @@ if (this.state === 'hangar') { this.pos = V.add(this.startB.km, V.scale(this.sta
 this.ref = this.refBody(); this.thr = 0; this.rcs = 0;
 return;
 }
-const I = this.input(), sh = this.ship;
+const I = this.lastInput = this.input(), sh = this.ship;
 const manualT = I.l || I.u, manualR = I.pitch || I.yaw || I.roll;
 if (manualT && (this.intercept || this.match || this.hold || this.orbit)) { this.cancelAuto(); this.msg('Control manual: asistencias de navegación desactivadas.', 'quiet'); this.refreshBar(); }
 if (manualR && this.aim) { this.aim = false; this.refreshBar(); }
@@ -8495,7 +9704,7 @@ let hmax = 60;
 for (const g of this.grav) { const r = V.dist(this.pos, g.rb.km); if (r < g.rb.R * 60 || g.rb.isSun) hmax = Math.min(hmax, 0.01 * Math.sqrt(r * r * r / g.GM)); }
 for (const rb of World.rb) { if (!rb.drawOn && !rb.def.mass) continue; const d = V.dist(this.pos, rb.km) - rb.R; if (d < 1e6) hmax = Math.min(hmax, Math.max(0.02, 0.05 * d / Math.max(vr, 1e-3))); }
 let n = Math.min(500, Math.max(1, Math.ceil(dtSim / Math.max(hmax, 1e-3))));
-const h = dtSim / n;
+const h = dtSim / n; this._fdt = 1 / n;
 this.accNow = 0; this.thr = 0; this.thrAuto = 0; this.rcs = Math.min(1, Math.abs(I.pitch) + Math.abs(I.yaw) + Math.abs(I.roll) + Math.abs(this.rcsL) + Math.abs(this.rcsU));
 for (let i = 0; i < n; i++) this.step(h, (i + 1) / n, I);
 if (dtSim === 0) this.step(0, 1, I);
@@ -8557,7 +9766,7 @@ a = Math.min(a, h > 0 ? m / h : a);
 return V.scale(d, a);
 },
 step(h, f, I) {
-const sh = this.ship, main = sh.accel / 1000, L = this.L();
+const sh = this.ship, main = sh.accel / 1000, L = this.L(), f0 = Math.max(0, f - (this._fdt || 0));   // f0: inicio del subpaso, el mismo instante que this.pos (a 30 km/s de órbita solar, un desfase de 0.1 s son 3 km)
 let acc = [0, 0, 0], thr = 0;
 const T = this.target;
 if (this.thrAct !== 0) { acc = V.add(acc, V.scale(this.F, this.thrAct * main)); thr = Math.max(0, this.thrAct); }
@@ -8579,7 +9788,7 @@ const b = V.scale(b0, this.brk);
 if (V.len(vrel) > 1e-6) { acc = V.add(acc, b); thr = Math.max(thr, 0.6 * this.brk); }
 }
 if (T && (this.intercept || this.match || this.hold)) {
-const Tp = this.bodyAt(T, f), r = V.sub(Tp, this.pos), d = V.len(r), rh = V.scale(r, 1 / Math.max(d, 1e-9));
+const Tp = this.bodyAt(T, f0), r = V.sub(Tp, this.pos), d = V.len(r), rh = V.scale(r, 1 / Math.max(d, 1e-9));
 const vr = V.sub(this.vel, T.vel), aPlan = sh.accel / 1000 * 0.35;
 let vdes = [0, 0, 0];
 if (this.intercept) {
@@ -8601,7 +9810,7 @@ if (lm > 1e-7) acc = V.add(acc, V.scale(lat, -Math.min(main * 0.25, h > 0 ? lm /
 this.braking = false;
 if (this.autoBrake) {
 for (const rb of [this.target, ref].filter(Boolean)) {
-const r = V.sub(this.bodyAt(rb, f), this.pos), d = V.len(r), rh = V.scale(r, 1 / Math.max(d, 1e-9));
+const r = V.sub(this.bodyAt(rb, f0), this.pos), d = V.len(r), rh = V.scale(r, 1 / Math.max(d, 1e-9));
 const clos = V.dot(V.sub(this.vel, rb.vel), rh), free = d - rb.R - this.safeDist(rb) * 0.5;
 const a = main * 0.9;
 if (clos > 0 && clos * clos > 2 * a * 0.8 * Math.max(free, 0)) { acc = V.add(acc, V.scale(rh, -Math.min(a, h > 0 ? clos / h : a))); this.braking = true; thr = Math.max(thr, 0.5); }
@@ -8609,7 +9818,7 @@ if (clos > 0 && clos * clos > 2 * a * 0.8 * Math.max(free, 0)) { acc = V.add(acc
 }
 let g = [0, 0, 0];
 if (!this.assisted) for (const G of this.grav) {
-const r = V.sub(this.bodyAt(G.rb, f), this.pos), d2 = V.dot(r, r), d = Math.sqrt(d2);
+const r = V.sub(this.bodyAt(G.rb, f0), this.pos), d2 = V.dot(r, r), d = Math.sqrt(d2);
 if (d < G.rb.R * 0.5) continue;
 g = V.add(g, V.scale(r, G.GM / (d2 * d)));
 }
@@ -8628,11 +9837,11 @@ if (rb.isCraft || !(rb.R > 0)) continue;
 const B = this.bodyAt(rb, f), lim = rb.R + this.sRad();
 const u = L2 > 0 ? clamp(V.dot(V.sub(B, p0), seg) / L2, 0, 1) : 1, r = V.sub(V.add(p0, V.scale(seg, u)), B), d = V.len(r);   // punto del paso más cercano: a gran velocidad la nave no atraviesa cuerpos pequeños
 if (d < lim) {
-const n = d > 1e-9 ? V.scale(r, 1 / d) : [0, 1, 0];
+const n = d > 1e-9 ? V.scale(r, 1 / d) : [0, 1, 0], vImp = V.len(V.sub(this.vel, rb.vel));
 this.pos = V.add(B, V.scale(n, lim * 1.0005)); this.vel = rb.vel.slice();
 if (this.landed !== rb) {                          // posada: la gravedad la vuelve a apoyar sin repetir la alarma
 this.landed = rb; this.cancelAuto(); this.warpIdx = 0; this.thrCmd = 0; this.thrAct = 0; this.thrRef.v = 0;
-this.msg('Contacto con ' + rb.def.name + '. La nave se ha detenido sobre la superficie.', 'alert', 5000); FlightAudio.thud(); this.refreshBar();
+this.msg('Contacto con ' + rb.def.name + ' a ' + this.fmtSpeed(vImp) + '. La nave se ha detenido sobre la superficie.', 'alert', 5000); FlightAudio.thud(); FlightGame.contact(rb, vImp); this.refreshBar();
 }
 } else if (this.landed === rb && d > lim * 1.01) this.landed = null;
 }
@@ -8655,9 +9864,11 @@ const tti = clos > 0 ? (d - rb.R) / clos : Infinity;
 if (tti < 20 * Math.max(1, WARPS[this.warpIdx])) { this.alert = { kind: 'prox', txt: 'Proximidad: impacto con ' + rb.def.name + ' en ' + fmtDur(tti / 86400) }; break; }
 if (d - rb.R < this.safeDist(rb) && clos > Math.sqrt(2 * sh.accel / 1000 * 0.5 * Math.max(d - rb.R, 0.001))) { this.alert = { kind: 'speed', txt: 'Velocidad excesiva para la aproximación a ' + rb.def.name }; break; }
 }
-if (this.alert && now > this.alarmT) { this.alarmT = now + (this.alert.kind === 'prox' ? 600 : 1100); FlightAudio.beep(this.alert.kind === 'prox' ? 880 : 620, 0.16, 'square', 0.05); if (this.alert.kind === 'speed') setTimeout(() => FlightAudio.beep(480, 0.16, 'square', 0.05), 180); }
-if (this.arrived) { this.msg('Has llegado a ' + this.arrived.def.name + '. Manteniendo distancia.', 'info', 5000); this.arrived = null; this.refreshBar(); }
-FlightAudio.update(this.state === 'fly' ? this.thr : 0, this.state === 'fly' ? Math.min(1, this.rcs + (this.braking ? 0.3 : 0)) : 0);
+if (this.alert && now > this.alarmT) { this.alarmT = now + (this.alert.kind === 'prox' ? 600 : 1100); FlightAudio.beep(this.alert.kind === 'prox' ? 880 : 620, 0.16, 'square', 0.05); if (this.alert.kind === 'speed') setTimeout(() => FlightAudio.beep(480, 0.16, 'square', 0.05), 180); Voice.say(this.alert.kind === 'prox' ? 'Alerta de proximidad.' : 'Velocidad excesiva para la aproximación.', 'alert-' + this.alert.kind, 9000); }
+if (this.arrived) { this.msg('Has llegado a ' + this.arrived.def.name + '. Manteniendo distancia.', 'info', 5000); Voice.say('Llegada a ' + this.arrived.def.name + '.', 'arr', 3000); FlightAudio.event('apOff'); this.arrived = null; this.refreshBar(); }
+FlightGame.update(dt);
+const I = this.lastInput || {};
+FlightAudio.update(this.state === 'fly' ? this.thr : 0, this.state === 'fly' ? Math.min(1, this.rcs + (this.braking ? 0.3 : 0)) : 0, -(I.l || 0) * 0.8 + (I.yaw || 0) * 0.4);
 Music.setDuck(this.state === 'fly' && FlightAudio.on ? 0.55 : 1);
 },
 camera(dt) {
@@ -8726,7 +9937,18 @@ this.camera(dt || 0.016);
 App.prepare();
 World.render(t); World.frame++;
 UI.updateLabels();
-this.hud();
+this.hud(dt || 0.016);
+},
+orbitEl() {                                        // elementos de la órbita respecto al cuerpo de referencia (pantalla ÓRBITA y logros)
+const B = this.ref; if (!B || !B.def.mass) return null;
+const GM = G_CONST * B.def.mass * 1e-9, r = V.sub(this.pos, B.km), v = V.sub(this.vel, B.vel), rl = V.len(r), v2 = V.dot(v, v);
+const h = V.cross(r, v), hl = V.len(h); if (rl < 1e-9 || hl < 1e-12) return null;
+const ev = V.sub(V.scale(V.cross(v, h), 1 / GM), V.scale(r, 1 / rl)), e = V.len(ev), E = v2 / 2 - GM / rl;
+const ex = e > 1e-6 ? V.scale(ev, 1 / e) : V.scale(r, 1 / rl), ey = V.norm(V.cross(V.scale(h, 1 / hl), ex));
+const nuA = Math.atan2(V.dot(r, ey), V.dot(r, ex));
+if (E >= 0 || e >= 1) return { bound: false, e, r: rl, nuA, w: 0 };
+const a = -GM / (2 * E);
+return { bound: true, a, e, rp: a * (1 - e), ra: a * (1 + e), T: TAU * Math.sqrt(a * a * a / GM), r: rl, nuA, w: 0 };
 },
 drawShip(useP) {
 if (this.camMode === 'cockpit') return;
@@ -8738,7 +9960,7 @@ const m = M4.fromBasis(this.L(), this.U, this.F, s, rel);
 const pr = useP(P), ob = new Float32Array(16); let n = 0;
 for (const rb of [this.ref, World.byId.tierra, World.byId.luna]) { if (!rb || rb.isSun || n >= 4) continue; const r2 = V.sub(rb.posS, cam); ob[n * 4] = r2[0]; ob[n * 4 + 1] = r2[1]; ob[n * 4 + 2] = r2[2]; ob[n * 4 + 3] = rb.rS; n++; }
 const nz = this.nozzles[0], ep = this.km2s(V.add(this.pos, this.bodyVec([nz[0], nz[1], nz[2] - this.ship.len * 0.12])));
-GLX.setAll(pr, { u_model: m, u_occ: ob, u_occN: n, u_sunR: World.shadowSunR, u_ambient: S.ambient + 0.01, u_hover: 0, u_eng: [...V.sub(ep, cam), this.thr * 1.3], u_engCol: this.ship.eng, u_engR: this.ship.len * 0.35 / AU_KM });
+GLX.setAll(pr, { u_model: m, u_occ: ob, u_occN: n, u_sunR: World.shadowSunR, u_ambient: S.ambient + 0.01, u_hover: 0, u_eng: [...V.sub(ep, cam), this.thr * 1.3], u_engCol: this.ship.eng, u_engR: this.ship.len * 0.35 / AU_KM, u_mR: 0 });
 if (tex) World.drawGroups(this.mesh, pr); else GLX.draw(this.mesh, pr);
 },
 bodyVec(v) { const L = this.L(); return V.scale(V.add(V.add(V.scale(L, v[0]), V.scale(this.U, v[1])), V.scale(this.F, v[2])), 1 / 1000); },
@@ -8833,7 +10055,7 @@ this.trajPts = pts;
 refreshKeyTips() {                                 // atajos según Ajustes › Controles
 const L = a => esc(Keys.label(Keys.code('flight', a))), K = (...a) => a.map(x => `<kbd>${L(x)}</kbd>`).join(' ');
 const box = $('#fp-keys'); if (box) box.innerHTML = `<dl><dt>${K('thrUp', 'thrDown')}</dt><dd>Subir y bajar el empuje por posiciones</dd><dt><kbd>1</kbd>–<kbd>4</kbd></dt><dd>Empuje 25, 50, 75 y 100 %</dd><dt>${K('thr0')} o <kbd>0</kbd></dt><dd>Motores en reposo</dd><dt>${K('left', 'right')}</dt><dd>Propulsores laterales</dd><dt>${K('up', 'down')}</dt><dd>Propulsores arriba y abajo</dd><dt>${K('pitchUp', 'pitchDown')} o arrastrar</dt><dd>Cabeceo</dd><dt>${K('yawL', 'yawR')} o arrastrar</dt><dd>Guiñada</dd><dt>${K('rollL', 'rollR')}</dt><dd>Alabeo</dd><dt>${K('brake')}</dt><dd>Frenar (corta el empuje)</dd></dl>
-<dl><dt>${K('stab')}</dt><dd>Estabilización automática</dd><dt>${K('mode')}</dt><dd>Modo asistido o simulación</dd><dt>${K('cam')} o <kbd>Mayús</kbd> + <kbd>1</kbd>–<kbd>6</kbd></dt><dd>Cámara</dd><dt>${K('warpDown', 'warpUp')}</dt><dd>Aceleración temporal</dd><dt>${K('target')} o clic</dt><dd>Elegir objetivo</dd><dt>${K('sound')}</dt><dd>Silenciar sonido</dd><dt><kbd>Esc</kbd></dt><dd>Pausa</dd></dl>
+<dl><dt>${K('stab')}</dt><dd>Estabilización automática</dd><dt>${K('mode')}</dt><dd>Modo asistido o simulación</dd><dt>${K('cam')} o <kbd>Mayús</kbd> + <kbd>1</kbd>–<kbd>6</kbd></dt><dd>Cámara</dd><dt>${K('warpDown', 'warpUp')}</dt><dd>Aceleración temporal</dd><dt>${K('target')} o clic</dt><dd>Elegir objetivo</dd><dt>${K('sound')}</dt><dd>Silenciar sonido</dd><dt>${K('scan')}</dt><dd>Escanear el objetivo</dd><dt>${K('logbook')}</dt><dd>Bitácora, logros y retos</dd><dt><kbd>Esc</kbd></dt><dd>Pausa</dd></dl>
 <dl><dt>${K('aim')}</dt><dd>Orientar hacia el objetivo</dd><dt>${K('match')}</dt><dd>Igualar velocidad</dd><dt>${K('autobrake')}</dt><dd>Freno de aproximación</dd><dt>${K('hold')}</dt><dd>Mantener distancia</dd><dt>${K('orbit')}</dt><dd>Entrar o salir de órbita</dd><dt>${K('intercept')}</dt><dd>Interceptar (piloto automático)</dd></dl>`;
 const u = $('[data-thr="up"]'), d = $('[data-thr="down"]');
 if (u) u.dataset.tip = `Aumentar empuje (${L('thrUp')})`; if (d) d.dataset.tip = `Disminuir empuje (${L('thrDown')})`;
@@ -8841,15 +10063,15 @@ if (u) u.dataset.tip = `Aumentar empuje (${L('thrUp')})`; if (d) d.dataset.tip =
 buildDOM() {
 const el = $('#flight');
 el.innerHTML = `
-<svg id="cockpit" viewBox="0 0 1600 900" preserveAspectRatio="none" aria-hidden="true">
-<path fill-rule="evenodd" fill="#04060c" d="M0 0H1600V900H0Z M120 70 L1480 70 L1560 330 L1500 760 L1080 840 L520 840 L100 760 L40 330 Z"/>
-<path fill="none" stroke="rgba(143,195,255,.18)" stroke-width="2" d="M120 70 L1480 70 L1560 330 L1500 760 L1080 840 L520 840 L100 760 L40 330 Z M800 70 L800 40 M520 840 L560 900 M1080 840 L1040 900"/>
-<path fill="#04060c" d="M770 70 L830 70 L812 120 L788 120 Z"/>
-</svg>
-<div id="fl-mk" aria-hidden="true">
-<div id="mk-bore" class="mk"></div><div id="mk-pro" class="mk"></div><div id="mk-retro" class="mk"></div>
-<div id="mk-tgt" class="mk"><i></i><div class="t"><b></b><span></span></div></div><div id="mk-arrow" class="mk"></div>
-</div>
+<canvas id="fl-hud" aria-hidden="true"></canvas>
+<div id="cockpit" aria-hidden="true"><canvas id="ck-glass"></canvas><canvas id="ck-base"></canvas><div id="ck-light"></div><canvas id="ck-mfd"></canvas></div>
+<div id="ck-hits"></div>
+<div id="fl-chal" class="fl-card" aria-live="polite"></div>
+<div id="fl-coach" class="fl-card" role="status" aria-live="polite"></div>
+<div id="fl-ach" class="fl-card" role="status" aria-live="polite"></div>
+<div id="fl-disc" class="fl-card" role="status" aria-live="polite"></div>
+<div id="fl-result"></div>
+<div id="fl-log" role="dialog" aria-modal="true" aria-labelledby="fl-log-title"></div>
 <div id="hud-top" class="hud"><span id="h-ship"></span><span id="h-mode"></span><span id="h-cam"></span><span id="h-warp"></span></div>
 <div id="hud-warn" class="hud" role="status" aria-live="polite"></div>
 <section id="hud-l" class="hud hud-col" aria-label="Navegación">
@@ -8879,7 +10101,7 @@ el.innerHTML = `
 <h2 id="fp-title">Vuelo en pausa</h2>
 <div class="fp-grid" id="fp-keys"></div>
 <p class="note">En modo asistido no hay gravedad y la nave corrige su deriva. En modo simulación la nave conserva su inercia y la gravedad del Sol, los planetas y las lunas grandes curva tu trayectoria.</p>
-<div class="fp-actions"><button class="cta" id="fl-resume">Continuar vuelo</button><button class="txt-btn" id="fl-tohangar">Cambiar de nave</button><button class="txt-btn" id="fl-exit">Salir del modo de vuelo</button></div>
+<div class="fp-actions"><button class="cta" id="fl-resume">Continuar vuelo</button><button class="txt-btn" data-log="desc">Bitácora y logros</button><button class="txt-btn" data-log="retos">Retos</button><button class="txt-btn" id="fl-tut">Escuela de vuelo</button><button class="txt-btn" id="fl-tohangar">Cambiar de nave</button><button class="txt-btn" id="fl-exit">Salir del modo de vuelo</button></div>
 </div></div>
 <div id="hangar" role="dialog" aria-labelledby="hg-title">
 <div class="hg-panel">
@@ -8887,6 +10109,10 @@ el.innerHTML = `
 <h2 id="hg-title">Elige tu nave</h2>
 <p class="note">Naves conceptuales: sus prestaciones son teóricas o ficticias. El Sistema Solar, en cambio, está a escala real.</p>
 <div id="hg-list" role="radiogroup" aria-label="Naves"></div>
+<div class="hg-game"><div class="hg-rank" id="hg-rank"></div>
+<button class="hg-gbtn" data-log="retos" data-tip="${RETOS.length} desafíos con medallas"><b>Retos</b></button>
+<button class="hg-gbtn" data-log="desc" data-tip="Descubrimientos, logros y estadísticas"><b>Bitácora</b></button>
+<button class="hg-gbtn" id="hg-tut" data-tip="Tutorial interactivo paso a paso"><b>Escuela de vuelo</b></button></div>
 </div>
 <div class="hg-info">
 <span id="hg-type"></span><h3 id="hg-name"></h3><p id="hg-desc"></p>
@@ -8903,6 +10129,9 @@ el.innerHTML = `
 </div>`;
 this.dom = true;
 $('#fl-resume').addEventListener('click', () => this.pause(false));
+$('#fl-tut').addEventListener('click', () => { this.pause(false); FlightGame.startTutorial(); });
+$('#hg-tut').addEventListener('click', () => FlightGame.startTutorial());
+FlightGame.bind();
 $('#fl-exit').addEventListener('click', () => this.requestExit());
 $('#fl-tohangar').addEventListener('click', () => { this.pause(false); this.openHangar(); });
 $('#fl-launch').addEventListener('click', () => this.launch());
@@ -8948,6 +10177,8 @@ ${I.destacadas ? `<h4>Características destacadas</h4><ul class="hg-feat">${I.de
 const br = $('#hg-brand');
 br.hidden = !sh.brand;
 if (sh.brand) { const im = br.querySelector('img'); if (im.getAttribute('src') !== sh.brand.src) im.src = sh.brand.src; im.alt = sh.brand.alt; im.width = sh.brand.w; im.height = sh.brand.h; br.dataset.brand = sh.id; }
+const R = FlightGame.rank(), D = FlightGame.data;
+$('#hg-rank').innerHTML = `<span>Rango</span><b>${esc(R.name)}</b><small>${fmt(D.stats.points, 0)} puntos · ${Object.keys(D.scans).length} descubrimientos · ${Object.keys(D.ach).length}/${ACHS.length} logros</small>`;
 const cr = MODEL_CREDITS[sh.id]; $('#hg-credit').innerHTML = cr && World.hd[sh.id] ? 'Modelo 3D: ' + UI.creditHTML(cr) : '';
 $('#hg-start').value = this.startId;
 document.querySelectorAll('[data-as]').forEach(b => { const on = (b.dataset.as === '1') === this.assisted; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); });
@@ -8987,6 +10218,7 @@ btn('stab', 'Estabilizar', this.stab, 'Estabilización automática', 'stab') +
 btn('aim', 'Orientar', this.aim, 'Orientar hacia el objetivo', 'aim') + btn('match', 'Igualar', this.match, 'Igualar velocidad con el objetivo', 'match') +
 btn('intercept', 'Interceptar', this.intercept, 'Piloto automático hasta el objetivo', 'intercept') + btn('hold', 'Mantener', !!this.hold, 'Mantener la distancia actual', 'hold') +
 btn('orbit', 'Órbita', !!this.orbit, 'Entrar o salir de órbita', 'orbit') + btn('autoBrake', 'Freno aprox.', this.autoBrake, 'Freno automático de aproximación', 'autobrake') +
+`<button class="fb scan${FlightGame.scan ? ' on' : ''}" data-fb="scan" data-tip="Escanear el objetivo y registrarlo en la bitácora (${K('scan')})">Escanear</button>` +
 `</span><span class="fb-grp">` +
 `<span class="fb-warpctl" role="group" aria-label="Aceleración temporal">` +
 `<button class="fb fb-step" data-fb="w-" data-tip="Menos aceleración temporal (${K('warpDown')})" aria-label="Menos aceleración temporal">−</button>` +
@@ -8994,6 +10226,8 @@ btn('orbit', 'Órbita', !!this.orbit, 'Entrar o salir de órbita', 'orbit') + bt
 `<button class="fb fb-step" data-fb="w+" data-tip="Más aceleración temporal (${K('warpUp')})" aria-label="Más aceleración temporal">+</button>` +
 `</span>` +
 btn('snd', FlightAudio.on ? 'Sonido' : 'Silencio', FlightAudio.on, 'Sonido de cabina', 'sound') +
+`<button class="fb ${Voice.on ? 'on' : ''}" data-fb="voice" aria-pressed="${Voice.on}" data-tip="Voz de la computadora de a bordo">Voz</button>` +
+`<button class="fb" data-fb="log" data-tip="Bitácora, logros y retos (${K('logbook')})">Bitácora</button>` +
 `<button class="fb ${Music.prefs.musicOn && (Music.playing || Music.waiting) ? 'on' : ''}" data-fb="music" aria-pressed="${!!(Music.prefs.musicOn && (Music.playing || Music.waiting))}" data-tip="Música de fondo: ${MUSIC_INFO.title}">Música</button>` +
 `<button class="fb" data-fb="pause" data-tip="Pausa y ayuda (Esc)">Pausa</button>` +
 `<span class="fb-touch"><button class="fb hold" data-hold="Space">Frenar</button></span>` +
@@ -9003,6 +10237,7 @@ const a = b.dataset.fb;
 if (a === 'cam') this.cycleCam(1); else if (a === 'mode') this.toggleAssisted(); else if (a === 'tgt') this.toggleTargets();
 else if (a === 'w-') this.setWarp(this.warpIdx - 1); else if (a === 'w+') this.setWarp(this.warpIdx + 1);
 else if (a === 'snd') this.toggleSound(); else if (a === 'music') Music.toggle(); else if (a === 'pause') this.pause(true);
+else if (a === 'scan') FlightGame.startScan(); else if (a === 'voice') this.toggleVoice(); else if (a === 'log') FlightGame.openLog('desc');
 else this.toggle(a);
 $('#gl').focus({ preventScroll: true });
 }));
@@ -9015,36 +10250,12 @@ fmtSpeed(v) {
 if (v < 1) return fmt(v * 1000, v < 0.1 ? 1 : 0) + ' m/s';
 return fmt(v, v < 100 ? 2 : 0) + ' km/s' + (v > C_KMS * 0.001 ? ' (' + fmt(v / C_KMS * 100, 2) + ' % c)' : '');
 },
-hud() {
+hud(dt) {
 if (this.state === 'hangar' || !this.dom) return;
-const W = innerWidth, H = innerHeight, ref = this.ref, T = this.target;
+const ref = this.ref, T = this.target;
 const vrel = V.sub(this.vel, ref.vel), sp = V.len(vrel);
-const put = (el, x, y, on) => { if (!on || !isFinite(x) || !isFinite(y)) { el.classList.remove('on'); return; } el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`; el.classList.add('on'); };
-const projDir = (d, o) => World.project(V.add(World.cam, d), o);
-const o = {};
-projDir(this.F, o); put($('#mk-bore'), o.x, o.y, o.on && this.camMode !== 'free');
-if (sp > 1e-5) { const vd = V.scale(vrel, 1 / sp); projDir(vd, o); put($('#mk-pro'), o.x, o.y, o.on); projDir(V.scale(vd, -1), o); put($('#mk-retro'), o.x, o.y, o.on); }
-else { $('#mk-pro').classList.remove('on'); $('#mk-retro').classList.remove('on'); }
-const mt = $('#mk-tgt'), ar = $('#mk-arrow');
-if (T) {
-const Ts = T.posS; World.project(Ts, o);
-const d = V.dist(this.pos, T.km), rv = V.sub(this.vel, T.vel), rh = V.scale(V.sub(T.km, this.pos), 1 / Math.max(d, 1e-9)), clos = V.dot(rv, rh);
-const inView = o.on && o.x > 30 && o.x < W - 30 && o.y > 30 && o.y < H - 30;
-if (inView) {
-const s = Math.max(28, Math.min(T.proj.rpx * 2 + 18, 260));
-mt.style.width = mt.style.height = s + 'px';
-put(mt, o.x - s / 2, o.y - s / 2, true); ar.classList.remove('on');
-if (this.frameN % 3 === 0) { mt.querySelector('b').textContent = T.def.short || T.def.name; mt.querySelector('span').textContent = fmtKm(d) + '  ' + (clos >= 0 ? '−' : '+') + this.fmtSpeed(Math.abs(clos)); }
-} else {
-mt.classList.remove('on');
-const v = World.view, dir = V.sub(Ts, World.cam);
-const vx = v[0] * dir[0] + v[4] * dir[1] + v[8] * dir[2], vy = v[1] * dir[0] + v[5] * dir[1] + v[9] * dir[2];
-const ang = Math.atan2(-vy, vx), cx = W / 2, cy = H / 2, rx = W / 2 - 60, ry = H / 2 - 70;
-const k = Math.min(rx / Math.abs(Math.cos(ang) || 1e-9), ry / Math.abs(Math.sin(ang) || 1e-9));
-ar.style.transform = `translate(${(cx + Math.cos(ang) * k).toFixed(1)}px, ${(cy + Math.sin(ang) * k).toFixed(1)}px) rotate(${ang}rad)`;
-ar.classList.add('on');
-}
-} else { mt.classList.remove('on'); ar.classList.remove('on'); }
+HUD.draw(this, dt || 0.016);
+if (this.camMode === 'cockpit') Cockpit.frame(dt || 0.016);
 this.updateThrottleUI();
 this.frameN++;
 if (this.frameN % 4) return this.hudWarn();
@@ -9056,13 +10267,14 @@ const elev = (vv) => z0(Math.asin(clamp(V.dot(V.norm(vv), north), -1, 1)) * RAD)
 const rollRef = V.norm(V.sub(north, V.scale(F, V.dot(north, F))));
 const roll = z0(Math.atan2(V.dot(V.cross(rollRef, this.U), F), V.dot(rollRef, this.U)) * RAD);
 const drift = sp > 1e-6 ? Math.acos(clamp(V.dot(V.norm(vrel), F), -1, 1)) * RAD : 0;
-const E = World.byId.tierra;
+const E = World.byId.tierra, O = !this.assisted && !ref.isSun ? this.orbitEl() : null;
 $('#h-nav').innerHTML = dl([
 ['Velocidad', this.fmtSpeed(sp), 'respecto a ' + ref.def.name],
+...(O ? [['Órbita alrededor de ' + ref.def.name, O.bound ? 'Pe ' + fmtKm(O.rp - ref.R) + ' · Ap ' + fmtKm(O.ra - ref.R) : 'Trayectoria de escape', O.bound ? (O.rp < ref.R ? '¡El periapsis está bajo la superficie!' : 'Periodo ' + fmtDur(O.T / 86400) + ' · e = ' + fmt(O.e, 3)) : 'Excentricidad ' + fmt(O.e, 2)]] : []),
 ['Dirección de movimiento', sp > 1e-6 ? 'Rumbo ' + fmt(hdg(vrel), 0) + '°, elevación ' + fmt(elev(vrel), 0) + '°' : 'Detenida', sp > 1e-6 ? fmt(drift, 0) + '° respecto a la proa' : ''],
 ['Orientación', 'Rumbo ' + fmt(hdg(F), 0) + '°, cabeceo ' + fmt(elev(F), 0) + '°', 'Alabeo ' + fmt(roll, 0) + '° (marco eclíptico)'],
 ['Distancia al Sol', fmtKm(V.len(this.pos)), fmtAU(V.len(this.pos) / AU_KM)],
-['Distancia a la Tierra', fmtKm(V.dist(this.pos, E.km)), V.dist(this.pos, E.km) > 1e6 ? fmtAU(V.dist(this.pos, E.km) / AU_KM) : ''],
+...(O ? [] : [['Distancia a la Tierra', fmtKm(V.dist(this.pos, E.km)), V.dist(this.pos, E.km) > 1e6 ? fmtAU(V.dist(this.pos, E.km) / AU_KM) : '']]),
 ]);
 if (T) {
 const d = V.dist(this.pos, T.km), rv = V.sub(this.vel, T.vel), rh = V.scale(V.sub(T.km, this.pos), 1 / Math.max(d, 1e-9)), clos = V.dot(rv, rh);
@@ -9072,6 +10284,7 @@ $('#h-tgt').innerHTML = dl([
 ['Distancia', fmtKm(d), (T.R > 1 ? 'Altitud ' + fmtKm(Math.max(alt, 0)) : '') + (d > 1e6 ? '  ' + fmtAU(d / AU_KM) : '')],
 ['Velocidad relativa', this.fmtSpeed(V.len(rv)), clos >= 0 ? 'Acercándose a ' + this.fmtSpeed(clos) : 'Alejándose a ' + this.fmtSpeed(-clos)],
 ['Tiempo estimado de llegada', eta != null ? fmtDur(eta / 86400) : 'Sin aproximación', eta != null && WARPS[this.warpIdx] > 1 ? '≈ ' + fmtDur(eta / 86400 / WARPS[this.warpIdx]) + ' reales a ×' + fmt(WARPS[this.warpIdx], 0) : ''],
+['Escáner', (sc => sc && sc.T === T ? 'Escaneando ' + Math.round(sc.p * 100) + ' %' : FlightGame.scanState(T).done ? 'Registrado en la bitácora' : FlightGame.scanState(T).inRange ? 'Listo: pulsa ' + esc(Keys.label(Keys.code('flight', 'scan'))) : 'Fuera de alcance')(FlightGame.scan), 'Alcance ' + fmtKm(FlightGame.scanRange(T))],
 ['Distancia al Sol', fmtKm(V.len(T.km)), fmtAU(V.len(T.km) / AU_KM)],
 ]);
 } else $('#h-tgt').innerHTML = '<p class="note">Pulsa T o haz clic sobre un planeta, luna o estación para fijarlo como destino.</p>';
