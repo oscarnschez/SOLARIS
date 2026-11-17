@@ -1579,3 +1579,71 @@ html.hc #search::before { background: rgba(var(--ink), .96); }
 #results li { grid-template-columns: 14px minmax(0, 1fr) auto; }
 #results li .b3d, #results li .btex { grid-column: 3; grid-row: 1; }
 #results li small { grid-column: 2 / 4; }
+/* =====================================================================================================
+   Glassmorphism · Parte 2: paneles, ventanas y controles internos
+   ===================================================================================================== */
+/* fondo de las ventanas modales: el espacio se desenfoca y oscurece detrás del vidrio */
+#settings, #about, #guide, #tours, #help, #confirm, #ph-box { background: rgba(var(--ink), .5); }
+/* el desenfoque del fondo solo existe con la ventana abierta: un velo invisible a pantalla completa seguiría costando en cada fotograma */
+#settings.open, #about.open, #guide.open, #tours.open, #help.open, #confirm.open, #ph-box.open { background: rgba(var(--ink), .42); backdrop-filter: blur(10px) saturate(1.15); -webkit-backdrop-filter: blur(10px) saturate(1.15); }
+/* tarjetas de ventana: vidrio más denso para leer con comodidad */
+.set-card, .about-card, .guide-card, .tours-card, .help-card, .cf-card, .ph-card, .tool-panel, #sci-pop, #sys-pick, #music-pop, #cmp-tray {
+background: var(--glass-grain), var(--glass-sheen), var(--glass-2); border: 1px solid var(--line-2);
+box-shadow: var(--glass-shadow), 0 44px 110px -34px rgba(0, 0, 0, .9);
+backdrop-filter: blur(var(--blur-3)) saturate(1.6); -webkit-backdrop-filter: blur(var(--blur-3)) saturate(1.6);
+}
+.set-card, .about-card, .guide-card, .tours-card, .help-card, .ph-card, .tool-panel { border-radius: 28px; }
+.cf-card, #sci-pop, #sys-pick, #music-pop { border-radius: 22px; }
+.about-card { background: var(--glass-grain), radial-gradient(120% 60% at 50% 0%, rgba(242, 200, 121, .08), transparent 60%), var(--glass-sheen), var(--glass-2); }
+/* paneles laterales (ficha y secciones): sin corchetes de esquina, solo el borde de luz del vidrio */
+.panel { border-radius: 24px; }
+#info::after, #drawer::after, #tourbar::after { display: none; }
+#info::before { background: linear-gradient(180deg, transparent, rgba(255, 255, 255, .03) 70%, rgba(255, 255, 255, .16) 98%, rgba(255, 255, 255, .32) 100%); }
+.panel-head { padding: 16px 12px 8px 22px; }
+.panel-body { padding: 4px 22px 24px; }
+.close-float, .guide-x { width: 38px; height: 38px; border-radius: 50%; color: var(--text-2); background: rgba(var(--ink), .32); border: 1px solid var(--line); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.close-float:hover, .guide-x:hover { color: #fff; background: rgba(var(--frost), .14); }
+/* cabecera y pie de las ventanas */
+.set-top, .set-foot { background: rgba(255, 255, 255, .025); }
+.set-top { padding: 16px 18px 14px 24px; }
+.set-foot { padding: 14px 18px; }
+.set-nav { padding: 14px 10px; border-right-color: var(--line); background: rgba(var(--ink), .12); }
+.set-nav button { border-radius: 12px; padding: 10px 12px; transition: color .2s, background .2s, box-shadow .2s; }
+.set-nav button:hover { background: var(--hover); }
+.set-nav button.on { color: #fff; background: linear-gradient(180deg, rgba(255, 255, 255, .16), rgba(255, 255, 255, .05)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .22), 0 8px 18px -10px rgba(0, 0, 0, .9); }
+.set-nav button.on svg { color: var(--sun); }
+.set-row { border-bottom-color: var(--line); }
+/* botones */
+.set-btn, .mp-toggle { border-radius: 12px; border: 1px solid var(--line-2); background: linear-gradient(180deg, rgba(255, 255, 255, .08), rgba(255, 255, 255, .03)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1); transition: border-color .2s, color .2s, background .2s; }
+.set-btn:hover, .mp-toggle:hover { background: linear-gradient(180deg, rgba(255, 255, 255, .13), rgba(255, 255, 255, .05)); }
+.cta { border-radius: 16px; background: linear-gradient(180deg, #f8daa0, #ecbd66); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .55), inset 0 -1px 0 rgba(120, 80, 20, .25), 0 10px 26px -10px rgba(242, 200, 121, .55); }
+.cta:hover:not(:disabled) { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .6), inset 0 -1px 0 rgba(120, 80, 20, .25), 0 14px 34px -10px rgba(242, 200, 121, .7); }
+.cta-ghost { border-radius: 16px; background: var(--glass-grain), linear-gradient(180deg, rgba(242, 200, 121, .12), rgba(242, 200, 121, .03)), rgba(var(--ink), .25); box-shadow: inset 0 1px 0 rgba(255, 236, 190, .16); backdrop-filter: blur(var(--blur-1)); -webkit-backdrop-filter: blur(var(--blur-1)); }
+.pill { border-radius: 12px; border-color: var(--line); background: linear-gradient(180deg, rgba(255, 255, 255, .07), rgba(255, 255, 255, .025)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08); transition: border-color .2s, background .2s; }
+.pill:hover { border-color: var(--line-2); background: linear-gradient(180deg, rgba(255, 255, 255, .12), rgba(255, 255, 255, .04)); }
+.pill.on { background: linear-gradient(180deg, rgba(242, 200, 121, .2), rgba(242, 200, 121, .07)); border-color: rgba(242, 200, 121, .35); }
+.rel .link { background: rgba(255, 255, 255, .05); border-color: var(--line); }
+/* controles segmentados e interruptores */
+.seg { border-radius: 13px; padding: 3px; border-color: var(--line); background: rgba(var(--ink), .18); }
+.seg button { border-radius: 10px; transition: color .2s, background .2s, box-shadow .2s; }
+.seg button:hover:not(.on) { background: var(--hover); color: var(--text); }
+.seg button.on { color: #fff; background: linear-gradient(180deg, rgba(255, 255, 255, .17), rgba(255, 255, 255, .06)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .24), 0 6px 14px -8px rgba(0, 0, 0, .9); }
+.set-tog .sw, .mix-sw .sw, .check input { background: rgba(var(--ink), .4); box-shadow: inset 0 0 0 1px var(--line-2), inset 0 2px 4px rgba(0, 0, 0, .35); border-radius: 999px; }
+.set-tog .sw::after, .mix-sw .sw::after, .check input::after { background: linear-gradient(180deg, #ffffff, #d9dce3); box-shadow: 0 2px 5px rgba(0, 0, 0, .45); }
+.set-tog input:checked + .sw, .mix-sw input:checked + .sw, .check input:checked { background: linear-gradient(180deg, rgba(242, 200, 121, .75), rgba(226, 172, 84, .65)); box-shadow: inset 0 0 0 1px rgba(242, 200, 121, .6), 0 0 14px -4px rgba(242, 200, 121, .55); }
+.set-tog input:checked + .sw::after, .mix-sw input:checked + .sw::after, .check input:checked::after { background: linear-gradient(180deg, #ffffff, #f3ead8); }
+/* bloques internos de la ficha y de las secciones */
+.live { background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, .02)); border-color: var(--line); border-radius: 16px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07); }
+.vs-tile, .cmp-card, .cta-row { border-radius: 16px; border-color: var(--line); background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, .02)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07); }
+.cta-row:hover { background: linear-gradient(180deg, rgba(242, 200, 121, .16), rgba(242, 200, 121, .05)); border-color: rgba(242, 200, 121, .35); }
+.row { border-radius: 12px; }
+.row:hover { background: var(--hover); }
+.ph-frame { border-radius: 16px; }
+/* ventanas cerradas: invisibles al terminar el fundido (no se pintan ni reciben foco); el vidrio sigue desenfocando durante la animación */
+#settings, #about, #guide, #tours, #help, #confirm, .tool-panel, #sci-pop, #sys-pick, #music-pop { visibility: hidden; transition: opacity .3s ease, transform .35s ease, visibility 0s linear .35s; }
+#settings.open, #about.open, #guide.open, #tours.open, #help.open, #confirm.open, .tool-panel.open, #sci-pop.open, #sys-pick.open, #music-pop.open { visibility: visible; transition-delay: 0s; }
+/* bandeja de comparación: el botón no se parte en dos líneas y los nombres se recortan con puntos suspensivos; en móvil baja bajo la barra de modos */
+#cmp-tray { border-radius: 999px; }
+#cmp-tray .cta { white-space: nowrap; flex: none; border-radius: 999px; }
+#cmp-tray > span:not(.ct-dots) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 760px) { #cmp-tray { top: calc(var(--top) + 108px); width: calc(100% - 16px); max-width: none; } }
