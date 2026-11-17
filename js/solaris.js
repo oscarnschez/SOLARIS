@@ -1339,7 +1339,7 @@ return true;
 },
 };
 const ASSET_MANIFEST = {"music": {"webm": "assets/audio/metamorphosis.webm", "mp3": "assets/audio/metamorphosis.mp3"}, "bodyMeshes": {"fobos": {"url": "assets/models/moons/fobos.bin", "k": 1.26255}, "deimos": {"url": "assets/models/moons/deimos.bin", "k": 1.37497}, "haumea": {"url": "assets/models/dwarfs/haumea.bin", "k": 1.44255}}};
-const SOLARIS_BUILD = '2026.11.17-0937-web';
+const SOLARIS_BUILD = '2026.11.17-0956-web';
 console.info('SOLARIS · versión ' + SOLARIS_BUILD);
 const Assets = {
 cache: new Map(), busyN: new Map(),
@@ -1376,7 +1376,7 @@ if (rb.isCraft && m && (MODEL_PACKS[m] || m === 'jwst'))
 return { type: 'mesh', status: st(PackedModels.state[m]), source: m };
 if (ASSET_MANIFEST.bodyMeshes && ASSET_MANIFEST.bodyMeshes[id])
 return { type: 'mesh', status: st(PackedModels.bodyState[id]), source: ASSET_MANIFEST.bodyMeshes[id].url };
-if (typeof PLANET_TEX !== 'undefined' && PLANET_TEX[id]) {
+if (PLANET_TEX[id]) {
 const s = World.texState && World.texState[id];
 return { type: s === 'fail' ? 'standard' : 'texture', status: st(s), source: PLANET_TEX[id].map };
 }
@@ -2132,6 +2132,8 @@ if (this.progs[name]) return this.progs[name];
 const gl = this.gl, p = gl.createProgram();
 gl.attachShader(p, this.compile(gl.VERTEX_SHADER, vs, name + ':vs'));
 gl.attachShader(p, this.compile(gl.FRAGMENT_SHADER, fs, name + ':fs'));
+// cada atributo en la misma posición en todos los programas: las mallas compartidas (esferas) ya no pueden desactivar por error la posición de otro atributo al cambiar de programa
+['a_pos', 'a_nrm', 'a_dir', 'a_col', 'a_uv', 'a_frac', 'a_mat', 'a_e1', 'a_e2'].forEach((n, i) => gl.bindAttribLocation(p, i, n));
 gl.linkProgram(p);
 if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error('Link ' + name + ': ' + gl.getProgramInfoLog(p));
 const u = {}, n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
@@ -2246,27 +2248,37 @@ if (!this._avif) this._avif = new Promise(res => { const i = new Image(); i.onlo
 return this._avif;
 },
 setTexQuality(q) {
-const gl = this.gl; if (!gl) return;
-const base = { low: 2, medium: 1, high: 0, ultra: 0 }[q] || 0, an = gl.getExtension('EXT_texture_filter_anisotropic');
-const maxA = an ? gl.getParameter(an.MAX_TEXTURE_MAX_ANISOTROPY_EXT) : 1, aniso = Math.min(maxA, { low: 1, medium: 2, high: 4, ultra: 16 }[q] || 4);
+if (!this.gl) return;
 this.texQ = q;
-for (const t of this.mipTex) { gl.bindTexture(gl.TEXTURE_2D, t); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_BASE_LEVEL, base); if (an) gl.texParameterf(gl.TEXTURE_2D, an.TEXTURE_MAX_ANISOTROPY_EXT, aniso); }
+for (const t of this.mipTex) this.texParams(t);
+},
+// nivel base y anisotropía de una textura según la calidad; las que ya se subieron reducidas solo saltan los niveles que les falten
+texParams(t) {
+const gl = this.gl, q = this.texQ || 'high', an = gl.getExtension('EXT_texture_filter_anisotropic');
+gl.bindTexture(gl.TEXTURE_2D, t); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_BASE_LEVEL, Math.max(0, ({ low: 2, medium: 1 }[q] || 0) - (t._down || 0)));
+if (an) gl.texParameterf(gl.TEXTURE_2D, an.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(gl.getParameter(an.MAX_TEXTURE_MAX_ANISOTROPY_EXT), { low: 1, medium: 2, high: 4, ultra: 16 }[q] || 4));
 },
 async texFromURI(uri, clampT) {
 const gl = this.gl, img = new Image();
 img.src = uri; await img.decode();
-const t = gl.createTexture(); this.mipTex.push(t);
+// calidad media o baja: la imagen se reduce antes de subirla; antes se subía entera y sus niveles grandes ocupaban memoria de vídeo sin mostrarse nunca
+const down = { low: 2, medium: 1 }[this.texQ] || 0;
+let src = img;
+if (down && img.naturalWidth > 1024) {
+const c = document.createElement('canvas'); c.width = img.naturalWidth >> down; c.height = Math.max(1, img.naturalHeight >> down);
+const x = c.getContext('2d'); x.imageSmoothingQuality = 'high'; x.drawImage(img, 0, 0, c.width, c.height); src = c;
+}
+const t = gl.createTexture(); t._down = src === img ? 0 : down; this.mipTex.push(t);
 gl.bindTexture(gl.TEXTURE_2D, t);
 gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
-gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, src);
+if (src !== img) src.width = src.height = 0;
 gl.generateMipmap(gl.TEXTURE_2D);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, clampT ? gl.CLAMP_TO_EDGE : gl.REPEAT);
-const an = gl.getExtension('EXT_texture_filter_anisotropic');
-if (an) gl.texParameterf(gl.TEXTURE_2D, an.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(4, gl.getParameter(an.MAX_TEXTURE_MAX_ANISOTROPY_EXT)));
-if (this.texQ) { const q = this.texQ; this.texQ = null; this.setTexQuality(q); }
+this.texParams(t);
 return t;
 },
 whiteTex() {
@@ -2300,6 +2312,9 @@ return f;
 },
 resize(w, h, dpr) {
 const gl = this.gl;
+// tope: el máximo del dispositivo y unos 6 Mpx con MSAA (9 Mpx sin él); en un 5K a pantalla completa los búferes HDR pasaban de 0.8 GB
+const lim = this.maxRB || (this.maxRB = Math.min(gl.getParameter(gl.MAX_RENDERBUFFER_SIZE), gl.getParameter(gl.MAX_TEXTURE_SIZE)));
+dpr = Math.min(dpr, lim / Math.max(1, w), lim / Math.max(1, h), Math.sqrt((this.samples ? 6e6 : 9e6) / Math.max(1, w * h)));
 this.dpr = dpr;
 const W = Math.max(2, Math.floor(w * dpr)), H = Math.max(2, Math.floor(h * dpr));
 if (W === this.W && H === this.H && this.targets) return;
@@ -2360,6 +2375,7 @@ if (t.samples) {
 gl.bindFramebuffer(gl.READ_FRAMEBUFFER, t.msFbo);
 gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, t.resFbo);
 gl.blitFramebuffer(0, 0, this.W, this.H, 0, 0, this.W, this.H, gl.COLOR_BUFFER_BIT, gl.NEAREST);
+gl.invalidateFramebuffer(gl.READ_FRAMEBUFFER, [gl.COLOR_ATTACHMENT0, gl.DEPTH_ATTACHMENT]);   // GPU por mosaicos (iPhone, Android): el MSAA ya resuelto no se escribe de vuelta a memoria
 }
 this.state({ depthTest: false, depthWrite: false, cull: 'none', blend: 'none' });
 gl.bindVertexArray(this.fsTri);
@@ -2369,6 +2385,7 @@ if (post.bloom > 0) {
 for (let i = 0; i < t.bloom.length; i++) {
 const L = t.bloom[i];
 gl.bindFramebuffer(gl.FRAMEBUFFER, L.fbo); gl.viewport(0, 0, L.w, L.h);
+gl.invalidateFramebuffer(gl.FRAMEBUFFER, [gl.COLOR_ATTACHMENT0]);   // esta pasada lo sobrescribe entero: no hace falta cargar el contenido anterior
 const pr = i === 0 ? P.downT : P.down;
 this.use(pr);
 this.set(pr, 'u_src', src); this.set(pr, 'u_texel', [1 / sw, 1 / sh]); this.set(pr, 'u_threshold', post.threshold);
@@ -2433,11 +2450,13 @@ faces = nf;
 return { verts, faces };
 },
 irregular(shape, rough, seed, bilobe) {
-const { verts, faces } = Geo.icosphere(5);
+// la esfera base (10,242 vértices) y sus índices son iguales para todos los cuerpos irregulares: se construyen una sola vez
+const base = Geo._irr || (Geo._irr = (() => { const { verts, faces } = Geo.icosphere(5), dir = new Float32Array(verts.length * 3); verts.forEach((d, i) => { dir[i * 3] = d[0]; dir[i * 3 + 1] = d[1]; dir[i * 3 + 2] = d[2]; }); const idx = []; faces.forEach(([a, b, c]) => Geo.pushTri(idx, dir, a, b, c)); return { verts, dir, idx: new Uint32Array(idx) }; })());
+const verts = base.verts, dir = base.dir, idx = base.idx;
 const rng = makeRng(Math.floor(seed * 1000) + 7);
 const off = [rng() * 100, rng() * 100, rng() * 100];
 const sx = shape ? shape[0] : 1, sy = shape ? shape[1] : 1, sz = shape ? shape[2] : 1;
-const pos = new Float32Array(verts.length * 3), dir = new Float32Array(verts.length * 3);
+const pos = new Float32Array(verts.length * 3);
 verts.forEach((d, i) => {
 let r;
 if (bilobe) {
@@ -2448,12 +2467,9 @@ const n1 = Noise3.fbm(d[0] * 1.6 + off[0], d[1] * 1.6 + off[1], d[2] * 1.6 + off
 const n2 = Noise3.fbm(d[0] * 5 + off[1], d[1] * 5 + off[2], d[2] * 5 + off[0], 3);
 r *= 1 + rough * n1 + rough * 0.25 * n2;
 pos[i * 3] = d[0] * r * sx; pos[i * 3 + 1] = d[1] * r * sy; pos[i * 3 + 2] = d[2] * r * sz;
-dir[i * 3] = d[0]; dir[i * 3 + 1] = d[1]; dir[i * 3 + 2] = d[2];
 });
 let mean = 0; for (let i = 0; i < verts.length; i++) mean += Math.hypot(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]);
 mean /= verts.length; for (let i = 0; i < pos.length; i++) pos[i] /= mean;
-const idx = [];
-faces.forEach(([a, b, c]) => Geo.pushTri(idx, dir, a, b, c));
 const nrm = new Float32Array(pos.length);
 for (let f = 0; f < idx.length; f += 3) {
 const a = idx[f], b = idx[f + 1], c = idx[f + 2];
@@ -2462,7 +2478,7 @@ const n = V.cross(V.sub(pb, pa), V.sub(pc, pa));
 for (const k of [a, b, c]) { nrm[k * 3] += n[0]; nrm[k * 3 + 1] += n[1]; nrm[k * 3 + 2] += n[2]; }
 }
 for (let i = 0; i < verts.length; i++) { const l = Math.hypot(nrm[i * 3], nrm[i * 3 + 1], nrm[i * 3 + 2]) || 1; nrm[i * 3] /= l; nrm[i * 3 + 1] /= l; nrm[i * 3 + 2] /= l; }
-return { pos, nrm, dir, idx: new Uint32Array(idx) };
+return { pos, nrm, dir, idx };
 },
 ring(inner, outer, seg, rings) {
 const pos = [], idx = [];
@@ -3665,7 +3681,7 @@ hz: false,          // capa científica: zona habitable
 hzModel: 'conservador',
 };
 const COLORS = { orbitPlanet: '#8fb3e6', orbitDwarf: '#c2ae8c', orbitAst: '#a39886', orbitComet: '#7fd0ff', orbitMoon: '#8095b5', orbitCraft: '#86d3c6', select: '#f2c879' };
-const lin = h => srgbToLin(hexToRgb(h));
+const LIN = {}, lin = h => LIN[h] || (LIN[h] = srgbToLin(hexToRgb(h)));   // colores lineales en caché: se pedían para cada órbita en cada fotograma (nadie modifica el resultado)
 const World = {
 rb: [], byId: {}, sun: null, hd: {}, jd: 0, cam: [0, 0, 0], view: null, proj: null, meshes: {}, P: {},
 sky: null, stars: null, constLines: null, belts: {}, markers: null, comets: [], landTex: null,
@@ -4115,7 +4131,7 @@ const useP = pr => { GLX.use(pr); GLX.setAll(pr, glob); return pr; };
 GLX.beginScene();
 if (L.deepSky && Settings.state.graphics.nebulae) {
 GLX.state({ depthTest: false, depthWrite: false, cull: 'none', blend: 'none' });
-const pr = useP(P.sky), v = this.view, f = 1 / this.proj[5];
+const pr = useP(P.sky), v = this.view;
 GLX.setAll(pr, { u_sky: this.sky, u_camR: [v[0], v[4], v[8]], u_camU: [v[1], v[5], v[9]], u_camF: [-v[2], -v[6], -v[10]], u_tan: [1 / this.proj[0], 1 / this.proj[5]], u_off: [this.proj[8], this.proj[9]], u_skyB: 1.0 });
 gl.bindVertexArray(GLX.fsTri); gl.drawArrays(gl.TRIANGLES, 0, 3);
 }
@@ -4273,13 +4289,13 @@ m = M4.fromBasis(V.scale(p, El.a), F.n, V.scale(q, -El.a * Math.sqrt(1 - El.e * 
 } else m = M4.fromBasis(F.u, F.n, V.cross(F.u, F.n), rb.moonDistMean, V.sub(rb.parent.posS, cam));
 mesh = this.meshes.circle;
 }
-else { m = M4.translate(V.sub([0, 0, 0], cam)); mesh = rb.orbitMesh; }
+else { m = this._orbT = M4.translate([-cam[0], -cam[1], -cam[2]], 1, this._orbT); mesh = rb.orbitMesh; }   // misma matriz para todas las órbitas heliocéntricas, sin crear una nueva por órbita
 GLX.setAll(pO, { u_model: m, u_color: lin(color), u_alpha: alpha * vis1, u_cur: rb.orbitFrac || 0, u_fade: orbMode ? 0.35 : 1 });
 GLX.draw(mesh, pO);
 }
 if (SOLAR) {
 GLX.state({ depthTest: true, depthWrite: false, cull: 'none', blend: 'add' });
-for (const c of this.comets) this.drawComet(c, glob, useP);
+for (const c of this.comets) this.drawComet(c, useP);
 if (Flight.on) Flight.drawFx(useP);
 }
 if (L.markers) {
@@ -4300,7 +4316,7 @@ GLX.draw(this.markers, pr, n);                    // solo los cuerpos del sistem
 }
 GLX.endScene({ progs: this.post.progs, bloom: Settings.state.graphics.bloom ? lerp(0.7, 0.18, smoothstep(30, 260, this.sun.proj.on ? this.sun.proj.rpx : 0)) * Gfx.flash() : 0, threshold: GLX.hdr ? 1.1 : 0.27, exposure: 1.05, vignette: 0.35 });
 },
-drawComet(c, glob, useP) {
+drawComet(c, useP) {
 const rb = c.rb, cam = this.cam;
 if (c.act < 0.01 || !rb.proj.on) return;
 const r = c.r, h = rb.helio;
@@ -4312,7 +4328,7 @@ const endS = ScaleState.mapVec(Astro.eclToScene(V.add(h, V.scale(anti, LenAU))))
 const lenS = V.dist(startS, endS);
 const N = c.N;
 const fill = (mesh, kind) => {
-const pos = new Float32Array((N + 1) * 6), uv = new Float32Array((N + 1) * 4);
+const pos = mesh._pos || (mesh._pos = new Float32Array((N + 1) * 6)), uv = mesh._uv || (mesh._uv = new Float32Array((N + 1) * 4));   // búferes reutilizados: antes se creaban 4 por cometa en cada fotograma
 let prev = null;
 for (let i = 0; i <= N; i++) {
 const s = i / N;
@@ -4332,7 +4348,7 @@ pos[j * 3] = rel[0] + side[0] * wdt * sg; pos[j * 3 + 1] = rel[1] + side[1] * wd
 uv[j * 2] = s; uv[j * 2 + 1] = sg;
 }
 }
-GLX.update(mesh, 'a_pos', pos); GLX.update(mesh, 'a_uv', uv);
+GLX.update(mesh, 'a_pos', pos); if (!mesh._uvOk) { GLX.update(mesh, 'a_uv', uv); mesh._uvOk = true; }   // las coordenadas de textura no cambian
 };
 fill(c.ion, 'ion'); fill(c.dust, 'dust');
 const w = Math.max(V.dist(startS, cam), 1e-9), px = this.pxPerUnit(w);
@@ -4759,7 +4775,11 @@ m.R = R;
 return (cache[name] = m);
 },
 define(name, fn) { MODELS[name] = fn; },
-setMesh(name, mesh) { if (MODELS[name] && !MODELS[name + '-lite']) MODELS[name + '-lite'] = MODELS[name]; cache[name] = mesh; },
+setMesh(name, mesh) {
+if (MODELS[name] && !MODELS[name + '-lite']) MODELS[name + '-lite'] = MODELS[name];
+if (cache[name] && !cache[name + '-lite']) cache[name + '-lite'] = cache[name];   // la malla procedimental ya construida pasa a ser la versión ligera: ni se pierde en la GPU ni se reconstruye
+cache[name] = mesh;
+},
 };
 })();
 COLORS.orbitFiction = '#c9a46e';
@@ -5228,12 +5248,15 @@ location.reload();
 // Esfera girando en un canvas 2D: proyección ortográfica de la miniatura equirectangular con iluminación, atmósfera y anillos
 const GlobeCanvas = {
 tex: {}, live: new Set(), raf: 0, t0: 0,
+// una ficha cerrada solo baja su opacidad: sin esta comprobación la esfera se seguía dibujando píxel a píxel 25 veces por segundo
+visible(s) { const c = s.cv; return c.checkVisibility ? c.checkVisibility({ opacityProperty: true, visibilityProperty: true }) : c.getClientRects().length > 0; },
 load(id, big) {                                   // miniatura de 512 px; en el visor ampliado, la textura completa del modelo 3D (reducida a 2048 px)
 const src = big && PLANET_TEX[id] ? PLANET_TEX[id].map : 'assets/images/globes/' + id + '.webp', key = src;
 if (this.tex[key]) return this.tex[key];
+if (big && PLANET_TEX[id]) { if (this.bigKey && this.bigKey !== key) delete this.tex[this.bigKey]; this.bigKey = key; }   // solo se guarda una textura grande (8 MB cada una) a la vez
 return (this.tex[key] = new Promise((ok, ko) => {
 const im = new Image(); im.decoding = 'async';
-im.onload = () => { const w = Math.min(im.naturalWidth, 2048), h = Math.round(w * im.naturalHeight / im.naturalWidth), c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(im, 0, 0, w, h); ok({ w, h, d: x.getImageData(0, 0, w, h).data }); };
+im.onload = () => { const w = Math.min(im.naturalWidth, 2048), h = Math.round(w * im.naturalHeight / im.naturalWidth), c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(im, 0, 0, w, h); const d = x.getImageData(0, 0, w, h).data; c.width = c.height = 0; ok({ w, h, d }); };   // el lienzo temporal se libera al instante (Safari lo retenía)
 im.onerror = () => { delete this.tex[key]; big ? this.load(id).then(ok, ko) : ko(); }; im.src = src;
 }));
 },
@@ -5296,7 +5319,7 @@ const tick = now => {
 this.raf = 0;
 for (const s of this.live) if (!s.cv.isConnected) this.live.delete(s);
 if (!this.live.size) return;
-if (now - last > 40 && !document.hidden) { last = now; const t = (now - this.t0) / 1000; for (const s of this.live) if (s.cv.getClientRects().length) this.draw(s, t); }
+if (now - last > 40 && !document.hidden) { last = now; const t = (now - this.t0) / 1000; for (const s of this.live) if (this.visible(s) && !(UI.reducedMotion && s.drawn)) { this.draw(s, t); s.drawn = true; } }
 this.raf = requestAnimationFrame(tick);
 };
 this.raf = requestAnimationFrame(tick);
@@ -5733,11 +5756,14 @@ document.querySelectorAll('#speed-menu [data-i]').forEach(b => b.setAttribute('a
 tickTime() {
 const d = Astro.dateFromJD(Time.jd);
 if (isNaN(d.getTime())) return;
-$('#t-date').textContent = d.toLocaleDateString(I18N.loc(), { day: 'numeric', month: 'short', year: 'numeric' });
+// formateadores creados una vez y escritura solo si el texto cambia (antes, tres formateos y tres escrituras unas 15 veces por segundo, también en pausa)
+const loc = I18N.loc(), F = this._tf && this._tf.loc === loc ? this._tf : (this._tf = { loc, date: new Intl.DateTimeFormat(loc, { day: 'numeric', month: 'short', year: 'numeric' }), time: new Intl.DateTimeFormat(loc, { hour: '2-digit', minute: '2-digit', hour12: false }), utc: new Intl.DateTimeFormat(loc, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'UTC', hour12: false }) });
+const setT = (el, v) => { if (el.textContent !== v) el.textContent = v; };
+setT($('#t-date'), F.date.format(d));
 const nowT = performance.now(); if (!this._tlT || nowT - this._tlT > 250) { this._tlT = nowT; TL.refresh(); }   // indicador de simulación (4 veces por segundo)
 const live = Time.live && !Time.paused && Time.idx === 0;
-$('#t-clock').textContent = d.toLocaleTimeString(I18N.loc(), { hour: '2-digit', minute: '2-digit', hour12: false }) + (live ? ' · en vivo' : ' hora local');
-$('#t-clock').dataset.tip = d.toLocaleString(I18N.loc(), { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'UTC', hour12: false }) + ' UTC';
+const ck = $('#t-clock'), tip = F.utc.format(d) + ' UTC';
+setT(ck, F.time.format(d) + (live ? ' · en vivo' : ' hora local')); if (ck.dataset.tip !== tip) ck.dataset.tip = tip;
 const capped = World.rb.some(r => r.capped && r.proj.rpx > 20);
 $('#rot-flag').classList.toggle('on', !!capped);
 },
@@ -5920,7 +5946,7 @@ if (!this.sel || (!force && now - this.lastLive < 250)) return;
 this.lastLive = now;
 const rows = Info.live(this.sel);
 const el = $('#live-rows'); if (!el) return;
-el.innerHTML = rows.map(r => `<div class="live-row"><span>${esc(r.label)}</span><b>${escNum(r.txt || fmtKm(r.km))}</b>${r.au != null && r.au >= 0.001 ? `<small>${escNum(fmtAU(r.au))}</small>` : ''}</div>`).join('');
+{ const h = rows.map(r => `<div class="live-row"><span>${esc(r.label)}</span><b>${escNum(r.txt || fmtKm(r.km))}</b>${r.au != null && r.au >= 0.001 ? `<small>${escNum(fmtAU(r.au))}</small>` : ''}</div>`).join(''); if (el._h !== h) { el.innerHTML = h; el._h = h; } }
 },
 buildLabels() {
 const host = $('#labels');
@@ -6017,7 +6043,7 @@ $('#mm-toggle').setAttribute('aria-pressed', this.mmOn);
 refreshMinimap() { this.toggleMinimap(this.mmOn, false); },   // aplica el estado (que en móvil empieza apagado) sin tocar la preferencia
 mmMap(x, z, R) { const r = Math.hypot(x, z); if (r < 1e-9) return [0, 0]; const k = R * Math.log(1 + r / 0.35) / Math.log(1 + 45 / 0.35) / r; return [x * k, z * k]; },
 drawMinimap() {
-if (!this.mmOn) return;
+if (!this.mmOn || S.mode === 'cine' || this.tourCine || (innerWidth <= 1100 && $('#info').classList.contains('open'))) return;   // oculto por CSS en esos casos: no se redibuja
 const cv = $('#minimap'), dpr = Math.min(devicePixelRatio || 1, 2), S2 = cv.clientWidth;
 if (!S2) return;
 const px = Math.round(S2 * dpr); if (cv.width !== px) cv.width = cv.height = px;
@@ -6125,10 +6151,11 @@ case 'pilot': Flight.openHangar(); break;
 },
 frame(dt) {
 this.dateSaveT = (this.dateSaveT || 0) + dt; if (this.dateSaveT > 10) { this.dateSaveT = 0; SettingsApply.saveDate(); }
-this.updateLabels();
+const studio = CompareView.active;                                       // el comparador 3D tapa la escena general: sus etiquetas y el minimapa no se ven
+if (!studio) this.updateLabels();
 this.updateLive();
 this.tickTour(dt);
-if ((World.frame & 3) === 0) { this.tickTime(); this.drawMinimap(); }
+if ((World.frame & 3) === 0) { this.tickTime(); if (!studio) this.drawMinimap(); }
 },
 };
 const TOUR_SYSTEMS = [
@@ -6659,9 +6686,9 @@ document.querySelectorAll('.mix').forEach(m => m.classList.toggle('all-muted', S
 document.querySelectorAll('[data-music]').forEach(b => b.classList.toggle('all-muted', SFX.prefs.muted));
 },
 });
-const MUSIC_INFO = { title: 'Metamorphosis', artist: 'Laura Platt', role: 'Tema musical principal', url: 'https://www.youtube.com/watch?v=G7-1z_8Mn5M', license: 'CC BY 4.0', licenseUrl: 'https://creativecommons.org/licenses/by/4.0/' };
+const MUSIC_INFO = { title: 'Metamorphosis', artist: 'Laura Platt', url: 'https://www.youtube.com/watch?v=G7-1z_8Mn5M', license: 'CC BY 4.0', licenseUrl: 'https://creativecommons.org/licenses/by/4.0/' };
 const Music = {
-el: null, ctx: null, gain: null, ready: false, playing: false, duck: 1, waiting: false, fadeTimer: null,
+el: null, ctx: null, gain: null, playing: false, duck: 1, waiting: false, fadeTimer: null,
 get prefs() { return Settings.state.audio; },
 ensureSource() {                                 // la pista es un archivo que se descarga al empezar a sonar
 if (this.el) return;
@@ -6818,7 +6845,7 @@ const SETTINGS_SCHEMA = [
 { type: 'seg', path: 'graphics.scale', label: 'Resolución de renderizado', desc: 'Más de 100 % mejora la nitidez con un coste alto de rendimiento.', options: [[0.5, '50 %'], [0.75, '75 %'], [1, '100 %'], [1.25, '125 %']] },
 { type: 'toggle', path: 'graphics.aa', label: 'Antialiasing', desc: 'Suaviza los bordes dentados.' },
 { type: 'seg', path: 'graphics.shadows', label: 'Sombras', desc: 'Eclipses de lunas y planetas y sombra de los anillos.', options: [[0, 'Desactivadas'], [1, 'Bajas'], [2, 'Medias'], [3, 'Altas']] },
-{ type: 'seg', path: 'graphics.textures', label: 'Calidad de texturas', desc: 'Determina la resolución de las superficies planetarias.', options: [['low', 'Baja'], ['medium', 'Media'], ['high', 'Alta'], ['ultra', 'Ultra']] },
+{ type: 'seg', path: 'graphics.textures', label: 'Calidad de texturas', desc: 'Determina la resolución de las superficies planetarias. Las calidades media y baja ahorran memoria de vídeo; al subirla, las texturas ya cargadas mejoran al recargar la página.', options: [['low', 'Baja'], ['medium', 'Media'], ['high', 'Alta'], ['ultra', 'Ultra']] },
 { type: 'seg', path: 'graphics.distance', label: 'Distancia de renderizado', desc: 'Lunas, asteroides, cometas y naves lejanos. Los planetas siempre se dibujan.', options: [['low', 'Baja'], ['medium', 'Media'], ['high', 'Alta'], ['max', 'Máxima']] },
 { type: 'seg', path: 'graphics.lod', label: 'Nivel de detalle (LOD)', desc: 'Detalle geométrico de planetas y naves según su tamaño en pantalla.', options: [['low', 'Bajo'], ['medium', 'Medio'], ['high', 'Alto']] },
 { type: 'seg', path: 'graphics.particles', label: 'Partículas', desc: 'Estrellas, asteroides y polvo espacial.', options: [['low', 'Bajo'], ['medium', 'Medio'], ['high', 'Alto']] },
@@ -7023,6 +7050,7 @@ const st = Settings.state, h = document.documentElement, I = st.interface, A = s
 h.classList.toggle('anim-reduced', I.anim === 'reduced' || A.reducedMotion);
 h.classList.toggle('hc', A.contrast);
 h.classList.remove('ts-small', 'ts-large'); if (A.text !== 'normal') h.classList.add('ts-' + A.text);
+for (const k in UI.labels) UI.labels[k].w = 0;                         // las etiquetas se miden de nuevo con el tamaño de texto nuevo
 h.style.setProperty('--uiz', I.uiScale);
 const a = I.panelOpacity;
 // vidrio grafito: la opacidad elegida (0.3–0.95, 0.6 por defecto) se traduce en un velo más ligero, porque el desenfoque ya da lectura
@@ -7040,7 +7068,7 @@ if (sec === 'audio') {
 SFX.apply();
 if (key === 'music') Music.applyLevel();
 if (key === 'musicOn') { if (v) Music.play(2.2); else Music.pause(); }
-UI.refreshAudio(); UI.refreshMusic();
+UI.refreshMusic();   // refreshMusic ya llama a refreshAudio: antes se redibujaba dos veces por cada movimiento del control
 } else if (sec === 'graphics') {
 if (['scale', 'aa', 'preset'].includes(key)) this.debounce('q', 250, () => App.applyQuality(true));
 if (key === 'textures' || key === 'preset') GLX.setTexQuality(st.graphics.textures);
@@ -7353,7 +7381,7 @@ photosHTML(rbs) {
 const n = rbs.length, sz = innerWidth < 760 ? 118 : n > 3 ? 112 : n > 2 ? 138 : 168;
 return `<div class="cmp-photos" style="--n:${n}">${rbs.map(rb => `<div class="cp-col"><h4><i class="dot" style="--c:${rb.def.color}"></i>${esc(rb.def.name)}</h4>
 ${Photo.has(rb.id) ? Photo.pair(rb.id, sz) + `<p class="ph-credit">${Photo.credit(rb.id)}</p>` : `<p class="note">Aún no hay una fotografía real de ${esc(rb.def.name)} en SOLARIS${['asteroid', 'comet', 'tno'].includes(rb.def.type) ? ': muchos de estos objetos solo se conocen como puntos de luz o por imágenes de sobrevuelos parciales' : ''}.</p>`}</div>`).join('')}</div>
-${Photo.ok() ? '' : `<p class="note ph-why" data-ph-why>Las fotografías reales se descargan de Wikimedia Commons, un servicio de la Fundación Wikimedia (Estados Unidos): al mostrarlas, tu navegador se conecta a sus servidores y les envía tu dirección IP. La preferencia se guarda en este navegador y puedes retirarla en <button type="button" class="link" data-privacy-open>Preferencias de privacidad</button>.</p>`}
+${Photo.whyHTML()}
 <p class="note">Las fotografías no están a la misma escala: cada una muestra el objeto completo. Pulsa una foto para verla en grande junto al modelo girando. Las imágenes se cargan desde Wikimedia Commons solo si lo permites.</p>`;
 },
 gravHTML(rbs) {
@@ -7388,7 +7416,7 @@ pluton: { P: -153.2928, obl: 119.51, fs: 'plutofact', note: 'Rotación retrógra
 const CompareView = {
 active: false, stage: null, rect: null, items: [], tSim: 0, playing: true, speed: 'media', custom: 7200, scale: 'real', info: false, sel: null,
 SPEEDS: [['real', 'Tiempo real', 1], ['baja', '10 min por segundo', 600], ['media', '2 horas por segundo', 7200], ['alta', '1 día por segundo', 86400], ['custom', 'Personalizada', null]],
-view: new Float64Array(16), proj: new Float64Array(16), cam: [0, 0, 1], camT: null, o: {},
+view: new Float64Array(16), proj: new Float64Array(16), camT: null,
 // datos de rotación de un cuerpo: curados (NASA) o los de su ficha de SOLARIS
 rot(rb) {
 const d = rb.def, R = ROT_DATA[rb.id];
@@ -7492,8 +7520,9 @@ GLX.beginScene();
 // fondo: el mismo campo de estrellas de SOLARIS en toda la pantalla
 if (S.layers.stars !== false) {
 GLX.state({ depthTest: false, depthWrite: false, cull: 'none', blend: 'add' });
-const pr = useP(P.stars); GLX.setAll(pr, { u_proj: this.wide || (this.wide = M4.perspInf(50 * DEG, 1, 1e-4)), u_dpr: dpr, u_bright: 0.35 });
-this.wide[0] = this.wide[5] * GLX.H / GLX.W;
+const pr = useP(P.stars), wide = this.wide || (this.wide = M4.perspInf(50 * DEG, 1, 1e-4));
+wide[0] = wide[5] * GLX.H / GLX.W;
+GLX.setAll(pr, { u_proj: wide, u_dpr: dpr, u_bright: 0.35 });
 GLX.bindMesh(World.stars, pr); gl.drawArrays(gl.POINTS, 0, Math.round((World.starN || World.stars.count) * Gfx.particles()));
 }
 gl.viewport(vx, vy, vw, vh); gl.enable(gl.SCISSOR_TEST); gl.scissor(vx, vy, vw, vh);
@@ -7616,7 +7645,6 @@ st.addEventListener('input', e => { if (e.target.id === 'cv-custom') { this.cust
 if (!this._docBound) {
 this._docBound = true;
 addEventListener('resize', () => { if (this.active) { this.measure(); this.layout(); this.camT = null; } });
-document.addEventListener('scroll', () => { if (this.active) this.measure(); }, true);
 }
 },
 pinchDist(ptrs) { const [a, b] = [...ptrs.values()]; return Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)); },
@@ -7647,21 +7675,23 @@ paint() {
 if (!this.stage || !this.camT) return;
 if (!this._ctlPainted) this.paintCtl();
 const L = this.stage.querySelector('.cs-labels'), ax = this.stage.querySelector('.cs-axes'), R = this.rect;
-let html = '', svg = '', lastX = [-1e9, -1e9];
+let html = '', svg = '', lastX = [-1e9, -1e9]; const pos = [];
 for (const it of this.items) {
 const b = this.project([it.pos[0], it.pos[1] - it.halfH, 0]), c = this.project(it.pos);
 if (!b || !c) continue;
 const lane = c[0] - lastX[0] < 96 ? (c[0] - lastX[1] < 96 ? 0 : 1) : 0; lastX[lane] = c[0];   // nombres de cuerpos muy juntos: en dos alturas para que no se pisen
 const tiny = it.px < 1.5, d = it.rb.def;
 if (b[0] < -80 || b[0] > R.w + 80 || (this.sel && this.sel !== it.rb.id)) continue;
-html += `<button class="cs-lab${this.sel === it.rb.id ? ' on' : ''}" data-cv="sel" data-id="${it.rb.id}" style="transform:translate(${(c[0]).toFixed(1)}px, ${(Math.min(b[1] + 8, R.h - 60 - lane * 40) + lane * 40).toFixed(1)}px)"><b>${esc(d.short || d.name)}</b><small>${fmt(2 * d.R, d.R < 50 ? 1 : 0)} km${tiny ? ' · casi invisible a esta escala' : ''}</small>${this.info && it.rot.P ? `<small class="cs-rot">${it.rot.retro ? '↻' : '↺'} ${this.periodTxt(it.rot.P).replace(/ \(.*/, '')}${it.rot.obl != null ? ' · ' + fmt(it.rot.obl, it.rot.obl < 1 ? 3 : 1) + '°' : ''}</small>` : ''}</button>`;
+pos.push(`translate(${(c[0]).toFixed(1)}px, ${(Math.min(b[1] + 8, R.h - 60 - lane * 40) + lane * 40).toFixed(1)}px)`);
+html += `<button class="cs-lab${this.sel === it.rb.id ? ' on' : ''}" data-cv="sel" data-id="${it.rb.id}"><b>${esc(d.short || d.name)}</b><small>${fmt(2 * d.R, d.R < 50 ? 1 : 0)} km${tiny ? ' · casi invisible a esta escala' : ''}</small>${this.info && it.rot.P ? `<small class="cs-rot">${it.rot.retro ? '↻' : '↺'} ${this.periodTxt(it.rot.P).replace(/ \(.*/, '')}${it.rot.obl != null ? ' · ' + fmt(it.rot.obl, it.rot.obl < 1 ? 3 : 1) + '°' : ''}</small>` : ''}</button>`;
 if (tiny) svg += `<circle cx="${c[0].toFixed(1)}" cy="${c[1].toFixed(1)}" r="6" class="cs-tiny"/>`;
 if (this.info && it.px > 6) {
 const B = it.B || this.basis(it), k = 1.45 * it.r, a = this.project(V.add(it.pos, V.scale(B[1], k))), z = this.project(V.sub(it.pos, V.scale(B[1], k))), n1 = this.project(V.add(it.pos, [0, k, 0])), n2 = this.project(V.sub(it.pos, [0, k, 0]));
 if (a && z && n1 && n2) svg += `<line x1="${n2[0].toFixed(1)}" y1="${n2[1].toFixed(1)}" x2="${n1[0].toFixed(1)}" y2="${n1[1].toFixed(1)}" class="cs-norm"/><line x1="${z[0].toFixed(1)}" y1="${z[1].toFixed(1)}" x2="${a[0].toFixed(1)}" y2="${a[1].toFixed(1)}" class="cs-axis"/><circle cx="${a[0].toFixed(1)}" cy="${a[1].toFixed(1)}" r="3" class="cs-pole"/>`;
 }
 }
-if (html !== this._labH) { L.innerHTML = html; this._labH = html; }
+if (html !== this._labH) { L.innerHTML = html; this._labH = html; }   // los botones solo se reconstruyen si cambia su contenido: así no pierden el foco del teclado al mover la cámara
+for (let i = 0; i < pos.length; i++) { const el = L.children[i]; if (el && el._tf !== pos[i]) el.style.transform = el._tf = pos[i]; }
 if (svg !== this._svgH) { ax.innerHTML = svg; this._svgH = svg; }
 const ck = this.stage.querySelector('.cs-clock'), ct = `1 s = ${this.rateTxt(this.speedK())} · ${this.simTxt(this.tSim)}${this.playing ? '' : ' · en pausa'}`;
 if (ck && ct !== this._ckT) { ck.textContent = ct; this._ckT = ct; }
@@ -8687,6 +8717,7 @@ const lv = { low: 3, medium: 4 }[g.preset] || 5;
 return { dpr: clamp(d * g.scale, 0.35, 2.5), samples: g.aa ? 4 : 0, bloomLevels: lv };
 },
 applyQuality(rebuild) {
+this.dprCeil = 0;
 const p = this.qualityParams();
 GLX.samples = p.samples; GLX.bloomLevels = p.bloomLevels; this.dpr = p.dpr;
 if (rebuild) { GLX.W = 0; this.resize(); }
@@ -8703,7 +8734,7 @@ $('#app').classList.add('failed'); Splash.fail(); return;
 document.querySelectorAll('img[data-logo]').forEach(i => { i.src = document.querySelector(i.dataset.logo === 'big' ? '.intro-logo img' : '.about-logo').src; });
 SettingsApply.boot();
 this.applyQuality(false); this.resize();
-addEventListener('resize', () => this.resize());
+addEventListener('resize', () => { clearTimeout(this._rzT); this._rzT = setTimeout(() => this.resize(), 120); });   // un solo reajuste al terminar de cambiar el tamaño
 Time.startState();
 const steps = 9; let n = 0;
 try {
@@ -8775,8 +8806,8 @@ if (this.adaptT < 1.5 || document.hidden) return;
 this.adaptT = 0;
 const max = this.qualityParams().dpr, min = Math.min(max, 0.75);
 let d = this.dpr;
-if (this.ema > 1 / 42 && d > min) d = Math.max(min, d * 0.85);
-else if (this.ema < 1 / 57 && d < max) d = Math.min(max, d * 1.12);
+if (this.ema > 1 / 42 && d > min) { this.dprCeil = d * 0.95; d = Math.max(min, d * 0.85); }   // recuerda el nivel que no aguantó para no volver a subir hasta él
+else if (this.ema < 1 / 57 && d < max) d = Math.min(max, this.dprCeil || max, d * 1.12);
 if (Math.abs(d - this.dpr) > 0.01) { this.dpr = d; this.resize(); }
 },
 scaleCam() {
@@ -9570,7 +9601,7 @@ points(n) { this.data.stats.points += n; },
 // sesión de vuelo
 begin(ch) {
 if (!this.data) this.load();
-this.sess = { t0: performance.now(), time: 0, dist: 0, scanned: new Set(), cams: new Set([CAMS[Flight.camIdx][0]]), rotated: false, targeted: false, stableT: 0, cassini: null, prevH: null, ign: false, prevD: {}, creakT: 8 + Math.random() * 10, lastI: {}, ch: ch ? { R: ch, t: 0, done: false } : null, tut: this.data.tut || ch ? null : { i: 0, t: 0 } };
+this.sess = { time: 0, dist: 0, scanned: new Set(), cams: new Set([CAMS[Flight.camIdx][0]]), rotated: false, targeted: false, stableT: 0, cassini: null, prevH: null, ign: false, prevD: {}, creakT: 8 + Math.random() * 10, lastI: {}, ch: ch ? { R: ch, t: 0, done: false } : null, tut: this.data.tut || ch ? null : { i: 0, t: 0 } };
 this.scan = null; Flight._p0 = null;
 this.data.stats.flights++; this.unlock('despegue'); this.save();
 this.renderChal(); this.renderCoach();
@@ -10417,7 +10448,8 @@ if (this.state === 'hangar') return;
 this.trajT -= 1;
 if (this.trajT <= 0 || !this.trajPts) { this.predict(); this.trajT = 6; }
 if (this.trajPts) {
-const b = new Float32Array(241 * 3), refS = this.km2s(this.ref.km);
+const b = this.fx.trajBuf || (this.fx.trajBuf = new Float32Array(241 * 3)), refS = this.km2s(this.ref.km);   // búfer reutilizado en cada fotograma
+if (this.trajPts.length < 241) b.fill(0);
 this.trajPts.forEach((q, i) => { const s = V.sub(V.add(refS, this.km2s(q)), cam); b[i * 3] = s[0]; b[i * 3 + 1] = s[1]; b[i * 3 + 2] = s[2]; });
 GLX.update(this.fx.traj, 'a_pos', b);
 GLX.state({ depthTest: true, depthWrite: false, cull: 'none', blend: 'alpha' });
@@ -10701,6 +10733,7 @@ this.updateThrottleUI();
 this.frameN++;
 if (this.frameN % 4) return this.hudWarn();
 const dl = (rows) => rows.map(([k, v, s]) => `<div><dt>${k}</dt><dd>${v}${s ? `<small>${s}</small>` : ''}</dd></div>`).join('');
+const put = (el, h) => { if (el._h !== h) { el.innerHTML = h; el._h = h; } };   // solo se reescribe si cambia (en pausa los valores no cambian)
 const north = [0, 1, 0], F = this.F;
 const z0 = x => (Math.abs(x) < 0.5 ? 0 : x);
 const hdg = (vv) => { const e = Astro.sceneToEcl(vv); return wrap360(Math.round(Math.atan2(e[1], e[0]) * RAD)) % 360; };
@@ -10709,26 +10742,26 @@ const rollRef = V.norm(V.sub(north, V.scale(F, V.dot(north, F))));
 const roll = z0(Math.atan2(V.dot(V.cross(rollRef, this.U), F), V.dot(rollRef, this.U)) * RAD);
 const drift = sp > 1e-6 ? Math.acos(clamp(V.dot(V.norm(vrel), F), -1, 1)) * RAD : 0;
 const E = World.byId.tierra, O = !this.assisted && !ref.isSun ? this.orbitEl() : null;
-$('#h-nav').innerHTML = dl([
+put($('#h-nav'), dl([
 ['Velocidad', this.fmtSpeed(sp), 'respecto a ' + ref.def.name],
 ...(O ? [['Órbita alrededor de ' + ref.def.name, O.bound ? 'Pe ' + fmtKm(O.rp - ref.R) + ' · Ap ' + fmtKm(O.ra - ref.R) : 'Trayectoria de escape', O.bound ? (O.rp < ref.R ? '¡El periapsis está bajo la superficie!' : 'Periodo ' + fmtDur(O.T / 86400) + ' · e = ' + fmt(O.e, 3)) : 'Excentricidad ' + fmt(O.e, 2)]] : []),
 ['Dirección de movimiento', sp > 1e-6 ? 'Rumbo ' + fmt(hdg(vrel), 0) + '°, elevación ' + fmt(elev(vrel), 0) + '°' : 'Detenida', sp > 1e-6 ? fmt(drift, 0) + '° respecto a la proa' : ''],
 ['Orientación', 'Rumbo ' + fmt(hdg(F), 0) + '°, cabeceo ' + fmt(elev(F), 0) + '°', 'Alabeo ' + fmt(roll, 0) + '° (marco eclíptico)'],
 ['Distancia al Sol', fmtKm(V.len(this.pos)), fmtAU(V.len(this.pos) / AU_KM)],
 ...(O ? [] : [['Distancia a la Tierra', fmtKm(V.dist(this.pos, E.km)), V.dist(this.pos, E.km) > 1e6 ? fmtAU(V.dist(this.pos, E.km) / AU_KM) : '']]),
-]);
+]));
 if (T) {
 const d = V.dist(this.pos, T.km), rv = V.sub(this.vel, T.vel), rh = V.scale(V.sub(T.km, this.pos), 1 / Math.max(d, 1e-9)), clos = V.dot(rv, rh);
 const alt = d - T.R, eta = clos > 1e-6 ? alt / clos : null;
-$('#h-tgt').innerHTML = dl([
+put($('#h-tgt'), dl([
 ['Objetivo', esc(T.def.name), TYPE_LABEL[T.def.type]],
 ['Distancia', fmtKm(d), (T.R > 1 ? 'Altitud ' + fmtKm(Math.max(alt, 0)) : '') + (d > 1e6 ? '  ' + fmtAU(d / AU_KM) : '')],
 ['Velocidad relativa', this.fmtSpeed(V.len(rv)), clos >= 0 ? 'Acercándose a ' + this.fmtSpeed(clos) : 'Alejándose a ' + this.fmtSpeed(-clos)],
 ['Tiempo estimado de llegada', eta != null ? fmtDur(eta / 86400) : 'Sin aproximación', eta != null && WARPS[this.warpIdx] > 1 ? '≈ ' + fmtDur(eta / 86400 / WARPS[this.warpIdx]) + ' reales a ×' + fmt(WARPS[this.warpIdx], 0) : ''],
 ['Escáner', (sc => sc && sc.T === T ? 'Escaneando ' + Math.round(sc.p * 100) + ' %' : FlightGame.scanState(T).done ? 'Registrado en la bitácora' : FlightGame.scanState(T).inRange ? 'Listo: pulsa ' + esc(Keys.label(Keys.code('flight', 'scan'))) : 'Fuera de alcance')(FlightGame.scan), 'Alcance ' + fmtKm(FlightGame.scanRange(T))],
 ['Distancia al Sol', fmtKm(V.len(T.km)), fmtAU(V.len(T.km) / AU_KM)],
-]);
-} else $('#h-tgt').innerHTML = '<p class="note">Pulsa T o haz clic sobre un planeta, luna o estación para fijarlo como destino.</p>';
+]));
+} else put($('#h-tgt'), '<p class="note">Pulsa T o haz clic sobre un planeta, luna o estación para fijarlo como destino.</p>');
 $('#h-ship').textContent = this.ship.name;
 $('#h-mode').textContent = this.assisted ? 'Modo asistido' : 'Modo simulación';
 $('#h-cam').textContent = 'Cámara ' + CAMS[this.camIdx][1].toLowerCase();
