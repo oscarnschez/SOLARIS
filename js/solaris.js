@@ -461,7 +461,7 @@ facts: ['El 26 de septiembre de 2022, la nave DART (NASA) chocó contra ella a u
 {
 id: 'halley', name: '1P/Halley', short: 'Halley', aka: ['halley', 'cometa halley'], type: 'comet', parent: 'sol',
 R: 5.5, shape: [1.4, 0.75, 0.75], mass: 2.2e14, rotH: 52.8, color: '#bfe3ff',
-orbit: { t: 'kep', a: 17.834, e: 0.96714, i: 162.262, node: 58.420, peri: 111.332, tp: '1986-02-09' },
+orbit: { t: 'kep', a: 17.857, e: 0.96714, i: 162.262, node: 58.420, peri: 111.332, tp: '1986-02-09' },
 vis: { style: 'rock', feat: 'comet', c1: '#3a3632', c2: '#22201e', c3: '#57524c', crater: 0.2, seed: 171.5, irregular: 0.22 },
 info: {
 desc: 'El cometa periódico más famoso: regresa al Sistema Solar interior cada 75 o 76 años.',
@@ -1339,7 +1339,7 @@ return true;
 },
 };
 const ASSET_MANIFEST = {"music": {"webm": "assets/audio/metamorphosis.webm", "mp3": "assets/audio/metamorphosis.mp3"}, "bodyMeshes": {"fobos": {"url": "assets/models/moons/fobos.bin", "k": 1.26255}, "deimos": {"url": "assets/models/moons/deimos.bin", "k": 1.37497}, "haumea": {"url": "assets/models/dwarfs/haumea.bin", "k": 1.44255}}};
-const SOLARIS_BUILD = '2026.11.17-0853-web';
+const SOLARIS_BUILD = '2026.11.17-0937-web';
 console.info('SOLARIS · versión ' + SOLARIS_BUILD);
 const Assets = {
 cache: new Map(), busyN: new Map(),
@@ -1635,10 +1635,11 @@ firstRun: true,
 };
 },
 merge(base, over) {
-for (const k in over) {
-if (!(k in base)) continue;                         // descarta claves desconocidas u obsoletas
-if (base[k] && typeof base[k] === 'object' && !Array.isArray(base[k]) && over[k] && typeof over[k] === 'object') this.merge(base[k], over[k]);
-else if (typeof over[k] === typeof base[k] || base[k] === null) base[k] = over[k];
+for (const k of Object.keys(over)) {
+if (!Object.prototype.hasOwnProperty.call(base, k)) continue;   // descarta claves desconocidas, obsoletas o heredadas (__proto__)
+const b = base[k], o = over[k];
+if (b && typeof b === 'object' && !Array.isArray(b)) { if (o && typeof o === 'object' && !Array.isArray(o)) this.merge(b, o); }   // una sección solo se fusiona con otra sección: un null guardado no la borra
+else if (b === null || (o !== null && typeof o === typeof b)) base[k] = o;
 }
 return base;
 },
@@ -1649,6 +1650,9 @@ try { saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null'); } catch 
 if (saved && typeof saved === 'object') {
 if ((saved.v || 0) <= SETTINGS_VERSION) this.merge(st, saved);    // versiones futuras: se ignoran con seguridad
 st.firstRun = false;
+// una acción añadida en una versión nueva no puede compartir tecla con otra que la persona reasignó: queda sin tecla y puede asignarla en Ajustes
+const sc = saved.controls && typeof saved.controls === 'object' ? saved.controls : {};
+for (const ctx in st.controls) { const m = st.controls[ctx], sv = sc[ctx] && typeof sc[ctx] === 'object' ? sc[ctx] : {}; for (const a in m) if (!Object.prototype.hasOwnProperty.call(sv, a) && m[a] && Object.keys(m).some(b => b !== a && m[b] === m[a])) m[a] = ''; }
 } else {
 try { const m = JSON.parse(localStorage.getItem('solaris.music') || 'null'); if (m) { st.audio.musicOn = m.on !== false; if (typeof m.vol === 'number') st.audio.music = m.vol; } } catch (e) {}
 try { const a = JSON.parse(localStorage.getItem('solaris.audio') || 'null'); if (a) ['master', 'ui', 'ship', 'muted', 'hover'].forEach(k => { if (k in a) st.audio[k] = a[k]; }); if (a && 'ui' in a) st.audio.nav = a.ui; } catch (e) {}
@@ -1664,7 +1668,7 @@ this._saveT = setTimeout(() => this.flush(), 200);
 flush() {
 if (!this._dirty || !this.state) return;
 clearTimeout(this._saveT); this._dirty = false;
-try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(Object.assign({}, this.state, { firstRun: false }))); } catch (e) {}
+try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(Object.assign({}, this.state, { firstRun: false }))); localStorage.removeItem('solaris.music'); localStorage.removeItem('solaris.audio'); } catch (e) {}
 },
 get(path) { return path.split('.').reduce((o, k) => o && o[k], this.state); },
 set(path, value, opts) {
@@ -1715,6 +1719,7 @@ const Keys = {
 norm(e) { const k = e.key; if (!k) return ''; if (k === ' ' || k === 'Spacebar') return 'space'; return k.toLowerCase(); },
 code(ctx, action) { return Settings.state.controls[ctx][action]; },
 action(ctx, key) {
+if (!key) return null;
 const m = Settings.state.controls[ctx];
 for (const a in m) if (m[a] === key) return a;
 const alias = ctx === 'explore' ? { '=': 'zoomIn', '_': 'zoomOut', ']': 'faster', '[': 'slower' } : { 'pageup': 'warpUp', 'pagedown': 'warpDown' };
@@ -1722,6 +1727,7 @@ const a = alias[key]; if (a && m[a] === KEY_ACTIONS[ctx].find(x => x[0] === a)[1
 return null;
 },
 label(k) {
+if (!k) return '—';
 const map = { space: 'Espacio', arrowup: '↑', arrowdown: '↓', arrowleft: '←', arrowright: '→', backspace: '⌫', delete: 'Supr', insert: 'Insert', end: 'Fin' };
 return map[k] ? I18N.t(map[k]) : k.length === 1 ? k.toUpperCase() : k.charAt(0).toUpperCase() + k.slice(1);
 },
@@ -2077,6 +2083,7 @@ const ScaleState = {
 from: 'visual', to: 'visual', t: 1,
 set(name, animate) {
 if (name === this.to && this.t >= 1) return;
+if (animate && this.t < 1 && name === this.from) { [this.from, this.to] = [this.to, this.from]; this.t = 1 - this.t; return; }   // easeInOut es simétrica: el recorrido sigue desde donde está
 this.from = animate ? this.to : name; this.to = name; this.t = animate ? 0 : 1;
 },
 k() { return easeInOut(clamp(this.t, 0, 1)); },
@@ -4952,8 +4959,10 @@ this.last = { x: e.clientX, y: e.clientY };
 this.down.moved += Math.abs(dx) + Math.abs(dy);
 if (this.mode === 'pinch' && this.pointers.size >= 2) {
 const s = this.pinchState();
+s.ox = this.pinch.ox != null ? this.pinch.ox : this.pinch.cx; s.oy = this.pinch.oy != null ? this.pinch.oy : this.pinch.cy;
+s.panning = this.pinch.panning || Math.hypot(s.cx - s.ox, s.cy - s.oy) > 16;   // el centro de dos dedos siempre tiembla unos píxeles
 if (this.pinch.d > 0 && s.d > 0) Cam.zoom(this.pinch.d / s.d);
-this.pan(s.cx - this.pinch.cx, s.cy - this.pinch.cy);
+if (s.panning) this.pan(s.cx - this.pinch.cx, s.cy - this.pinch.cy);
 this.pinch = s; return;
 }
 if (this.down.moved < 3) return;
@@ -5024,7 +5033,7 @@ return s === 1 ? 'Tiempo real' : '×' + s.toLocaleString(I18N.loc()).replace(/,/
 rateText() {
 const s = this.speeds[this.idx];
 if (s < 60) return s + ' s por segundo';
-if (s < 3600) return Math.round(s / 60) + ' min por segundo';
+if (s < 3600) return fmt(s / 60, s < 600 ? 1 : 0) + ' min por segundo';
 if (s < 86400) return (s / 3600).toFixed(1).replace('.0', '') + ' h por segundo';
 return (s / 86400).toFixed(s < 864000 ? 1 : 0).replace('.0', '') + ' días por segundo';
 },
@@ -5208,6 +5217,13 @@ addEventListener('solaris:privacy-wipe', e => {
 const k = (e.detail && e.detail.keys) || [];
 if (k.includes(SETTINGS_KEY)) { clearTimeout(Settings._saveT); Settings._dirty = false; Settings.save = Settings.flush = () => {}; }
 if (k.includes(FG_KEY)) FlightGame.save = () => {};
+});
+// otra pestaña (por ejemplo, una página legal) borró datos de SOLARIS: esta deja de escribirlos y se recarga para no restaurarlos al cerrarse
+addEventListener('storage', e => {
+const k = e.key === null ? [SETTINGS_KEY, FG_KEY] : e.newValue === null && (e.key === SETTINGS_KEY || e.key === FG_KEY) ? [e.key] : null;
+if (!k) return;
+dispatchEvent(new CustomEvent('solaris:privacy-wipe', { detail: { keys: k } }));
+location.reload();
 });
 // Esfera girando en un canvas 2D: proyección ortográfica de la miniatura equirectangular con iluminación, atmósfera y anillos
 const GlobeCanvas = {
@@ -5432,7 +5448,7 @@ this.buildCredits();
 this.initMusic();
 $('#minimap').addEventListener('click', e => this.minimapClick(e));
 this.tipEl = $('#tip');
-document.addEventListener('mouseover', e => { const t = e.target.closest && e.target.closest('[data-tip]'); if (t) this.showTip(t); });
+document.addEventListener('pointerover', e => { if (e.pointerType !== 'mouse') return; const t = e.target.closest && e.target.closest('[data-tip]'); if (t) this.showTip(t); });   // un toque simula un «mouseover» después de pointerdown
 document.addEventListener('mouseout', e => { const t = e.target.closest && e.target.closest('[data-tip]'); if (t) this.tipEl.classList.remove('on'); });
 document.addEventListener('focusin', e => { const t = e.target.closest && e.target.closest('[data-tip]'); if (t && t.matches(':focus-visible')) this.showTip(t); });
 document.addEventListener('focusout', () => this.tipEl.classList.remove('on'));
@@ -5442,7 +5458,7 @@ this.refreshMinimap();
 this.updateScaleBadge();
 },
 initMoreMenu() {
-const btn = $('#more-btn'), menu = $('#more-menu'), items = () => [...menu.querySelectorAll('.mm-item')].filter(b => b.offsetParent);
+const btn = $('#more-btn'), menu = $('#more-menu'), items = () => [...menu.querySelectorAll('.mm-item, .mm-legal a')].filter(b => b.offsetParent);   // las flechas también llegan a los enlaces legales
 const set = v => { menu.hidden = !v; btn.setAttribute('aria-expanded', String(v)); btn.classList.toggle('on', v); };
 btn.addEventListener('click', e => { e.stopPropagation(); const v = menu.hidden; set(v); this.tipEl.classList.remove('on'); if (v) { const f = items()[0]; if (f) f.focus({ preventScroll: true }); } });
 menu.addEventListener('click', () => setTimeout(() => set(false)), true);      // se cierra después de que el elemento ejecute su acción
@@ -5458,6 +5474,11 @@ e.stopPropagation();
 addEventListener('pointerdown', e => { if (!menu.hidden && !e.target.closest('.more-wrap')) set(false); }, true);
 },
 hint(msg, ms) { if (Settings.state.general.tips && !this.tourCine) this.toast(msg, ms); },
+refocus(el) {
+if (!el || !el.focus || !document.contains(el)) return;
+if (el.offsetParent === null && el.closest('#more-menu')) el = $('#more-btn');
+el.focus({ preventScroll: true });
+},
 showTip(t) {
 if (!Settings.state.general.tips || t.closest('#more-menu')) return;
 const r = t.getBoundingClientRect(), el = this.tipEl;
@@ -5749,7 +5770,7 @@ const q = $('#q'), res = $('#results');
 this.searchIdx = -1;
 const run = () => {
 const t = norm(q.value.trim());
-if (!t) { res.classList.remove('open'); res.innerHTML = ''; q.setAttribute('aria-expanded', 'false'); return; }
+if (!t) { res.classList.remove('open'); res.innerHTML = ''; q.setAttribute('aria-expanded', 'false'); this.hits = []; this.searchIdx = -1; q.removeAttribute('aria-activedescendant'); return; }
 const hits = World.rb.map(rb => {
 const names = [rb.def.name, rb.def.short || '', ...(rb.def.aka || [])].map(norm);
 let sc = 99;
@@ -5760,6 +5781,7 @@ this.hits = hits.map(h => h.rb); this.searchIdx = hits.length ? 0 : -1;
 res.innerHTML = hits.length ? hits.map((h, i) => `<li role="option" id="opt-${i}" aria-selected="${i === 0}" data-go="${h.rb.id}"><i class="dot" style="--c:${h.rb.def.color}"></i><b>${esc(h.rb.def.name)}</b>${this.badge(h.rb)}<small>${esc(TYPE_LABEL[h.rb.def.type])}${h.rb.parent && h.rb.def.type === 'moon' ? ' de ' + esc(h.rb.parent.def.name) : ''}</small></li>`).join('')
 : `<li class="empty">Sin resultados para "${esc(q.value)}". Prueba con un planeta, luna, asteroide o cometa.</li>`;
 res.classList.add('open'); q.setAttribute('aria-expanded', 'true');
+if (hits.length) q.setAttribute('aria-activedescendant', 'opt-0'); else q.removeAttribute('aria-activedescendant');
 };
 const go = rb => { if (!rb) return; this.select(rb, { fly: true }); q.value = ''; run(); q.blur(); };
 q.addEventListener('input', run);
@@ -5802,6 +5824,7 @@ $('#gl').style.cursor = rb ? 'pointer' : 'grab';
 },
 renderInfo(rb) {
 const d = rb.def, P = $('#info-body'), basic = Settings.state.interface.info === 'basic';
+const same = P.dataset.rb === rb.id && $('#info').classList.contains('open'), keepY = same ? P.scrollTop : 0;   // misma ficha abierta: se actualiza sin saltar arriba
 let F = rb.isCraft ? null : Info.fields(rb);
 if (F && basic) {
 const keep = l => /^(Diámetro medio|Gravedad superficial|Temperatura aproximada|Número de lunas|Duración de un día|Duración de un año|Periodo orbital|Distancia media)/.test(l);
@@ -5842,7 +5865,7 @@ ${basic ? '<p class="note">Vista básica: activa la información científica ava
 ${d.info.feats && d.info.feats.length ? `<section><h3>Características principales</h3><ul class="facts">${d.info.feats.map(x => `<li>${esc(x)}</li>`).join('')}</ul></section>` : ''}
 ${d.info.facts && d.info.facts.length ? `<section><h3>Curiosidades</h3><ul class="facts">${d.info.facts.map(x => `<li>${esc(x)}</li>`).join('')}</ul></section>` : ''}
 <footer class="src"><p><b>Fuente:</b> ${esc(d.src)}</p>${d.credit && World.hd[d.model || d.id] ? `<p><b>Modelo 3D:</b> ${UI.creditHTML(d.credit)}</p>` : ''}<p class="legend"><em class="tag calc">calc.</em> derivado de otros datos <em class="tag sim">sim.</em> aproximación de la simulación</p>${this.scaleWarn(rb)}</footer>`;
-P.scrollTop = 0; this.hudScan(); GlobeCanvas.scan(P);
+P.scrollTop = keepY; P.dataset.rb = rb.id; if (!same) this.hudScan(); GlobeCanvas.scan(P);
 $('#info-travel').addEventListener('click', () => { this.userActed(); Cam.travel(rb); });
 $('#info-follow').addEventListener('click', () => { this.userActed(); if (Cam.focus === rb && Cam.follow) Cam.follow = false; else { if (Cam.focus !== rb) Cam.travel(rb, { keepAngles: true, dist: clamp(Cam.dist, rb.rS * 1.3, Cam.maxDist()) }); Cam.follow = true; } this.refreshCamButtons(); });
 $('#info-close2').addEventListener('click', () => { this.userActed(); Cam.travel(rb, { close: true }); });
@@ -5983,15 +6006,15 @@ el.classList.add('on');
 ret($('#reticle'), S.mode === 'cine' ? null : this.sel);
 ret($('#reticle-hover'), this.hov !== this.sel ? this.hov : null);
 },
-toggleMinimap(v) {
+toggleMinimap(v, persist = true) {
 this.mmOn = v == null ? !this.mmOn : v;
-if (Settings.state.interface.minimap !== this.mmOn) { Settings.state.interface.minimap = this.mmOn; Settings.save(); }
+if (persist && Settings.state.interface.minimap !== this.mmOn) { Settings.state.interface.minimap = this.mmOn; Settings.save(); }
 $('#minimap-wrap').classList.toggle('off', !this.mmOn);
 $('#app').classList.toggle('mm-on', this.mmOn);
 $('#mm-toggle').classList.toggle('on', this.mmOn);
 $('#mm-toggle').setAttribute('aria-pressed', this.mmOn);
 },
-refreshMinimap() { this.toggleMinimap(this.mmOn); },
+refreshMinimap() { this.toggleMinimap(this.mmOn, false); },   // aplica el estado (que en móvil empieza apagado) sin tocar la preferencia
 mmMap(x, z, R) { const r = Math.hypot(x, z); if (r < 1e-9) return [0, 0]; const k = R * Math.log(1 + r / 0.35) / Math.log(1 + 45 / 0.35) / r; return [x * k, z * k]; },
 drawMinimap() {
 if (!this.mmOn) return;
@@ -6038,7 +6061,7 @@ if (best) this.select(best, { fly: true });
 toggleGuide(v) {
 const g = $('#guide'); g.classList.toggle('open', v); g.setAttribute('aria-hidden', !v);
 if (v) { this._guideFrom = document.activeElement; g.querySelector('.guide-card').scrollTop = 0; setTimeout(() => $('#guide-x').focus({ preventScroll: true }), 30); }
-else if (this._guideFrom && this._guideFrom.focus) this._guideFrom.focus({ preventScroll: true });
+else this.refocus(this._guideFrom);
 },
 toggleHelp(v) { const h = $('#help'); h.classList.toggle('open', v); h.setAttribute('aria-hidden', !v); if (v) $('#help-close').focus(); },
 bindKeys() {
@@ -6048,7 +6071,8 @@ const tag = (e.target.tagName || '').toLowerCase();
 if (e.key === 'k' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); $('#q').focus(); return; }
 if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
 if ((e.key === ' ' || e.key === 'Enter') && e.target.closest && e.target.closest('button, a, [role="radio"], [role="tab"]')) return;
-if ($('#settings') && $('#settings').classList.contains('open')) return;
+if (document.querySelector('#settings.open, #guide.open, #tours.open, #about.open, #credits.open, #confirm.open')) return;
+if ($('#help').classList.contains('open') && e.key !== 'Escape') return;   // con los atajos abiertos solo Escape actúa (los cierra)
 const key = Keys.norm(e), act = Keys.action('explore', key);
 if (act === 'search') { e.preventDefault(); $('#q').focus(); return; }
 if (!this.started) return;
@@ -6181,7 +6205,7 @@ $('#tours-list').innerHTML = order.map((tr, i) => `
 toggleTours(v) {
 const g = $('#tours'); g.classList.toggle('open', v); g.setAttribute('aria-hidden', !v);
 if (v) { this._toursFrom = document.activeElement; setTimeout(() => { const b = g.querySelector('[data-tour]'); if (b) b.focus({ preventScroll: true }); }, 40); }
-else if (this._toursFrom && this._toursFrom.focus) this._toursFrom.focus({ preventScroll: true });
+else this.refocus(this._toursFrom);
 },
 launchTour(id, cine) {
 this.toggleTours(false);
@@ -6362,7 +6386,7 @@ addEventListener('keydown', e => { if (e.key === 'Escape' && $('#about').classLi
 toggleAbout(v) {
 const g = $('#about'); g.classList.toggle('open', v); g.setAttribute('aria-hidden', !v);
 if (v) { this._aboutFrom = document.activeElement; g.querySelector('.about-card').scrollTop = 0; setTimeout(() => $('#about-x').focus({ preventScroll: true }), 30); }
-else { if (this._aboutFrom && this._aboutFrom.focus) this._aboutFrom.focus({ preventScroll: true }); }
+else this.refocus(this._aboutFrom);
 },
 });
 Object.assign(UI, {
@@ -6469,7 +6493,7 @@ set(this.bus.ui, P.ui * 2 * cine); set(this.bus.navigation, P.nav * 1.9);
 set(this.bus.spacecraft, P.ship); set(this.bus.alerts, P.ship * 0.9);
 },
 set(key, v) { Settings.set('audio.' + key, v); },
-unlock() { const c = this.ensure(); if (c && c.state === 'suspended') c.resume(); },
+unlock() { const c = this.ensure(); if (c && c.state !== 'running' && c.state !== 'closed') c.resume().catch(() => {}); },   // iOS usa también el estado «interrupted»
 ready() { return this.ctx && this.ctx.state === 'running' && !this.prefs.muted; },
 tone(bus, o) {
 const c = this.ctx, t = c.currentTime + (o.delay || 0), dur = o.dur, nodes = [];
@@ -6580,7 +6604,7 @@ return 'minor';
 },
 init() {
 const unlock = () => this.unlock();
-['pointerdown', 'keydown', 'touchstart'].forEach(t => addEventListener(t, unlock, { capture: true, passive: true }));
+['pointerdown', 'keydown', 'touchstart', 'touchend'].forEach(t => addEventListener(t, unlock, { capture: true, passive: true }));   // en iOS solo touchend cuenta como gesto
 document.addEventListener('click', e => {
 const el = e.target.closest('button, a[href], [role="button"], [role="option"]');
 if (!el || el.disabled || el.closest('#gl')) return;
@@ -6687,7 +6711,7 @@ await this.el.play();
 if (!this.prefs.musicOn) { this.el.pause(); this.waiting = false; UI.refreshMusic(); return; }   // se desactivó mientras arrancaba
 this.playing = true; this.waiting = false;
 this.fadeTo(this.level(), fade == null ? 3.5 : fade);
-} catch (e) { this.playing = false; this.waitForGesture(); }
+} catch (e) { this.playing = false; if (this.el && this.el.error) { this.waiting = false; UI.toast(t('No se pudo cargar la música.')); } else this.waitForGesture(); }
 UI.refreshMusic();
 },
 pause(fade) {
@@ -6842,6 +6866,7 @@ Object.assign(UI, {
 setCat: 'general',
 openSettings(cat) {
 if (cat) this.setCat = cat;
+this.keyMsg = '';
 const m = $('#settings'); this._setFrom = document.activeElement;
 this.renderSettings();
 m.classList.add('open'); m.setAttribute('aria-hidden', 'false');
@@ -6851,11 +6876,14 @@ closeSettings() {
 const m = $('#settings'); if (!m.classList.contains('open')) return;
 this.cancelRebind();
 m.classList.remove('open'); m.setAttribute('aria-hidden', 'true');
-if (this._setFrom && this._setFrom.focus) this._setFrom.focus({ preventScroll: true });
+this.refocus(this._setFrom);
 },
 itemValue(it) { return it.get ? it.get() : it.path ? Settings.get(it.path) : undefined; },
 renderSettings() {
 this.cancelRebind();
+const fa = document.activeElement, fq = fa && $('#settings').contains(fa) ? (fa.id ? '#' + CSS.escape(fa.id) : fa.dataset.cat ? `[data-cat="${CSS.escape(fa.dataset.cat)}"]`
+: fa.dataset.actKey ? `[data-ctx="${CSS.escape(fa.dataset.ctx)}"][data-act-key="${CSS.escape(fa.dataset.actKey)}"]` : fa.dataset.act ? `[data-act="${CSS.escape(fa.dataset.act)}"]`
+: fa.dataset.i != null ? `[data-i="${CSS.escape(fa.dataset.i)}"]` + (fa.dataset.v != null ? `[data-v="${CSS.escape(fa.dataset.v)}"]` : '') : null) : null;   // control con el foco, para devolverlo tras redibujar
 const cat = SETTINGS_SCHEMA.find(c => c.id === this.setCat) || SETTINGS_SCHEMA[0];
 $('#set-nav').innerHTML = SETTINGS_SCHEMA.map(c => `<button role="tab" aria-selected="${c.id === cat.id}" class="${c.id === cat.id ? 'on' : ''}" data-cat="${c.id}"><svg viewBox="0 0 24 24" aria-hidden="true">${SET_ICONS[c.id]}</svg><span>${t(c.title)}</span></button>`).join('');
 const g = Settings.state.graphics;
@@ -6877,12 +6905,13 @@ return `<div class="set-row set-seg"><div class="set-lbl"><b id="${id}-l">${t(it
 return '';
 }).join('');
 this.renderKeyHelp();
+if (fq) { const f = $('#settings').querySelector(fq); if (f) f.focus({ preventScroll: true }); }
 },
 keysHTML() {
 const row = (ctx, [a]) => { const k = Keys.code(ctx, a); return `<div class="key-row"><span>${t(Keys.describe(ctx, a))}</span><button class="kbd-btn" data-ctx="${ctx}" data-act-key="${a}" aria-label="${t('Cambiar la tecla de «{0}»', t(Keys.describe(ctx, a)))}">${esc(Keys.label(k))}</button></div>`; };
 const fixed = (rows) => rows.map(([l, k]) => `<div class="key-row fixed"><span>${t(l)}</span><kbd>${t(k)}</kbd></div>`).join('');
 return `<p class="set-desc">${t('Haz clic en una tecla y pulsa la nueva. Si ya estaba en uso, se intercambia para que ninguna acción quede sin control.')}</p>
-<p id="key-msg" class="set-note" role="status" aria-live="polite"></p>
+<p id="key-msg" class="set-note" role="status" aria-live="polite">${esc(this.keyMsg || '')}</p>
 <h3 class="set-head">${t('Exploración')}</h3><div class="key-grid">${fixed([['Rotar cámara', 'Arrastrar'], ['Zoom', 'Rueda'], ['Seleccionar objeto', 'Clic'], ['Sol, planetas y Plutón', '0–9']])}${KEY_ACTIONS.explore.map(r => row('explore', r)).join('')}</div>
 <h3 class="set-head">${t('Nave espacial')}</h3><div class="key-grid">${fixed([['Empuje 25, 50, 75 y 100 %', '1–4'], ['Cámaras', 'Mayús + 1–6'], ['Pausa y ayuda', 'Esc']])}${KEY_ACTIONS.flight.map(r => row('flight', r)).join('')}</div>
 <div class="set-row"><div class="set-lbl"><b>${t('Restaurar controles predeterminados')}</b></div><button class="set-btn" data-act="reset-keys">${t('Restaurar')}</button></div>`;
@@ -6913,13 +6942,13 @@ $('#set-close').addEventListener('click', () => this.closeSettings());
 $('#set-done').addEventListener('click', () => this.closeSettings());
 $('#set-reset').addEventListener('click', resetAll);
 document.querySelectorAll('[data-open-settings]').forEach(b => b.addEventListener('click', () => this.openSettings()));
-addEventListener('keydown', e => { if (e.key === 'Escape' && m.classList.contains('open') && !this.rebind) { e.stopImmediatePropagation(); this.closeSettings(); } }, true);
+addEventListener('keydown', e => { if (e.key === 'Escape' && m.classList.contains('open') && !this.rebind && !$('#confirm').classList.contains('open')) { e.stopImmediatePropagation(); this.closeSettings(); } }, true);
 Settings.on(() => { if (m.classList.contains('open') && !this._rendering) { this._rendering = true; requestAnimationFrame(() => { this._rendering = false; if (!this.rebind && !document.activeElement.matches('input[type="range"]')) this.renderSettings(); }); } });
 this.renderKeyHelp();
 },
 curItems() { return (SETTINGS_SCHEMA.find(c => c.id === this.setCat) || SETTINGS_SCHEMA[0]).items; },
 startRebind(btn) {
-this.cancelRebind();
+this.cancelRebind(); this.keyMsg = '';
 this.rebind = { btn, ctx: btn.dataset.ctx, act: btn.dataset.actKey, old: btn.textContent };
 btn.textContent = t('Pulsa una tecla…'); btn.classList.add('listening');
 this.rebindH = e => {
@@ -6927,10 +6956,10 @@ e.preventDefault(); e.stopImmediatePropagation();
 if (e.key === 'Escape') return this.cancelRebind();
 const key = Keys.norm(e), r = Keys.assign(this.rebind.ctx, this.rebind.act, key);
 const msg = $('#key-msg');
-if (!r.ok) { if (msg) msg.textContent = t('La tecla «{0}» está reservada para la navegación básica.', Keys.label(key)); return; }
+if (!r.ok) { if (msg) msg.textContent = this.keyMsg = t('La tecla «{0}» está reservada para la navegación básica.', Keys.label(key)); return; }
 const swapped = r.swapped ? t('Se intercambió con «{0}».', t(Keys.describe(this.rebind.ctx, r.swapped))) : '';
+this.keyMsg = t('Asignada: {0}.', Keys.label(key)) + (swapped ? ' ' + swapped : '');
 this.cancelRebind(true); this.renderSettings();
-const m2 = $('#key-msg'); if (m2) m2.textContent = t('Asignada: {0}.', Keys.label(key)) + (swapped ? ' ' + swapped : '');
 };
 addEventListener('keydown', this.rebindH, true);
 },
@@ -7004,7 +7033,8 @@ if (app) { app.classList.toggle('hud-reduced', I.hud === 'reduced'); app.classLi
 },
 onChange(path, v) {
 const st = Settings.state;
-if (path === '*') { this.syncRuntime(); this.applyCSS(); App.applyQuality(true); GLX.setTexQuality(st.graphics.textures); this.applyAtmos(); this.rebakeSky(); SFX.apply(); Music.applyLevel(); UI.toggleMinimap(UI.mmOn); UI.refreshAudio(); this.refreshViews(); return; }
+if (path === '*') { const sc0 = st.simulation.scale; if (SCALES[sc0] && sc0 !== S.scale) UI.setScale(sc0);   // restaurar valores: la escala cambia con su indicador y encuadre
+this.syncRuntime(); this.applyCSS(); App.applyQuality(true); GLX.setTexQuality(st.graphics.textures); this.applyAtmos(); this.rebakeSky(); SFX.apply(); Music.applyLevel(); UI.toggleMinimap(UI.mmOn, false); UI.refreshAudio(); this.refreshViews(); return; }
 const [sec, key, sub] = path.split('.');
 if (sec === 'audio') {
 SFX.apply();
@@ -7213,6 +7243,7 @@ t.innerHTML = n ? `<span class="ct-dots">${this.list.map(id => `<i class="dot" s
 },
 isOpen() { const p = $('#cmp'); return !!p && p.classList.contains('open'); },
 open() {
+if (Planner.isOpen()) Planner.close();
 let p = $('#cmp');
 if (!p) {
 p = document.createElement('section'); p.id = 'cmp'; p.className = 'tool-panel ui'; p.setAttribute('role', 'dialog'); p.setAttribute('aria-labelledby', 'cmp-title');
@@ -7222,7 +7253,7 @@ const a = e.target.closest('[data-c]'); if (!a) return; const v = a.dataset.c, i
 if (v === 'close') this.close(); else if (v === 'remove') this.remove(id);
 else if (v === 'locate') { this.close(); UI.select(World.byId[id], { fly: true }); }
 else if (v === 'view') { this.view = a.dataset.v; this.render(); }
-else if (v === 'add') { this.add(id); $('#cmp-q').value = ''; }
+else if (v === 'add') this.add(id);   // render() vuelve a crear el campo vacío (o lo quita al llegar a 4)
 });
 p.addEventListener('input', e => { if (e.target.id === 'cmp-q') this.renderHits(); });
 addEventListener('keydown', e => { if (e.key === 'Escape' && this.isOpen() && !$('#ph-box.open')) { e.stopImmediatePropagation(); if (CompareView.active && CompareView.sel) CompareView.select(null); else this.close(); } }, true);
@@ -7380,7 +7411,7 @@ this.items = rbs.map(rb => ({ rb, rot: this.rot(rb), w0: (rb.def.W0 || 0) + 90 }
 this.items.forEach(it => { if (PLANET_TEX[it.rb.id]) World.requestTex(it.rb.id, true); if (it.rb.isSun) World.requestTex('sol', true); });
 if (this._first == null) { this._first = true; if (UI.reducedMotion) this.playing = false; }
 $('#app').classList.add('cmp-studio');
-this.bind(); this.layout(); this.measure(); this.paint();
+this.bind(); this.measure(); this.layout(); this.paint();
 },
 exit() {
 if (!this.active) return;
@@ -7724,7 +7755,7 @@ else if (a.dataset.tla === 'go' && rb) { if (rb.hidden) UI.toast(rb.def.name + '
 });
 $('#tl-x').addEventListener('click', () => this.toggle(false));
 $('#tl-today').addEventListener('click', () => { Time.goLive(); UI.refreshTime(); this.refresh(); UI.toast('De vuelta a la fecha y hora actuales'); });
-$('#tl-pick').addEventListener('change', e => { if (e.target.value) UI.setSimDate(Astro.jdFromISO(e.target.value) + 0.5); });
+$('#tl-pick').addEventListener('change', e => { if (e.target.value) UI.setSimDate(Astro.jdFromDate(new Date(e.target.value + 'T12:00'))); });   // mediodía local, como el selector de la barra de tiempo
 p.addEventListener('change', e => { const c = e.target.closest('[data-cat]'); if (c) { this.cats[c.dataset.cat] = c.checked; this.paintEvents(); } });
 const r = $('#tl-range');
 r.addEventListener('input', () => { this.pending = +r.value; Time.paused = true; if (!this.raf) this.raf = requestAnimationFrame(() => { this.raf = 0; UI.setSimDate(dateToJD(new Date(this.pending)), { toast: false }); }); });
@@ -7750,12 +7781,12 @@ refresh(force) {
 const sim = UI.isSimulatedDate(), d = jdToDate(Time.jd);
 const chip = $('#t-sim'); if (chip) chip.hidden = !sim;
 if (!this.isOpen() && !force) return;
-$('#tl-date').textContent = d.toLocaleDateString(I18N.loc(), { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' }).replace('.', '').toUpperCase();
+$('#tl-date').textContent = d.toLocaleDateString(I18N.loc(), { day: '2-digit', month: 'short', year: 'numeric' }).replace('.', '').toUpperCase();
 $('#tl-tag').textContent = sim ? 'SIMULACIÓN' : 'EN VIVO'; $('#tl-tag').classList.toggle('live', !sim);
 const days = Time.jd - dateToJD(new Date()), ad = Math.abs(days);
 $('#tl-rel').textContent = !sim ? 'Fecha y hora actuales' : (ad < 60 ? fmt(ad, 0) + ' días' : ad < 730 ? fmt(ad / 30.44, 0) + ' meses' : fmt(ad / 365.25, 0) + ' años') + (days > 0 ? ' en el futuro' : ' en el pasado');
 const r = $('#tl-range'); if (document.activeElement !== r) r.value = clamp(d.getTime(), this.MIN, this.MAX);
-const pk = $('#tl-pick'); if (document.activeElement !== pk) pk.value = d.toISOString().slice(0, 10);
+const pk = $('#tl-pick'); if (document.activeElement !== pk) pk.value = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 },
 };
 $('#t-tl').addEventListener('click', () => TL.toggle());
@@ -7910,7 +7941,8 @@ clearInterval(this.tick); this.tick = setInterval(() => { if (this.isOpen()) thi
 close() { const p = $('#plan'); if (p) p.classList.remove('open'); clearInterval(this.tick); },
 rb(id) { const r = World.byId[id]; return r && !r.hidden ? r : null; },
 shipDef() { return SHIPS.find(s => s.id === this.ship) || SHIPS.find(s => s.id === 'ranger') || SHIPS[0]; },
-orbitalOK(o, d) { return o && d && o !== d && !o.isSun && !d.isSun && !o.isCraft && !d.isCraft && o.parent && o.parent.isSun && d.parent && d.parent.isSun && !o.def.interstellar && !d.def.interstellar; },   // un objeto interestelar no tiene órbita cerrada: sin transferencia de Hohmann
+orbitalOK(o, d) { return o && d && o !== d && !o.isSun && !d.isSun && !o.isCraft && !d.isCraft && o.parent && o.parent.isSun && d.parent && d.parent.isSun && !o.def.interstellar && !d.def.interstellar && !this.retro(o) && !this.retro(d); },
+retro(rb) { const o = rb.def.orbit; return !!o && (o.t === 'jpl' ? o.el[2] : o.i || 0) > 90; },   // órbita retrógrada: Hohmann supone que ambos giran en el mismo sentido   // un objeto interestelar no tiene órbita cerrada: sin transferencia de Hohmann
 meanAU(rb) { const n = Compare.num(rb, 'au'); return n || V.len(rb.helio); },
 calc() {
 const o = this.rb(this.origin), d = this.rb(this.dest), sh = this.shipDef(); if (!o || !d || o === d) return { o, d, sh };
@@ -7984,7 +8016,7 @@ let html = `<div class="pl-grid">
 </div>
 <p class="pl-note">${fict} — cálculo realizado con los parámetros internos de SOLARIS. Estimación simplificada basada en distancia y velocidad seleccionada. No representa una trayectoria orbital real${R.d.parent && !R.d.isSun ? ' ni el movimiento del destino durante el viaje' : ''}.</p>`;
 if (this.mode === 'orbital') {
-if (!R.hoh) html += `<p class="pl-note">El modo orbital necesita dos cuerpos que orbiten directamente al Sol (por ejemplo, Tierra → Marte). Para lunas, naves o el propio Sol se muestra solo la estimación simple.</p>`;
+if (!R.hoh) html += `<p class="pl-note">El modo orbital necesita dos cuerpos que orbiten directamente al Sol y en el mismo sentido que los planetas (por ejemplo, Tierra → Marte). Para lunas, naves o el propio Sol se muestra solo la estimación simple.</p>`;
 else {
 const H = R.hoh, deg = x => fmt(x * 180 / Math.PI, 0) + '°';
 html += `<h4 class="pl-h">Transferencia orbital simplificada (Hohmann)</h4><div class="pl-grid">
@@ -8100,7 +8132,7 @@ this.apply('gargantua'); app.classList.add('sys-intro'); Cam.introSY = -0.33; th
 World.bhReveal = 0; Cam.fly = null; Cam.focus = World.sun; Cam.follow = true; Cam.target = [0, 0, 0]; Cam.az = 0.55; Cam.el = 0.05; Cam.dDist = Cam.dist = G.H * 150;
 this.fade(false, reduce ? 300 : 1800);                                   // 2. aparecen las estrellas
 if (reduce) { done(); return; }
-const t0 = performance.now(), rev = () => { const k = clamp((performance.now() - t0 - 900) / 2600, 0, 1); World.bhReveal = k * k * (3 - 2 * k); if (k < 1 && this.busy) requestAnimationFrame(rev); };
+const t0 = performance.now(), rev = () => { if (!this.busy) return; const k = clamp((performance.now() - t0 - 900) / 2600, 0, 1); World.bhReveal = k * k * (3 - 2 * k); if (k < 1) requestAnimationFrame(rev); };   // tras «Omitir», done() ya fijó bhReveal = 1
 requestAnimationFrame(rev);                                              // 3–4. Gargantúa y su disco se hacen visibles
 T.push(setTimeout(() => Cam.travelTo([0, 0, 0], G.H * 34, 0.12), 1600));   // 5. aproximación lenta
 T.push(setTimeout(() => { $('#sys-t1').textContent = 'SISTEMA GARGANTÚA'; $('#sys-t2').textContent = 'Interstellar'; f.classList.add('titled'); }, 2600));   // 6. título
@@ -8567,6 +8599,7 @@ return r;
 };
 const _msPause = Missions.pause.bind(Missions);
 Missions.pause = function (v) { _msPause(v); if (MillerFX.active && Missions.run) MillerFX.pause(Missions.run.paused); };
+document.addEventListener('visibilitychange', () => { if (MillerFX.active && !(Missions.run && Missions.run.paused)) MillerFX.pause(document.hidden); });   // la ambientación de Miller no suena en una pestaña oculta
 const Splash = {                                   // pantalla de carga: el Sol de SOLARIS se enciende y su órbita marca el progreso real
 el: null, p: 0, shown: 0, raf: 0, keyBlock: null,
 reduced() { return document.documentElement.classList.contains('anim-reduced') || !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches); },
@@ -8756,10 +8789,10 @@ if (ScaleState.t >= 1) this.scaleRatio = null;
 loop(t) {
 requestAnimationFrame(tt => this.loop(tt));
 const cap = Settings.state.graphics.fps;
-if (cap && this.last && t - this.last < 1000 / cap - 1.5) return;
+if (cap) { if (this.capT && t < this.capT - 1.5) return; this.capT = Math.max((this.capT || t) + 1000 / cap, t); } else this.capT = 0;
 const dt = this.last ? Math.min(0.1, (t - this.last) / 1000) : 0.016;
 this.tickT = (this.tickT || 0) + dt;
-if (this.tickT > 0.25 && World.texState) { this.tickT = 0; World.texTick(); PackedModels.tick(); }
+if (this.tickT > 0.25 && World.texState && !GLX.lost) { this.tickT = 0; World.texTick(); PackedModels.tick(); }
 this.last = t;
 this.adapt(dt);
 if (GLX.lost) { if (UI.started) UI.frame(dt); return; }   // sin contexto gráfico no se dibuja nada hasta recargar
@@ -8899,9 +8932,11 @@ odisea: { whine: 95, wType: 'sawtooth', rumble: 1.1, roar: 0.5, crackle: 0, puls
 const FlightAudio = {
 ctx: null, on: true, prof: SHIP_SND.colibri,
 init() {
-if (this.ctx) { SFX.unlock(); this.active = true; this.setMute(!this.on); return; }
+if (this.ctx) { SFX.unlock(); this.active = true; this.link(true); this.setMute(!this.on); return; }
 const ctx = SFX.ensure(); if (!ctx) return;
-this.ctx = ctx; this.active = true;
+this.ctx = ctx; this.active = true; this.linked = true;
+// pestaña oculta: requestAnimationFrame se detiene y el motor sonaría fijo en segundo plano
+document.addEventListener('visibilitychange', () => { if (!this.master || !this.active) return; if (document.hidden) { const t = this.ctx.currentTime; this.master.gain.setTargetAtTime(0, t, 0.05); this.alertOut.gain.setTargetAtTime(0, t, 0.05); } else this.setMute(!this.on); });
 const G = (v, to) => { const g = ctx.createGain(); g.gain.value = v; if (to) g.connect(to); return g; };
 const F = (type, f, q, to) => { const b = ctx.createBiquadFilter(); b.type = type; b.frequency.value = f; if (q != null) b.Q.value = q; if (to) b.connect(to); return b; };
 const loop = (buf, to) => { const s = ctx.createBufferSource(); s.buffer = buf; s.loop = true; s.connect(to); s.start(); return s; };
@@ -8999,7 +9034,9 @@ case 'click': this.noise(0.03, { f: 3500, q: 2, vol: 0.05 }); break;
 beep(freq, dur, type, vol) { if (!this.ctx || !this.on) return; this.osc(freq, dur, { type: type || 'square', vol: vol || 0.06, out: this.alertOut, a: 0.01 }); },
 ping() { if (!this.ctx) return; this.osc(660, 0.35, { f2: 990, glide: 0.5, vol: 0.08, out: this.alertOut, a: 0.02 }); },
 thud() { if (!this.ctx) return; this.noise(0.9, { brown: true, type: 'lowpass', f: 160, vol: 0.8, peak: 0.01, out: this.master }); this.event('clang'); },
-stop() { this.active = false; if (this.master) this.setMute(!this.on); Voice.stop(); },
+stop() { this.active = false; if (this.master) { this.setMute(!this.on); clearTimeout(this._unl); this._unl = setTimeout(() => { if (!this.active) this.link(false); }, 500); } Voice.stop(); },
+// fuera del vuelo, el motor sintetizado se desconecta de la mezcla para que el navegador deje de procesarlo
+link(v) { if (!this.master || v === this.linked) return; this.linked = v; const fn = v ? 'connect' : 'disconnect'; try { this.master[fn](SFX.bus.spacecraft); this.alertOut[fn](SFX.bus.alerts); } catch (e) { } },
 };
 // voz de la computadora de a bordo (síntesis de voz del navegador, solo si hay una voz en español instalada en el dispositivo:
 // las voces en línea enviarían el texto a un servicio externo, así que no se usan)
@@ -9522,7 +9559,9 @@ const FlightGame = {
 data: null, sess: null, scan: null, flashT: 0,
 load() {
 const d = { v: 1, scans: {}, ach: {}, best: {}, stats: { flights: 0, time: 0, dist: 0, maxV: 0, landings: 0, orbits: 0, points: 0 }, tut: false, voice: true };
-try { const s = JSON.parse(localStorage.getItem(FG_KEY) || 'null'); if (s && s.v === 1) { for (const k of ['scans', 'ach', 'best']) if (s[k] && typeof s[k] === 'object') d[k] = s[k]; if (s.stats) for (const k in d.stats) if (typeof s.stats[k] === 'number' && isFinite(s.stats[k])) d.stats[k] = s.stats[k]; d.tut = !!s.tut; d.voice = s.voice !== false; } } catch (e) { }
+try { const s = JSON.parse(localStorage.getItem(FG_KEY) || 'null'); if (s && s.v === 1) { for (const k of ['scans', 'ach', 'best']) if (s[k] && typeof s[k] === 'object' && !Array.isArray(s[k])) d[k] = s[k];
+for (const id of Object.keys(d.scans)) if (!d.scans[id] || typeof d.scans[id] !== 'object') delete d.scans[id];
+for (const id of Object.keys(d.best)) { const b = d.best[id]; if (!b || !Object.prototype.hasOwnProperty.call(MEDALS, b.m) || !isFinite(b.t)) delete d.best[id]; } if (s.stats) for (const k in d.stats) if (typeof s.stats[k] === 'number' && isFinite(s.stats[k])) d.stats[k] = s.stats[k]; d.tut = !!s.tut; d.voice = s.voice !== false; } } catch (e) { }
 this.data = d; Voice.on = d.voice;
 },
 save() { try { localStorage.setItem(FG_KEY, JSON.stringify(this.data)); } catch (e) { } this._saveT = performance.now(); },
@@ -9775,7 +9814,7 @@ const ch = t.closest('[data-ch]'); if (ch) this.startChallenge(ch.dataset.ch);
 if (t.closest('[data-log-reset]')) this.resetAll();
 const lo = t.closest('[data-log]'); if (lo) this.openLog(lo.dataset.log);
 });
-addEventListener('keydown', e => { if (e.key === 'Escape' && $('#fl-log') && $('#fl-log').classList.contains('on')) { e.stopImmediatePropagation(); e.preventDefault(); this.closeLog(); } }, true);
+addEventListener('keydown', e => { if (e.key === 'Escape' && $('#fl-log') && $('#fl-log').classList.contains('on') && !$('#confirm').classList.contains('open')) { e.stopImmediatePropagation(); e.preventDefault(); this.closeLog(); } }, true);
 },
 };
 const ACH_ICON = '<svg viewBox="0 0 24 24" width="22" height="22"><path d="M12 2l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 15.6 6.6 18.5l1.2-6-4.5-4.2 6.1-.7z" fill="currentColor"/></svg>';
@@ -9938,20 +9977,20 @@ const nk = Keys.norm(e); (this.keyOf = this.keyOf || {})[e.code] = nk; this.keys
 addEventListener('keyup', e => { this.keys.delete(Keys.norm(e)); if (this.keyOf && this.keyOf[e.code]) this.keys.delete(this.keyOf[e.code]); });
 addEventListener('blur', () => this.keys.clear());
 cv.addEventListener('pointerdown', e => {
-if (!this.on) return;
+if (!this.on || this.drag) return;                                       // solo cuenta el primer dedo
 cv.setPointerCapture(e.pointerId);
-this.drag = { x: e.clientX, y: e.clientY, moved: 0 };
+this.drag = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: 0 };
 if (CAMS[this.camIdx][0] !== 'free' && this.state === 'fly' && e.button === 0) this.stick = { x0: e.clientX, y0: e.clientY, x: 0, y: 0 };
 });
 cv.addEventListener('pointermove', e => {
-if (!this.on || !this.drag) return;
+if (!this.on || !this.drag || e.pointerId !== this.drag.id) return;
 const dx = e.clientX - this.drag.x, dy = e.clientY - this.drag.y;
 this.drag.x = e.clientX; this.drag.y = e.clientY; this.drag.moved += Math.abs(dx) + Math.abs(dy);
 if (this.stick) { this.stick.x = clamp((e.clientX - this.stick.x0) / 140, -1, 1); this.stick.y = clamp((e.clientY - this.stick.y0) / 140, -1, 1); }
 else { this.free.az -= dx * 0.006; this.free.el = clamp(this.free.el + dy * 0.006, -1.5, 1.5); }
 });
 const up = e => {
-if (!this.drag) return;
+if (!this.drag || e.pointerId !== this.drag.id) return;
 if (this.on && this.drag.moved < 5) { const r = cv.getBoundingClientRect(); const rb = World.pick(e.clientX - r.left, e.clientY - r.top); if (rb && this.state === 'fly') this.setTarget(rb); }
 this.drag = null; this.stick = null;
 };
@@ -10195,7 +10234,7 @@ if (this.intercept) {
 const ds = this.safeDist(T), sp = Math.min(sh.maxSpeed * 0.97, Math.sqrt(2 * aPlan * Math.max(d - ds, 0)));
 vdes = V.scale(rh, sp);
 if (d < ds * 1.3 && V.len(vr) < Math.max(0.005, sp * 0.2 + 0.002)) { this.intercept = false; this.hold = { t: T, d: Math.max(d, ds) }; this.arrived = T; }
-} else if (this.hold) vdes = V.scale(rh, clamp((d - this.hold.d) * 0.05, -sh.maxSpeed * 0.2, sh.maxSpeed * 0.2));
+} else if (this.hold) vdes = V.scale(rh, clamp((d - this.hold.d) * Math.min(0.05, 0.5 / Math.max(h, 1e-6)), -sh.maxSpeed * 0.2, sh.maxSpeed * 0.2));   // con subpasos de ~60 s la ganancia fija oscilaba
 const D = V.sub(vdes, vr);
 const a = V.scale(this.thrustToward(D, h), Math.max(this.apR || 0, 0.05));
 acc = V.add(acc, a);
@@ -10209,7 +10248,7 @@ if (lm > 1e-7) acc = V.add(acc, V.scale(lat, -Math.min(main * 0.25, h > 0 ? lm /
 }
 this.braking = false;
 if (this.autoBrake) {
-for (const rb of [this.target, ref].filter(Boolean)) {
+for (const rb of (this.target && ref && this.target !== ref ? [this.target, ref] : [this.target || ref]).filter(Boolean)) {
 const r = V.sub(this.bodyAt(rb, f0), this.pos), d = V.len(r), rh = V.scale(r, 1 / Math.max(d, 1e-9));
 const clos = V.dot(V.sub(this.vel, rb.vel), rh), free = d - rb.R - this.safeDist(rb) * 0.5;
 const a = main * 0.9;
@@ -10643,7 +10682,8 @@ else this.toggle(a);
 $('#gl').focus({ preventScroll: true });
 }));
 document.querySelectorAll('[data-hold]').forEach(b => {
-const k = b.dataset.hold === 'Space' ? Keys.code('flight', 'brake') : b.dataset.hold, on = e => { e.preventDefault(); this.keys.add(k); }, off = () => this.keys.delete(k);
+const brake = b.dataset.hold === 'Space', k = brake ? Keys.code('flight', 'brake') : b.dataset.hold, off = () => this.keys.delete(k);
+const on = e => { e.preventDefault(); this.keys.add(k); if (brake && this.thrCmd > 0) this.setThrottle(0, 'quiet'); addEventListener('pointerup', off, { once: true }); addEventListener('pointercancel', off, { once: true }); };
 b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointerleave', off); b.addEventListener('pointercancel', off);
 });
 },

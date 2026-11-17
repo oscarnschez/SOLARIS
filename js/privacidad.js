@@ -25,6 +25,7 @@ var PURPOSES = {
 };
 var METODOS = { panel: 'Panel de privacidad', ficha: 'Botón en la ficha de un objeto', comparador: 'Botón del comparador', visor: 'Visor de fotografías', borrado: 'Borrado de datos' };
 
+function own(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }   // clave propia, no heredada (un historial alterado con «constructor» o «__proto__» no rompe el panel)
 function ls() { try { return window.localStorage; } catch (e) { return null; } }
 function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 function blank() { return { v: VER, ext: { wikimedia: false }, hist: [] }; }
@@ -35,7 +36,7 @@ function read() {
     var o = JSON.parse(s.getItem(KEY) || 'null');
     if (o && o.v === VER) {
       if (o.ext && typeof o.ext === 'object') for (var k in d.ext) d.ext[k] = o.ext[k] === true;
-      if (Array.isArray(o.hist)) d.hist = o.hist.filter(function (h) { return h && typeof h === 'object' && PURPOSES[h.fin]; }).slice(-MAX_HIST);
+      if (Array.isArray(o.hist)) d.hist = o.hist.filter(function (h) { return h && typeof h === 'object' && own(PURPOSES, h.fin); }).slice(-MAX_HIST);
     }
   } catch (e) { }
   return d;
@@ -53,7 +54,7 @@ var P = {
   allows: function (fin) { return read().ext[fin] === true; },
   // decisión del usuario: activa o retira un permiso y deja constancia solo en este navegador
   set: function (fin, ok, metodo) {
-    if (!PURPOSES[fin]) return false;
+    if (!own(PURPOSES, fin)) return false;
     var d = read(), t = now();
     if (d.ext[fin] === !!ok) return true;
     d.ext[fin] = !!ok;
@@ -125,7 +126,7 @@ var P = {
         clearTimeout(b._t); b._t = setTimeout(function () { b.dataset.armed = ''; b.textContent = b.dataset.txt; }, 5000);
         return;
       }
-      clearTimeout(b._t);
+      clearTimeout(b._t); b.dataset.armed = ''; b.textContent = b.dataset.txt;   // en las páginas legales el botón sigue en pantalla: vuelve a pedir confirmación
       P.wipe(b.dataset.pvWipe === '*' ? STORE.map(function (s) { return s.key; }) : [b.dataset.pvWipe]);
     });
     w.addEventListener('change', function (e) { if (e.target.id === 'pv-wiki') P.set('wikimedia', e.target.checked, 'panel'); });
