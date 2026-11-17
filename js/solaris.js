@@ -1339,7 +1339,7 @@ return true;
 },
 };
 const ASSET_MANIFEST = {"music": {"webm": "assets/audio/metamorphosis.webm", "mp3": "assets/audio/metamorphosis.mp3"}, "bodyMeshes": {"fobos": {"url": "assets/models/moons/fobos.bin", "k": 1.26255}, "deimos": {"url": "assets/models/moons/deimos.bin", "k": 1.37497}, "haumea": {"url": "assets/models/dwarfs/haumea.bin", "k": 1.44255}}};
-const SOLARIS_BUILD = '2026.10.14-2122-web';
+const SOLARIS_BUILD = '2026.11.17-0822-web';
 console.info('SOLARIS · versión ' + SOLARIS_BUILD);
 const Assets = {
 cache: new Map(), busyN: new Map(),
@@ -6996,8 +6996,9 @@ h.classList.toggle('hc', A.contrast);
 h.classList.remove('ts-small', 'ts-large'); if (A.text !== 'normal') h.classList.add('ts-' + A.text);
 h.style.setProperty('--uiz', I.uiScale);
 const a = I.panelOpacity;
-h.style.setProperty('--glass', `rgba(10, 15, 27, ${a})`);
-h.style.setProperty('--glass-2', `rgba(12, 18, 32, ${Math.min(0.97, a + 0.24)})`);
+// vidrio grafito: la opacidad elegida (0.3–0.95, 0.6 por defecto) se traduce en un velo más ligero, porque el desenfoque ya da lectura
+h.style.setProperty('--glass', `rgba(56, 59, 66, ${(0.22 + a * 0.55).toFixed(3)})`);
+h.style.setProperty('--glass-2', `rgba(40, 42, 48, ${Math.min(0.96, 0.5 + a * 0.5).toFixed(3)})`);
 const app = document.getElementById('app');
 if (app) { app.classList.toggle('hud-reduced', I.hud === 'reduced'); app.classList.toggle('hud-min', I.hud === 'minimal'); }
 },
