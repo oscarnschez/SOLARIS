@@ -1691,3 +1691,15 @@ backdrop-filter: blur(26px) saturate(1.5); -webkit-backdrop-filter: blur(26px) s
 #app.ready .intro-inner .loader { max-height: 0; margin-top: 0; }
 #app.failed .intro-inner .loader { max-height: 48px; margin-top: 22px; }
 @media (prefers-reduced-motion: reduce) { #app.sp-landed .intro-inner::before { animation: none; } .intro-inner .loader { transition: none; } }
+/* paneles cerrados (ficha, secciones, recorrido, bandeja de comparación): ocultos del todo al terminar el fundido, fuera del orden de tabulación y sin desenfoque */
+#drawer, #info, #tourbar, #cmp-tray { transition: opacity .45s ease, transform .45s ease, visibility 0s linear 0s; }
+#drawer:not(.open), #info:not(.open), #tourbar:not(.on), #cmp-tray:not(.on) { visibility: hidden; transition: opacity .45s ease, transform .45s ease, visibility 0s linear .45s; }
+/* iPhone: vh es la ventana grande de Safari; dvh, la visible. Las ventanas ya no quedan más altas que la pantalla */
+@supports (height: 100dvh) {
+.set-card { height: min(720px, calc(100dvh - 32px)); }
+.guide-card { max-height: min(88dvh, 900px); }
+.tours-card { max-height: min(90dvh, 900px); }
+.about-card { max-height: min(94dvh, 920px); }
+.help-card { max-height: calc(100dvh - 20px); }
+@media (max-width: 760px) { .set-card { height: calc(100dvh - 20px); } .guide-card { max-height: 92dvh; } }
+}
