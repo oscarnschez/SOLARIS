@@ -1647,3 +1647,47 @@ backdrop-filter: blur(var(--blur-3)) saturate(1.6); -webkit-backdrop-filter: blu
 #cmp-tray .cta { white-space: nowrap; flex: none; border-radius: 999px; }
 #cmp-tray > span:not(.ct-dots) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 760px) { #cmp-tray { top: calc(var(--top) + 108px); width: calc(100% - 16px); max-width: none; } }
+/* =====================================================================================================
+   Glassmorphism · Parte 3: portada, créditos y modo de vuelo
+   ===================================================================================================== */
+/* portada: el bloque de bienvenida es una gran lámina de vidrio; el Sistema Solar se ve desenfocado detrás */
+#intro { background: radial-gradient(90% 80% at 0% 100%, rgba(var(--ink), .5) 0%, transparent 70%); }
+.intro-inner { position: relative; isolation: isolate; max-width: 740px; padding: 34px 40px 28px; }
+.intro-inner::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: 34px; pointer-events: none;
+background: var(--glass-grain), linear-gradient(160deg, rgba(255, 255, 255, .1) 0%, rgba(255, 255, 255, .025) 30%, rgba(255, 255, 255, 0) 55%), rgba(46, 48, 55, .36);
+border: 1px solid var(--line-2); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .18), 0 60px 130px -46px rgba(0, 0, 0, .95);
+backdrop-filter: blur(26px) saturate(1.5); -webkit-backdrop-filter: blur(26px) saturate(1.5); }
+#app.sp-landed .intro-inner::before { animation: intro-glass .9s cubic-bezier(.16, 1, .3, 1) .35s backwards; }
+@keyframes intro-glass { from { opacity: 0; transform: translateY(14px) scale(.985); } }
+.intro-logo img { width: clamp(260px, 40vw, 640px); }
+.intro-tele { text-shadow: none; }
+.intro-mini, .intro-about, .intro-music { background: var(--glass-grain), var(--glass-sheen), var(--glass); border: 1px solid var(--line); box-shadow: var(--glass-shadow); backdrop-filter: var(--glass-filter); -webkit-backdrop-filter: var(--glass-filter); transition: border-color .2s, color .2s, background .2s; }
+.intro-mini { height: 36px; border-radius: 12px; padding: 0 13px; }
+.intro-mini:hover, .intro-about:hover, .intro-music:hover { border-color: var(--line-2); color: var(--text); background: var(--glass-grain), linear-gradient(180deg, rgba(255, 255, 255, .12), rgba(255, 255, 255, .04)), var(--glass); }
+.intro-about { border-radius: 16px; }
+@media (max-width: 760px) {
+.intro-inner { max-width: none; padding: 22px 20px 18px; }
+.intro-inner::before { border-radius: 26px; }
+.intro-logo img { width: min(100%, 420px); }
+}
+/* créditos: lámina de vidrio sobre el espacio, menos oscurecido para que el vidrio tenga qué esmerilar */
+.cr-bg { background: radial-gradient(90% 60% at 50% 0%, rgba(242, 200, 121, .07), transparent 60%), radial-gradient(70% 50% at 100% 100%, rgba(143, 195, 255, .06), transparent 70%), rgba(var(--ink), .55); backdrop-filter: blur(14px) saturate(1.2); -webkit-backdrop-filter: blur(14px) saturate(1.2); }
+.cr-panel { border-radius: 30px; border-color: var(--line-2); background: var(--glass-grain), var(--glass-sheen), rgba(46, 48, 55, .5); box-shadow: var(--glass-shadow), 0 50px 120px -40px rgba(0, 0, 0, .9); backdrop-filter: blur(var(--blur-3)) saturate(1.5); -webkit-backdrop-filter: blur(var(--blur-3)) saturate(1.5); }
+.cr-index a, .cr-back { background: var(--glass-grain), var(--glass-sheen), var(--glass); border-color: var(--line); box-shadow: var(--glass-shadow); backdrop-filter: var(--glass-filter); -webkit-backdrop-filter: var(--glass-filter); }
+.cr-index a { border-radius: 12px; padding: 7px 13px; }
+.cr-back { border-radius: 16px; }
+.cr-asset, .cr-card, .cr-chips li, .cr-format { background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, .02)); border: 1px solid var(--line); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07); }
+.cr-asset, .cr-card, .cr-format { border-radius: 18px; }
+.cr-chips li { border-radius: 11px; }
+.cr-contact { border-radius: 18px; background: linear-gradient(180deg, rgba(242, 200, 121, .12), rgba(242, 200, 121, .03)); box-shadow: inset 0 1px 0 rgba(255, 236, 190, .14); }
+/* modo de vuelo (la cabina 2D conserva su propio acabado metálico) */
+.hg-panel, .hg-info, .fp-card, #fl-bar, #fl-targets, .fl-card, .lg-card, .ms-card, .fr-card, #mx-hud { background: var(--glass-grain), var(--glass-sheen), var(--glass-2); box-shadow: var(--glass-shadow), 0 40px 100px -34px rgba(0, 0, 0, .9); backdrop-filter: blur(var(--blur-3)) saturate(1.5); -webkit-backdrop-filter: blur(var(--blur-3)) saturate(1.5); }
+.hg-panel, .hg-info, .fp-card, .lg-card { border-color: var(--line-2); }
+.hg-panel, .hg-info, .fp-card, .lg-card, .ms-card, .fr-card { border-radius: 28px; }
+#fl-bar, #fl-targets { border-radius: 22px; }
+#app:not(.fl-cockpit) .hud-col, #app:not(.fl-cockpit) #hud-thr { background: var(--glass-grain), var(--glass-sheen), rgba(20, 22, 26, .7); border-color: var(--line); box-shadow: var(--glass-shadow); backdrop-filter: blur(var(--blur-2)) saturate(1.4); -webkit-backdrop-filter: blur(var(--blur-2)) saturate(1.4); border-radius: 22px; }
+/* la barra de carga se pliega al terminar, para que la lámina de la portada no deje un hueco vacío abajo */
+.intro-inner .loader { max-height: 48px; overflow: hidden; transition: opacity .6s, max-height .6s ease .35s, margin-top .6s ease .35s; }
+#app.ready .intro-inner .loader { max-height: 0; margin-top: 0; }
+#app.failed .intro-inner .loader { max-height: 48px; margin-top: 22px; }
+@media (prefers-reduced-motion: reduce) { #app.sp-landed .intro-inner::before { animation: none; } .intro-inner .loader { transition: none; } }

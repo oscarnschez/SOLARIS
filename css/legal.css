@@ -119,3 +119,39 @@ dl.lg-facts dt:nth-last-of-type(1), dl.lg-facts dd:last-of-type { border-bottom:
   .lg-doc p, .lg-doc li, .lg-doc b, .lg-hero h1, .lg-doc h2, .lg-doc h3, dl.lg-facts dd, .lg-table td { color: #000 !important; }
   a { color: #000; }
 }
+/* ===== Glassmorphism: misma lámina de vidrio grafito que el simulador, sobre luz ambiental suave (solo en pantalla) ===== */
+@media screen {
+  :root {
+    --line: rgba(214, 220, 232, .14); --line-2: rgba(214, 220, 232, .26);
+    --text: #f2f3f6; --text-2: #dde0e6; --text-3: #c8ccd4; --muted: #aeb3bd; --dim: #8d939e;
+    --g-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.09'/%3E%3C/svg%3E");
+    --g-sheen: linear-gradient(165deg, rgba(255, 255, 255, .09) 0%, rgba(255, 255, 255, .025) 32%, rgba(255, 255, 255, 0) 58%);
+    --g-bg: rgba(46, 48, 55, .42); --g-bg-2: rgba(40, 42, 48, .7);
+    --g-shadow: inset 0 1px 0 rgba(255, 255, 255, .16), 0 30px 70px -30px rgba(0, 0, 0, .85);
+    --g-filter: blur(24px) saturate(1.5);
+    --g-tile: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, .02));
+  }
+  body { background-color: #07080a;
+    background-image: radial-gradient(42% 38% at 88% 6%, rgba(242, 200, 121, .2), transparent 70%), radial-gradient(36% 34% at 6% 62%, rgba(120, 160, 255, .12), transparent 72%), radial-gradient(30% 26% at 70% 96%, rgba(190, 140, 255, .08), transparent 72%); }
+  code { background: rgba(214, 220, 232, .08); }
+  .lg-top { background: var(--g-grain), rgba(30, 32, 37, .55); border-bottom-color: var(--line); box-shadow: inset 0 -1px 0 rgba(255, 255, 255, .03), 0 12px 30px -20px rgba(0, 0, 0, .8); backdrop-filter: var(--g-filter); -webkit-backdrop-filter: var(--g-filter); }
+  .lg-back { border-radius: 14px; background: var(--g-grain), var(--g-sheen), var(--g-bg); box-shadow: var(--g-shadow); backdrop-filter: var(--g-filter); -webkit-backdrop-filter: var(--g-filter); }
+  .lg-meta li { background: var(--g-grain), var(--g-bg); border-color: var(--line); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+  .lg-summary, .lg-toc { border-radius: 22px; border-color: var(--line-2); background: var(--g-grain), var(--g-sheen), var(--g-bg); box-shadow: var(--g-shadow); backdrop-filter: var(--g-filter); -webkit-backdrop-filter: var(--g-filter); }
+  .lg-toc a { border-radius: 10px; }
+  .lg-toc a:hover, .lg-toc a[aria-current="true"] { color: #fff; background: linear-gradient(180deg, rgba(255, 255, 255, .14), rgba(255, 255, 255, .05)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .18); }
+  .lg-draft { border-radius: 18px; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+  .lg-doc { padding: 6px 34px; border-radius: 28px; border: 1px solid var(--line-2); background: var(--g-grain), var(--g-sheen), var(--g-bg-2); box-shadow: var(--g-shadow); backdrop-filter: var(--g-filter); -webkit-backdrop-filter: var(--g-filter); }
+  .lg-doc > section:first-child { padding-top: 26px; }
+  dl.lg-facts { border-radius: 16px; background: var(--g-tile); }
+  dl.lg-facts dt { background: rgba(255, 255, 255, .03); }
+  .lg-table thead th { background: rgba(255, 255, 255, .04); }
+  .lg-btn { border-radius: 14px; background: linear-gradient(180deg, #f8daa0, #ecbd66); border-color: transparent; color: #17130a; font-weight: 500; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .55), 0 10px 26px -10px rgba(242, 200, 121, .55); }
+  .lg-btn:hover { background: linear-gradient(180deg, #fbe0aa, #efc270); }
+  .lg-link { text-decoration-color: rgba(214, 220, 232, .4); }
+  @media (max-width: 640px) {
+    .lg-doc { padding: 4px 18px; border-radius: 22px; }
+    .lg-table tr { border-radius: 14px; background: var(--g-tile); }
+  }
+  @media (prefers-reduced-transparency: reduce) { .lg-doc, .lg-summary, .lg-toc, .lg-top { background: rgb(34, 35, 40); } }
+}
