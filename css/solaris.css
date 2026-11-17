@@ -247,7 +247,7 @@ kbd { font-family: var(--mono); font-size: 11.5px; border: 1px solid var(--line-
 .lg-wrap { position: relative; display: inline-block; margin-left: -1.4%; }
 .lg-wrap img { opacity: 0; }
 .lg-anim { position: absolute; inset: 0; filter: drop-shadow(0 0 24px rgba(var(--ink), .6)); }
-.lg-l { position: absolute; top: 0; bottom: 0; background-image: url(../assets/images/logo-solaris.png); background-repeat: no-repeat; animation: lg-in 1.1s cubic-bezier(.16, 1, .3, 1) both; animation-delay: calc(var(--i) * 85ms + 350ms); }
+.lg-l { position: absolute; top: 0; bottom: 0; background-image: url(../assets/images/logo-solaris.webp); background-repeat: no-repeat; animation: lg-in 1.1s cubic-bezier(.16, 1, .3, 1) both; animation-delay: calc(var(--i) * 85ms + 350ms); }
 @keyframes lg-in { from { opacity: 0; transform: translateY(26%) scale(.96); } }   /* solo opacity/transform: corre en el compositor aunque el JS esté cargando */
 .lg-l.lg-sun { z-index: 1; transform-origin: 49.6% 50.3%; animation: lg-sun 1.8s cubic-bezier(.16, 1, .3, 1) .15s both; }
 @keyframes lg-sun { 0% { opacity: 0; transform: scale(.3); } 40% { opacity: 1; } 100% { transform: none; } }
@@ -471,7 +471,7 @@ background: radial-gradient(ellipse 55% 38% at 50% 100%, rgba(var(--ec), calc(va
 #hg-stats .bar { margin-top: 3px; }
 .hg-opts { flex-direction: row; align-items: flex-end; gap: 10px; margin-bottom: 10px; } .hg-opts > * { flex: 1; min-width: 0; } .hg-opts select { height: 34px; }
 .hg-info { width: 420px; }
-#hg-brand img { width: 82%; margin: 0 auto; }
+#hg-brand img { margin: 0 auto; }
 #hg-credit { font-size: 12px; margin: 0 0 10px; line-height: 1.4; }
 #hg-brand { margin-top: 12px; padding-top: 10px; }
 }
@@ -1132,22 +1132,13 @@ border: 1px solid rgba(160, 200, 225, .28); background: rgba(6, 10, 14, .48); ba
 .hud-col dd, .thr-head b, .fb-warp, .tl-ind b, .gx-clocks b, .mx-row b, .cc-step, .sp-row span, .pl-grid b,
 .mix-row output, .set-range output, .tl-j, .tl-ticks, .tl-card time, #h-warp { font-family: var(--mono); letter-spacing: -.01em; }
 .tl-ind b, .gx-clocks b, .mx-row b, .thr-head b { font-weight: 400; }
-/* Detalles HUD: esquinas tipo corchete en los paneles, retícula que se engancha al seleccionar y barrido al abrir la ficha */
-#info::after, #drawer::after, #tourbar::after { content: ""; position: absolute; inset: 7px; z-index: 3; pointer-events: none; opacity: 0; transform: scale(1.025); transition: opacity .5s ease .12s, transform .7s cubic-bezier(.16, 1, .3, 1) .12s;
---hc: rgba(242, 200, 121, .5); --hl: 12px;
-background: linear-gradient(var(--hc), var(--hc)) 0 0 / var(--hl) 1px, linear-gradient(var(--hc), var(--hc)) 0 0 / 1px var(--hl),
-linear-gradient(var(--hc), var(--hc)) 100% 0 / var(--hl) 1px, linear-gradient(var(--hc), var(--hc)) 100% 0 / 1px var(--hl),
-linear-gradient(var(--hc), var(--hc)) 0 100% / var(--hl) 1px, linear-gradient(var(--hc), var(--hc)) 0 100% / 1px var(--hl),
-linear-gradient(var(--hc), var(--hc)) 100% 100% / var(--hl) 1px, linear-gradient(var(--hc), var(--hc)) 100% 100% / 1px var(--hl);
-background-repeat: no-repeat; }
-#info.open::after, #drawer.open::after, #tourbar.on::after { opacity: 1; transform: none; }
+/* Detalles HUD: retícula que se engancha al seleccionar y barrido al abrir la ficha */
 #info::before { content: ""; position: absolute; left: 0; right: 0; top: -90px; height: 90px; z-index: 3; pointer-events: none; opacity: 0;
 background: linear-gradient(180deg, transparent, rgba(143, 195, 255, .06) 70%, rgba(143, 195, 255, .32) 98%, rgba(200, 225, 255, .6) 100%); }
 #info.scan::before { animation: hud-scan 1.1s cubic-bezier(.4, 0, .2, 1); }
 @keyframes hud-scan { 0% { top: -90px; opacity: 1; } 80% { opacity: 1; } 100% { top: 100%; opacity: 0; } }
 #reticle.lock { animation: ret-lock .6s cubic-bezier(.16, 1, .3, 1); }
 @keyframes ret-lock { from { scale: 1.9; rotate: 90deg; opacity: 0; } }
-html.hc #info::after, html.hc #drawer::after, html.hc #tourbar::after { --hc: rgba(255, 210, 122, .9); }
 /* Barra superior: logo y buscador a la izquierda, modos al centro, Pilotar y "Más opciones" (ajustes, música, ayuda) a la derecha */
 @media (min-width: 1101px) { #search { margin: 0; } #modes { margin: 0 auto; } }
 .more-wrap { position: relative; flex: none; }
@@ -1187,7 +1178,7 @@ html.hc #more-menu { background: rgba(var(--ink), .96); }
 .sp-glow { position: absolute; inset: -22%; border-radius: 50%; background: radial-gradient(circle, rgba(255, 222, 160, .34) 0, rgba(255, 176, 70, .15) 19%, rgba(255, 150, 50, .05) 34%, transparent 52%); animation: sp-glow-in 1.6s ease-out .2s backwards, sp-breathe 5s ease-in-out 1.8s infinite alternate; transition: opacity .6s, transform .6s; }
 .sp-rays { position: absolute; left: 14%; top: 14%; width: 72%; aspect-ratio: 1; border-radius: 50%; opacity: .55; background: repeating-conic-gradient(from 0deg, rgba(255, 206, 130, .16) 0deg 3deg, transparent 3deg 14deg); -webkit-mask-image: radial-gradient(circle, transparent 44%, #000 50%, transparent 72%); mask-image: radial-gradient(circle, transparent 44%, #000 50%, transparent 72%); animation: sp-fade-in 1.4s ease-out 1s backwards, sp-spin 90s linear infinite; transition: opacity .5s; }
 .sp-sunwrap { position: absolute; left: 33%; top: 33%; width: 34%; aspect-ratio: 1; transform-origin: 50% 50%; will-change: transform; }
-.sp-sun { position: absolute; inset: 0; border-radius: 50%; background: url(../assets/images/logo-solaris.png) no-repeat 16.598% 54.5% / 392.857% 107.143%; animation: sp-ignite 1.7s cubic-bezier(.16, 1, .3, 1) .25s backwards; transition: filter .45s ease, opacity .3s ease; }
+.sp-sun { position: absolute; inset: 0; border-radius: 50%; background: url(../assets/images/logo-solaris.webp) no-repeat 16.598% 54.5% / 392.857% 107.143%; animation: sp-ignite 1.7s cubic-bezier(.16, 1, .3, 1) .25s backwards; transition: filter .45s ease, opacity .3s ease; }
 .sp-core { position: absolute; left: 50%; top: 50%; width: 30%; aspect-ratio: 1; margin: -15% 0 0 -15%; border-radius: 50%; background: radial-gradient(circle, #fff 0, rgba(255, 244, 220, .95) 22%, rgba(255, 200, 120, .45) 45%, transparent 70%); opacity: 0; animation: sp-flash 1.5s cubic-bezier(.2, .7, .2, 1) .05s; pointer-events: none; }
 .sp-orbits { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; transition: opacity .5s ease-in, transform .55s cubic-bezier(.6, 0, .9, .4); }
 .sp-orb, .sp-track, .sp-prog { fill: none; vector-effect: non-scaling-stroke; }
@@ -1504,7 +1495,7 @@ button.ph-frame:hover, button.ph-frame:focus-visible { border-color: rgba(242, 2
 .tool.on, .icon-btn.on, .rail-btn.on { color: var(--sun); background: linear-gradient(180deg, rgba(242, 200, 121, .2), rgba(242, 200, 121, .08)); box-shadow: inset 0 1px 0 rgba(255, 236, 190, .2), inset 0 0 0 1px rgba(242, 200, 121, .2); }
 .txt-btn { border-radius: 12px; }
 /* barra superior */
-#top { gap: 10px; }
+@media (min-width: 761px) { #top { gap: 10px; } }   /* en móvil se mantiene la separación compacta de 6 px */
 .brand { height: 46px; border-radius: 14px; }
 .brand:hover { background: var(--hover); }
 #search { height: 46px; border-radius: 16px; padding: 0 8px 0 14px; transition: border-color .2s, box-shadow .25s; }
@@ -1597,7 +1588,6 @@ backdrop-filter: blur(var(--blur-3)) saturate(1.6); -webkit-backdrop-filter: blu
 .about-card { background: var(--glass-grain), radial-gradient(120% 60% at 50% 0%, rgba(242, 200, 121, .08), transparent 60%), var(--glass-sheen), var(--glass-2); }
 /* paneles laterales (ficha y secciones): sin corchetes de esquina, solo el borde de luz del vidrio */
 .panel { border-radius: 24px; }
-#info::after, #drawer::after, #tourbar::after { display: none; }
 #info::before { background: linear-gradient(180deg, transparent, rgba(255, 255, 255, .03) 70%, rgba(255, 255, 255, .16) 98%, rgba(255, 255, 255, .32) 100%); }
 .panel-head { padding: 16px 12px 8px 22px; }
 .panel-body { padding: 4px 22px 24px; }
@@ -1607,7 +1597,8 @@ backdrop-filter: blur(var(--blur-3)) saturate(1.6); -webkit-backdrop-filter: blu
 .set-top, .set-foot { background: rgba(255, 255, 255, .025); }
 .set-top { padding: 16px 18px 14px 24px; }
 .set-foot { padding: 14px 18px; }
-.set-nav { padding: 14px 10px; border-right-color: var(--line); background: rgba(var(--ink), .12); }
+.set-nav { border-right-color: var(--line); background: rgba(var(--ink), .12); }
+@media (min-width: 761px) { .set-nav { padding: 14px 10px; } }   /* en móvil la tira de pestañas conserva su relleno compacto */
 .set-nav button { border-radius: 12px; padding: 10px 12px; transition: color .2s, background .2s, box-shadow .2s; }
 .set-nav button:hover { background: var(--hover); }
 .set-nav button.on { color: #fff; background: linear-gradient(180deg, rgba(255, 255, 255, .16), rgba(255, 255, 255, .05)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .22), 0 8px 18px -10px rgba(0, 0, 0, .9); }
@@ -1703,3 +1694,12 @@ backdrop-filter: blur(26px) saturate(1.5); -webkit-backdrop-filter: blur(26px) s
 .help-card { max-height: calc(100dvh - 20px); }
 @media (max-width: 760px) { .set-card { height: calc(100dvh - 20px); } .guide-card { max-height: 92dvh; } }
 }
+@media (max-width: 760px) { .cr-panel { border-radius: 22px; } }   /* la lámina de créditos con esquinas algo menores en móvil */
+/* reducir transparencia también alcanza a las láminas con color propio (portada, créditos, instrumentos de vuelo) */
+@media (prefers-reduced-transparency: reduce) {
+.intro-inner::before, .cr-panel { background: rgb(34, 35, 40); backdrop-filter: none; -webkit-backdrop-filter: none; }
+.cr-bg { background: rgba(var(--ink), .94); backdrop-filter: none; -webkit-backdrop-filter: none; }
+#app:not(.fl-cockpit) .hud-col, #app:not(.fl-cockpit) #hud-thr { background: rgb(22, 23, 27); backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
+/* botones de cierre dentro de una tarjeta que ya desenfoca: un segundo desenfoque solo difuminaba el relleno plano de la tarjeta */
+.ph-card .close-float, .guide-card .guide-x, .tours-card .guide-x, .about-card .guide-x { backdrop-filter: none; -webkit-backdrop-filter: none; }
